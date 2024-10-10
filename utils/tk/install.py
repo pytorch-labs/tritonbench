@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import torch
@@ -7,17 +8,24 @@ import torch
 CUDA_HOME = (
     "/usr/local/cuda" if not "CUDA_HOME" in os.environ else os.environ["CUDA_HOME"]
 )
-REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent.parent
+REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent
 TK_PATH = REPO_PATH.joinpath("submodules", "ThunderKittens")
 TK_PYUTILS_PATH = TK_PATH.joinpath("src", "common", "pyutils")
-TRITONBENCH_TK_PATH = REPO_PATH.joinpath("userbenchmark", "triton", "tk")
+TRITONBENCH_TK_PATH = REPO_PATH.joinpath("utils", "tk")
 TORCH_BASE_PATH = Path(torch.__file__).parent
+CONDA_PREFIX = os.environ.get("CONDA_PREFIX", None)
+PYTHON_VERSION = f"python{sys.version_info[0]}.{sys.version_info[1]}"
 
 COMPILER_FLAGS = [
     f"-I{str(TORCH_BASE_PATH.joinpath('include').resolve())}",
-    f"-I{str(TK_PATH.joinpath('examples', 'attn', 'h100').resolve())}",
+    f"-I{str(TORCH_BASE_PATH.joinpath('include', 'torch', 'csrc', 'api', 'include').resolve())}",
+    f"-I{str(TK_PATH.joinpath('kernels', 'attn', 'h100').resolve())}",
+    f"-I{str(TK_PATH.joinpath('include').resolve())}",
     f"-I{str(TK_PATH.resolve())}",
 ]
+# Include "Python.h" if conda exists
+if CONDA_PREFIX:
+    COMPILER_FLAGS.append(f"-I{CONDA_PREFIX}/include/{PYTHON_VERSION}")
 
 LINKER_FLAGS = [
     "--shared",

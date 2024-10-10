@@ -9,6 +9,9 @@ from utils.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from utils.python_utils import pip_install_requirements
 from utils.git_utils import checkout_submodules
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 REPO_PATH = Path(os.path.abspath(__file__)).parent
 FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
@@ -92,23 +95,24 @@ if __name__ == "__main__":
     # checkout submodules
     checkout_submodules(REPO_PATH)
     if args.fbgemm or args.all:
-        logging.info("[tritonbench] installing FBGEMM...")
+        logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
     if args.fa or args.all:
-        logging.info("[tritonbench] installing flash-attn and fa3...")
+        logger.info("[tritonbench] installing flash-attn and fa3...")
         install_fa()
     if args.cutlass or args.all:
-        logging.info("[tritonbench] installing cutlass-kernels...")
+        logger.info("[tritonbench] installing cutlass-kernels...")
         install_cutlass()
     if args.jax or args.all:
-        logging.info("[tritonbench] installing jax...")
+        logger.info("[tritonbench] installing jax...")
         install_jax()
     if args.tk or args.all:
-        logging.info("[tritonbench] installing thunderkittens...")
+        logger.info("[tritonbench] installing thunderkittens...")
         install_tk()
     if args.liger or args.all:
-        logging.info("[tritonbench] installing liger-kernels...")
+        logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
+    logger.info("[tritonbench] installation complete!")
     # Run tests to check installation
     if args.test:
         test_fbgemm()
