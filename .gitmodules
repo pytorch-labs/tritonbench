@@ -1,0 +1,18 @@
+[submodule "submodules/FBGEMM"]
+	path = submodules/FBGEMM
+	url = https://github.com/pytorch/FBGEMM
+[submodule "submodules/ThunderKittens"]
+	path = submodules/ThunderKittens
+	url = https://github.com/HazyResearch/ThunderKittens.git
+[submodule "submodules/cutlass-kernels"]
+	path = submodules/cutlass-kernels
+	url = https://github.com/ColfaxResearch/cutlass-kernels
+[submodule "submodules/flash-attention"]
+	path = submodules/flash-attention
+	url = https://github.com/Dao-AILab/flash-attention
+[submodule "submodules/generative-recommenders"]
+	path = submodules/generative-recommenders
+	url = https://github.com/facebookresearch/generative-recommenders.git
+[submodule "submodules/kernels"]
+	path = submodules/kernels
+	url = https://github.com/triton-lang/kernels
