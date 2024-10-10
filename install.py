@@ -109,6 +109,6 @@ if __name__ == "__main__":
     if args.liger or args.all:
         logging.info("[tritonbench] installing liger-kernels...")
         install_liger()
-    # Run tests of the installation
+    # Run tests to check installation
     if args.test:
         test_fbgemm()
