@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import subprocess
 import sys
@@ -6,8 +7,9 @@ from pathlib import Path
 
 from utils.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from utils.python_utils import pip_install_requirements
+from utils.git_utils import checkout_submodules
 
-REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent
+REPO_PATH = Path(os.path.abspath(__file__)).parent
 FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
 
@@ -85,19 +87,27 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", help="Run tests")
     args = parser.parse_args()
 
-    # Install framework dependencies only
+    # install framework dependencies
     pip_install_requirements("requirements.txt")
+    # checkout submodules
+    checkout_submodules(REPO_PATH)
     if args.fbgemm or args.all:
+        logging.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
     if args.fa or args.all:
+        logging.info("[tritonbench] installing flash-attn and fa3...")
         install_fa()
     if args.cutlass or args.all:
+        logging.info("[tritonbench] installing cutlass-kernels...")
         install_cutlass()
     if args.jax or args.all:
+        logging.info("[tritonbench] installing jax...")
         install_jax()
     if args.tk or args.all:
+        logging.info("[tritonbench] installing thunderkittens...")
         install_tk()
     if args.liger or args.all:
+        logging.info("[tritonbench] installing liger-kernels...")
         install_liger()
     # Run tests of the installation
     if args.test:
