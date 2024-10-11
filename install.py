@@ -13,7 +13,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 REPO_PATH = Path(os.path.abspath(__file__)).parent
-FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
 
 def install_jax(cuda_version=DEFAULT_CUDA_VERSION):
@@ -58,7 +57,10 @@ def install_cutlass():
 
 
 def install_fa():
+    FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
+    FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
     cmd = [sys.executable, "setup.py", "install"]
+    subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
     subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()))
 
 
@@ -98,7 +100,7 @@ if __name__ == "__main__":
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
     if args.fa or args.all:
-        logger.info("[tritonbench] installing flash-attn and fa3...")
+        logger.info("[tritonbench] installing fa2 and fa3...")
         install_fa()
     if args.cutlass or args.all:
         logger.info("[tritonbench] installing cutlass-kernels...")
