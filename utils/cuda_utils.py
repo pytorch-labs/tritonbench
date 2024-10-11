@@ -192,6 +192,7 @@ def check_torch_nightly_version(force_date: Optional[str] = None):
 
 
 if __name__ == "__main__":
+    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--cudaver",
