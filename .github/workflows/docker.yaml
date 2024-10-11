@@ -18,7 +18,6 @@ jobs:
   build-push-docker:
     if: ${{ github.repository_owner == 'pytorch-labs' }}
     runs-on: ubuntu-latest
-    environment: docker-s3-upload
     steps:
       - name: Checkout
         uses: actions/checkout@v3
