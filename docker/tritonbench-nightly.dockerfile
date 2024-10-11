@@ -5,7 +5,7 @@ FROM ${BASE_IMAGE}
 
 ENV CONDA_ENV=tritonbench
 ENV SETUP_SCRIPT=/workspace/setup_instance.sh
-ARG TRITONBENCH_BRANCH=${TORCHBENCH_BRANCH:-main}
+ARG TRITONBENCH_BRANCH=${TRITONBENCH_BRANCH:-main}
 ARG FORCE_DATE=${FORCE_DATE}
 
 # Checkout TritonBench and submodules
