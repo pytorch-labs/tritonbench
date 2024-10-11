@@ -56,11 +56,15 @@ def install_cutlass():
     install_colfax_cutlass()
 
 
-def install_fa():
+def install_fa2():
     FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
-    FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
     cmd = [sys.executable, "setup.py", "install"]
     subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
+
+
+def install_fa3():
+    FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
+    cmd = [sys.executable, "setup.py", "install"]
     subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()))
 
 
@@ -83,7 +87,10 @@ if __name__ == "__main__":
         "--cutlass", action="store_true", help="Install optional CUTLASS kernels"
     )
     parser.add_argument(
-        "--fa", action="store_true", help="Install optional flash_attention kernels"
+        "--fa2", action="store_true", help="Install optional flash_attention 2 kernels"
+    )
+    parser.add_argument(
+        "--fa3", action="store_true", help="Install optional flash_attention 3 kernels"
     )
     parser.add_argument("--jax", action="store_true", help="Install jax nightly")
     parser.add_argument("--tk", action="store_true", help="Install ThunderKittens")
@@ -99,9 +106,12 @@ if __name__ == "__main__":
     if args.fbgemm or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
-    if args.fa or args.all:
-        logger.info("[tritonbench] installing fa2 and fa3...")
-        install_fa()
+    if args.fa2 or args.all:
+        logger.info("[tritonbench] installing fa2...")
+        install_fa2()
+    if args.fa3 or args.all:
+        logger.info("[tritonbench] installing fa3...")
+        install_fa3()
     if args.cutlass or args.all:
         logger.info("[tritonbench] installing cutlass-kernels...")
         install_cutlass()
