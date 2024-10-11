@@ -67,3 +67,24 @@ def pip_install_requirements(
     except Exception as e:
         return (False, e)
     return True, None
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--pyver",
+        type=str,
+        default=DEFAULT_PYTHON_VERSION,
+        help="Specify the Python version.",
+    )
+    parser.add_argument(
+        "--create-conda-env",
+        type=str,
+        default=None,
+        help="Create conda environment of the default Python version.",
+    )
+    args = parser.parse_args()
+    if args.create_conda_env:
+        create_conda_env(args.pyver, args.create_conda_env)
+

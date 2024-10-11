@@ -5,7 +5,7 @@ FROM ${BASE_IMAGE}
 
 ENV CONDA_ENV=tritonbench
 ENV SETUP_SCRIPT=/workspace/setup_instance.sh
-ARG TRITONBENCH_BRANCH=${TORCHBENCH_BRANCH:-main}
+ARG TRITONBENCH_BRANCH=${TRITONBENCH_BRANCH:-main}
 ARG FORCE_DATE=${FORCE_DATE}
 
 # Checkout TritonBench and submodules
@@ -41,12 +41,17 @@ RUN cd /workspace/tritonbench && \
         python utils/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     fi
 
+# Tritonbench library build and test require libcuda.so.1
+# which is from NVIDIA driver
+RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf
+
 # Install Tritonbench
 RUN cd /workspace/tritonbench && \
     bash .ci/tritonbench/install.sh
 
-# Test Tritonbench (libcuda.so.1 is required for fbgemm test, so install libnvidia-compute-550 as a hack)
-RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 && \
-    cd /workspace/tritonbench && \
-    bash .ci/tritonbench/test-install.sh && \
-    sudo apt-get purge -y libnvidia-compute-550
+# Test Tritonbench
+RUN cd /workspace/tritonbench && \
+    bash .ci/tritonbench/test-install.sh
+
+# Remove NVIDIA driver library - they are supposed to be mapped at runtime
+RUN sudo apt-get purge -y libnvidia-compute-550

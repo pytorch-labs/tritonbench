@@ -1,4 +1,3 @@
-import argparse
 import importlib
 import os
 import re
@@ -20,7 +19,7 @@ CUDA_VERSION_MAP = {
 }
 PIN_CMAKE_VERSION = "3.22.*"
 
-TORCHBENCH_TORCH_NIGHTLY_PACKAGES = ["torch", "torchvision", "torchaudio"]
+TORCH_NIGHTLY_PACKAGES = ["torch"]
 BUILD_REQUIREMENTS_FILE = REPO_ROOT.joinpath("utils", "build_requirements.txt")
 
 
@@ -96,7 +95,7 @@ def setup_cuda_softlink(cuda_version: str):
 
 def install_pytorch_nightly(cuda_version: str, env, dryrun=False):
     uninstall_torch_cmd = ["pip", "uninstall", "-y"]
-    uninstall_torch_cmd.extend(TORCHBENCH_TORCH_NIGHTLY_PACKAGES)
+    uninstall_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
     if dryrun:
         print(f"Uninstall pytorch: {uninstall_torch_cmd}")
     else:
@@ -105,7 +104,7 @@ def install_pytorch_nightly(cuda_version: str, env, dryrun=False):
             subprocess.check_call(uninstall_torch_cmd)
     pytorch_nightly_url = f"https://download.pytorch.org/whl/nightly/{CUDA_VERSION_MAP[cuda_version]['pytorch_url']}"
     install_torch_cmd = ["pip", "install", "--pre", "--no-cache-dir"]
-    install_torch_cmd.extend(TORCHBENCH_TORCH_NIGHTLY_PACKAGES)
+    install_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
     install_torch_cmd.extend(["-i", pytorch_nightly_url])
     if dryrun:
         print(f"Install pytorch nightly: {install_torch_cmd}")
@@ -159,17 +158,10 @@ def install_torch_build_deps(cuda_version: str):
     subprocess.check_call(cmd)
     # conda forge deps
     # ubuntu 22.04 comes with libstdcxx6 12.3.0
-    # we need to install the same library version in conda
+    # we need to install the same library version in conda to maintain ABI compatibility
     conda_deps = ["libstdcxx-ng=12.3.0"]
     cmd = ["conda", "install", "-y", "-c", "conda-forge"] + conda_deps
     subprocess.check_call(cmd)
-
-
-def install_torchbench_deps():
-    # tritonbench flash_attn depends on packaging to build
-    cmd = ["pip", "install", "unittest-xml-reporting", "boto3", "packaging"]
-    subprocess.check_call(cmd)
-
 
 def get_torch_nightly_version(pkg_name: str):
     pkg = importlib.import_module(pkg_name)
@@ -182,7 +174,7 @@ def get_torch_nightly_version(pkg_name: str):
 
 def check_torch_nightly_version(force_date: Optional[str] = None):
     pkg_versions = dict(
-        map(get_torch_nightly_version, TORCHBENCH_TORCH_NIGHTLY_PACKAGES)
+        map(get_torch_nightly_version, TORCH_NIGHTLY_PACKAGES)
     )
     pkg_dates = list(map(lambda x: x[1]["date"], pkg_versions.items()))
     if not len(set(pkg_dates)) == 1:
@@ -198,3 +190,62 @@ def check_torch_nightly_version(force_date: Optional[str] = None):
         f"Installed consistent torch nightly packages: {pkg_versions}. {force_date_str}"
     )
 
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cudaver",
+        default=DEFAULT_CUDA_VERSION,
+        help="Specify the default CUDA version",
+    )
+    parser.add_argument(
+        "--setup-cuda-softlink",
+        action="store_true",
+        help="Setup the softlink to /usr/local/cuda",
+    )
+    parser.add_argument(
+        "--install-torch-deps",
+        action="store_true",
+        help="Install pytorch runtime dependencies",
+    )
+    parser.add_argument(
+        "--install-torch-build-deps",
+        action="store_true",
+        help="Install pytorch build dependencies",
+    )
+    parser.add_argument(
+        "--install-torch-nightly", action="store_true", help="Install pytorch nightlies"
+    )
+    parser.add_argument(
+        "--install-torchbench-deps",
+        action="store_true",
+        help="Install torchbench conda dependencies",
+    )
+    parser.add_argument(
+        "--check-torch-nightly-version",
+        action="store_true",
+        help="Validate pytorch nightly package consistency",
+    )
+    parser.add_argument(
+        "--force-date",
+        type=str,
+        default=None,
+        help="Force Pytorch nightly release date version. Date string format: YYmmdd",
+    )
+    args = parser.parse_args()
+    if args.setup_cuda_softlink:
+        setup_cuda_softlink(cuda_version=args.cudaver)
+    if args.install_torch_deps:
+        install_torch_deps(cuda_version=args.cudaver)
+    if args.install_torch_build_deps:
+        install_torch_build_deps(cuda_version=args.cudaver)
+    if args.install_torch_nightly:
+        install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
+    if args.install_torchbench_deps:
+        install_torchbench_deps()
+    if args.check_torch_nightly_version:
+        assert (
+            not args.install_torch_nightly
+        ), "Error: Can't run install torch nightly and check version in the same command."
+        check_torch_nightly_version(args.force_date)
