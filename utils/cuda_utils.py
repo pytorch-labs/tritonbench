@@ -190,3 +190,61 @@ def check_torch_nightly_version(force_date: Optional[str] = None):
         f"Installed consistent torch nightly packages: {pkg_versions}. {force_date_str}"
     )
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cudaver",
+        default=DEFAULT_CUDA_VERSION,
+        help="Specify the default CUDA version",
+    )
+    parser.add_argument(
+        "--setup-cuda-softlink",
+        action="store_true",
+        help="Setup the softlink to /usr/local/cuda",
+    )
+    parser.add_argument(
+        "--install-torch-deps",
+        action="store_true",
+        help="Install pytorch runtime dependencies",
+    )
+    parser.add_argument(
+        "--install-torch-build-deps",
+        action="store_true",
+        help="Install pytorch build dependencies",
+    )
+    parser.add_argument(
+        "--install-torch-nightly", action="store_true", help="Install pytorch nightlies"
+    )
+    parser.add_argument(
+        "--install-torchbench-deps",
+        action="store_true",
+        help="Install torchbench conda dependencies",
+    )
+    parser.add_argument(
+        "--check-torch-nightly-version",
+        action="store_true",
+        help="Validate pytorch nightly package consistency",
+    )
+    parser.add_argument(
+        "--force-date",
+        type=str,
+        default=None,
+        help="Force Pytorch nightly release date version. Date string format: YYmmdd",
+    )
+    args = parser.parse_args()
+    if args.setup_cuda_softlink:
+        setup_cuda_softlink(cuda_version=args.cudaver)
+    if args.install_torch_deps:
+        install_torch_deps(cuda_version=args.cudaver)
+    if args.install_torch_build_deps:
+        install_torch_build_deps(cuda_version=args.cudaver)
+    if args.install_torch_nightly:
+        install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
+    if args.install_torchbench_deps:
+        install_torchbench_deps()
+    if args.check_torch_nightly_version:
+        assert (
+            not args.install_torch_nightly
+        ), "Error: Can't run install torch nightly and check version in the same command."
+        check_torch_nightly_version(args.force_date)
