@@ -3,6 +3,9 @@ on:
   schedule:
     # Push the nightly docker daily at 3 PM UTC
     - cron: '0 15 * * *'
+  pull_request:
+    paths:
+      - docker/*.dockerfile 
   workflow_dispatch:
     inputs:
       nightly_date:
