@@ -56,10 +56,16 @@ def install_cutlass():
     install_colfax_cutlass()
 
 
-def install_fa2():
-    FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
-    cmd = [sys.executable, "setup.py", "install"]
-    subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
+def install_fa2(compile=False):
+    if compile:
+        # compile from source (slow)
+        FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
+        cmd = [sys.executable, "setup.py", "install"]
+        subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
+    else:
+        # Install the pre-built binary
+        cmd = ["pip", "install", "flash-attn", "--no-build-isolation"]
+        subprocess.check_call(cmd)
 
 
 def install_fa3():
@@ -90,6 +96,9 @@ if __name__ == "__main__":
         "--fa2", action="store_true", help="Install optional flash_attention 2 kernels"
     )
     parser.add_argument(
+        "--fa2-compile", action="store_true", help="Install optional flash_attention 2 kernels from source."
+    )
+    parser.add_argument(
         "--fa3", action="store_true", help="Install optional flash_attention 3 kernels"
     )
     parser.add_argument("--jax", action="store_true", help="Install jax nightly")
@@ -109,6 +118,9 @@ if __name__ == "__main__":
     if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2...")
         install_fa2()
+    if args.fa2_compile:
+        logger.info("[tritonbench] installing fa2 from source...")
+        install_fa2(compile=True)
     if args.fa3 or args.all:
         logger.info("[tritonbench] installing fa3...")
         install_fa3()
