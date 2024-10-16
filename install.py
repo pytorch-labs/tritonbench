@@ -115,7 +115,8 @@ if __name__ == "__main__":
     if args.fbgemm or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
-    if args.fa2 or args.all:
+    # TODO: for some reason, fa2 compile will break docker build
+    if args.fa2:
         logger.info("[tritonbench] installing fa2...")
         install_fa2()
     if args.fa2_compile:
