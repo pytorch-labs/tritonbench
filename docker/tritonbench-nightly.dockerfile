@@ -3,7 +3,8 @@ ARG BASE_IMAGE=xzhao9/gcp-a100-runner-dind:latest
 
 FROM ${BASE_IMAGE}
 
-ENV CONDA_ENV=tritonbench
+ENV CONDA_ENV=pytorch
+ENV CONDA_ENV_TRITON_MAIN=triton-main
 ENV SETUP_SCRIPT=/workspace/setup_instance.sh
 ARG TRITONBENCH_BRANCH=${TRITONBENCH_BRANCH:-main}
 ARG FORCE_DATE=${FORCE_DATE}
@@ -41,17 +42,21 @@ RUN cd /workspace/tritonbench && \
         python utils/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     fi
 
-# Tritonbench library build and test require libcuda.so.1
-# which is from NVIDIA driver
-RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf
+# # Tritonbench library build and test require libcuda.so.1
+# # which is from NVIDIA driver
+# RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf
 
-# Install Tritonbench
+# # Install Tritonbench
+# RUN cd /workspace/tritonbench && \
+#     bash .ci/tritonbench/install.sh
+
+# # Test Tritonbench
+# RUN cd /workspace/tritonbench && \
+#     bash .ci/tritonbench/test-install.sh
+
+# # Remove NVIDIA driver library - they are supposed to be mapped at runtime
+# RUN sudo apt-get purge -y libnvidia-compute-550
+
+# Clone the pytorch env as triton-main env, then compile triton main from source
 RUN cd /workspace/tritonbench && \
-    bash .ci/tritonbench/install.sh
-
-# Test Tritonbench
-RUN cd /workspace/tritonbench && \
-    bash .ci/tritonbench/test-install.sh
-
-# Remove NVIDIA driver library - they are supposed to be mapped at runtime
-RUN sudo apt-get purge -y libnvidia-compute-550
+    BASE_CONDA_ENV=${CONDA_ENV} CONDA_ENV=${CONDA_ENV_TRITON_MAIN} bash .ci/tritonbench/install-triton-main.sh
