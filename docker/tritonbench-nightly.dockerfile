@@ -42,20 +42,21 @@ RUN cd /workspace/tritonbench && \
         python utils/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     fi
 
-# # Tritonbench library build and test require libcuda.so.1
-# # which is from NVIDIA driver
-# RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf
+# Tritonbench library build and test require libcuda.so.1
+# which is from NVIDIA driver
+RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf
 
-# # Install Tritonbench
-# RUN cd /workspace/tritonbench && \
-#     bash .ci/tritonbench/install.sh
+# Install Tritonbench
+RUN cd /workspace/tritonbench && \
+    bash .ci/tritonbench/install.sh
 
-# # Test Tritonbench
-# RUN cd /workspace/tritonbench && \
-#     bash .ci/tritonbench/test-install.sh
 
-# # Remove NVIDIA driver library - they are supposed to be mapped at runtime
-# RUN sudo apt-get purge -y libnvidia-compute-550
+# Test Tritonbench
+RUN cd /workspace/tritonbench && \
+    bash .ci/tritonbench/test-install.sh
+
+# Remove NVIDIA driver library - they are supposed to be mapped at runtime
+RUN sudo apt-get purge -y libnvidia-compute-550
 
 # Clone the pytorch env as triton-main env, then compile triton main from source
 RUN cd /workspace/tritonbench && \
