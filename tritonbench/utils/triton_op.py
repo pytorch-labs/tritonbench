@@ -3,7 +3,6 @@ import copy
 import csv
 import functools
 import gc
-import json
 import logging
 import os
 import random
@@ -24,11 +23,10 @@ import tabulate
 import torch
 import triton
 
-from torchbenchmark._components.ncu import analyzer as ncu_analyzer
-from torchbenchmark.util.env_check import fresh_triton_cache, set_random_seed
-from torchbenchmark.util.experiment.metrics import get_peak_memory
-from torchbenchmark.util.extra_args import apply_decoration_args, parse_decoration_args
-from torchbenchmark.util.input import input_cast
+from tritonbench.components.ncu import analyzer as ncu_analyzer
+from tritonbench.utils.env_check import fresh_triton_cache, set_random_seed
+from tritonbench.utils.extra_args import apply_decoration_args, parse_decoration_args
+from tritonbench.utils.input import input_cast
 
 try:
     from tqdm import tqdm
