@@ -23,5 +23,10 @@ conda create --name "${CONDA_ENV}" -y --clone "${BASE_CONDA_ENV}"
 conda activate "${CONDA_ENV}"
 
 . "${SETUP_SCRIPT}"
-# Install the nightly openai/triton
-pip install -U --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/Triton-Nightly/pypi/simple/ triton-nightly
+
+# Install and build triton from source code
+cd /workspace
+git clone https://github.com/triton-lang/triton.git
+cd /workspace/triton
+pip install ninja cmake wheel pybind11; # build-time dependencies
+pip install -e python
