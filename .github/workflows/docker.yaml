@@ -5,6 +5,7 @@ on:
     - cron: '0 15 * * *'
   pull_request:
     paths:
+      - .github/workflows/docker.yaml
       - docker/*.dockerfile 
   workflow_dispatch:
     inputs:
