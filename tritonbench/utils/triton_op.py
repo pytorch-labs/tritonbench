@@ -480,6 +480,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     mode: Mode = Mode.FWD
     test: str = "eval"
     device: str = "cuda"
+    # By default, do not touch the input data dtype
+    DEFAULT_PRECISION = "bypass"
     # By default, only collect latency metrics
     # Each operator can override to define their own default metrics
     DEFAULT_METRICS = ["latency"]
@@ -523,6 +525,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         if self.name not in REGISTERED_X_VALS:
             REGISTERED_X_VALS[self.name] = "x_val"
         # We rely on each operator to correctly respect the input data dtype
+        if self.tb_args.precision == "bypass":
+            self.tb_args.precision = self.DEFAULT_PRECISION
         self.dtype = PRECISION_DTYPE_MAPPING.get(self.tb_args.precision, None)
         self.DEFAULT_METRICS.extend(
             [

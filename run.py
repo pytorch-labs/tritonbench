@@ -58,8 +58,8 @@ def get_parser(args=None):
     parser.add_argument("--fwd-no-grad", action="store_true", help="Run forward pass without grad.")
     parser.add_argument("--precision", "--dtype",
         choices=AVAILABLE_PRECISIONS,
-        default="fp32",
-        help="Specify operator input dtype/precision.",
+        default="bypass",
+        help="Specify operator input dtype/precision. Default to `bypass` - using DEFAULT_PRECISION defined in the operator.",
     )
     parser.add_argument(
         "--device",
