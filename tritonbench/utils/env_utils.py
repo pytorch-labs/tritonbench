@@ -3,7 +3,7 @@ import logging
 import shutil
 from contextlib import contextmanager, ExitStack
 
-from typing import Optional, List
+from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -102,74 +102,6 @@ def fresh_triton_cache():
             del os.environ["TRITON_CACHE_DIR"]
         if old_cache_manager:
             os.environ["TRITON_CACHE_MANAGER"] = old_cache_manager
-
-
-def parse_decoration_args(
-    model: "torchbenchmark.util.model.BenchmarkModel", extra_args: List[str]
-) -> Tuple[argparse.Namespace, List[str]]:
-    parser = argparse.ArgumentParser(allow_abbrev=False)
-    parser.add_argument(
-        "--distributed",
-        choices=["ddp", "ddp_no_static_graph", "fsdp"],
-        default=None,
-        help="Enable distributed trainer",
-    )
-    parser.add_argument(
-        "--distributed_wrap_fn",
-        type=str,
-        default=None,
-        help="Path to function that will apply distributed wrapping fn(model, dargs.distributed)",
-    )
-    parser.add_argument(
-        "--precision",
-        choices=AVAILABLE_PRECISIONS,
-        default=get_precision_default(model),
-        help=f"choose precisions from {AVAILABLE_PRECISIONS}",
-    )
-    parser.add_argument(
-        "--channels-last",
-        action="store_true",
-        help="enable channels-last memory layout",
-    )
-    parser.add_argument(
-        "--accuracy",
-        action="store_true",
-        help="Check accuracy of the model only instead of running the performance test.",
-    )
-    parser.add_argument(
-        "--use_cosine_similarity",
-        action="store_true",
-        help="use cosine similarity for correctness check",
-    )
-    parser.add_argument(
-        "--quant-engine",
-        choices=QUANT_ENGINES,
-        default="x86",
-        help=f"choose quantization engine for fx_int8 precision from {QUANT_ENGINES}",
-    )
-    parser.add_argument(
-        "--num-batch",
-        type=int,
-        help="Number of batches if running the multi-batch train test.",
-    )
-    dargs, opt_args = parser.parse_known_args(extra_args)
-    if not check_precision(model, dargs.precision):
-        raise NotImplementedError(
-            f"precision value: {dargs.precision}, "
-            "amp is only supported if cuda+eval, or if `enable_amp` implemented,"
-            "or if model uses staged train interfaces (forward, backward, optimizer_step)."
-        )
-    if not check_memory_layout(model, dargs.channels_last):
-        raise NotImplementedError(
-            f"Specified channels_last: {dargs.channels_last} ,"
-            f" but the model doesn't implement the enable_channels_last() interface."
-        )
-    if not check_distributed_trainer(model, dargs.distributed):
-        raise NotImplementedError(
-            f"We only support distributed trainer {dargs.distributed} for train tests, "
-            f"but get test: {model.test}"
-        )
-    return (dargs, opt_args)
 
 
 def apply_precision(
