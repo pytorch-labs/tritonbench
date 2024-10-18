@@ -4,20 +4,21 @@ import sys
 import tempfile
 from typing import List
 
-from torch import version as torch_version
 from tritonbench.operator_loader import load_opbench_by_name_from_loader
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperatorResult,
+    IS_FBCODE,
     DEFAULT_RUN_ITERS,
     DEFAULT_WARMUP,
 )
+from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
 from tritonbench.utils.gpu_utils import gpu_lockdown
 
 try:
-    if not hasattr(torch_version, "git_version"):
+    if IS_FBCODE:
         from pytorch.benchmark.fb.run_utils import usage_report_logger
     else:
         usage_report_logger = lambda *args, **kwargs: None
@@ -50,9 +51,15 @@ def get_parser(args=None):
     )
     parser.add_argument("--bwd", action="store_true", help="Run backward pass.")
     parser.add_argument(
-        "--fwd_bwd",
+        "--fwd-bwd",
         action="store_true",
         help="Run both forward and backward pass.",
+    )
+    parser.add_argument("--fwd-no-grad", action="store_true", help="Run forward pass without grad.")
+    parser.add_argument("--precision", "--dtype",
+        choices=AVAILABLE_PRECISIONS,
+        default="fp32",
+        help="Specify operator input dtype/precision.",
     )
     parser.add_argument(
         "--device",
@@ -158,7 +165,7 @@ def get_parser(args=None):
         help="Benchmarking aten ops in tritonbench/operator_loader.",
     )
 
-    if not hasattr(torch_version, "git_version"):
+    if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
 
     args, extra_args = parser.parse_known_args(args)
@@ -180,6 +187,8 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
         args.mode = "fwd_bwd"
     if args.bwd:
         args.mode = "bwd"
+    if args.fwd_no_grad:
+        args.mode = "fwd_no_grad"
     opbench = Opbench(
         tb_args=args,
         extra_args=extra_args,
@@ -193,7 +202,7 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
                 metrics.write_csv_to_file(sys.stdout)
             else:
                 print(metrics)
-        if not hasattr(torch_version, "git_version") and args.log_scuba:
+        if IS_FBCODE and args.log_scuba:
             from .fb.utils import log_benchmark
 
             if "hardware" in args:
@@ -222,7 +231,6 @@ def run(args: List[str] = []):
     args, extra_args = parser.parse_known_args(args)
     if args.ci:
         from .ci import run_ci
-
         run_ci()
         return
 

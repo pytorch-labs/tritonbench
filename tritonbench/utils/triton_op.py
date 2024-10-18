@@ -24,8 +24,7 @@ import torch
 import triton
 
 from tritonbench.components.ncu import analyzer as ncu_analyzer
-from tritonbench.utils.env_check import fresh_triton_cache, set_random_seed
-from tritonbench.utils.extra_args import apply_decoration_args, parse_decoration_args
+from tritonbench.utils.env_utils import fresh_triton_cache, set_random_seed, apply_precision
 from tritonbench.utils.input import input_cast
 
 try:
@@ -520,11 +519,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if tb_args.metrics
             else self.DEFAULT_METRICS
         )
-        self.dargs, self.extra_args = parse_decoration_args(self, extra_args)
+        self.extra_args = extra_args
         if self.name not in REGISTERED_X_VALS:
             REGISTERED_X_VALS[self.name] = "x_val"
-        # This will be changed by the time we apply the decoration args
-        self.dtype = PRECISION_DTYPE_MAPPING.get(self.dargs.precision, None)
+        # Handle the input data types with best effort
+        apply_precision(self, self.tb_args.precision)
+        # We rely on each operator to correctly respect the input data dtype
+        self.dtype = PRECISION_DTYPE_MAPPING.get(self.tb_args.precision, None)
         self.DEFAULT_METRICS.extend(
             [
                 x
@@ -614,8 +615,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.baseline_fn = None
                 self.baseline_metrics = None
                 self._op_flops = {}
-                # Cast the input precisions
-                apply_decoration_args(self, self.dargs)
                 x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
@@ -1240,9 +1239,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             device_name in HW_ROOFLINE_SPECS
         ), f"{device_name} is not supported in HW roofline specs."
         assert (
-            self.dargs.precision in HW_ROOFLINE_SPECS[device_name]
-        ), f"{self.precision} is not supported for {device_name}."
-        return HW_ROOFLINE_SPECS[device_name][self.dargs.precision]
+            self.tb_args.precision in HW_ROOFLINE_SPECS[device_name]
+        ), f"{self.tb_args.precision} is not supported by {device_name}."
+        return HW_ROOFLINE_SPECS[device_name][self.tb_args.precision]
 
     def _compile_time_in_task(
         self,
