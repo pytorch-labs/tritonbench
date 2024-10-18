@@ -9,9 +9,9 @@ import torch
 import torch._inductor.config as inductor_config
 import triton
 
-from torchbenchmark import REPO_PATH
+from tritonbench.utils.path_utils import REPO_PATH
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     IS_FBCODE,

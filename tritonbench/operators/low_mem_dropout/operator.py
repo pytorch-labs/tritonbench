@@ -4,7 +4,7 @@ from typing import Generator, List
 import torch
 import triton
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     register_benchmark,

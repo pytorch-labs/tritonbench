@@ -22,7 +22,7 @@ try:
 except ImportError:
     HAS_FB_IMPORT = False
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     register_benchmark,

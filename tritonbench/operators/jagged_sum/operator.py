@@ -7,7 +7,7 @@ from typing import Callable, Generator, List, Optional, Tuple
 
 import torch
 import triton
-from torchbenchmark.util.jagged_utils import (
+from tritonbench.utils.jagged_utils import (
     ABSOLUTE_TOLERANCE,
     generate_input_vals,
     generate_random_nested_tensors,
@@ -21,7 +21,7 @@ from torchbenchmark.util.jagged_utils import (
     RELATIVE_TOLERANCE,
 )
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     register_benchmark,

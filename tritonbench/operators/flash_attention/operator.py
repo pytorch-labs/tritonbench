@@ -37,8 +37,12 @@ import os
 
 import torch
 import triton  # @manual=//triton:triton
-from torchbenchmark import add_path, SUBMODULE_PATH
 
+from tritonbench.utils.path_utils import (
+    add_path,
+    SUBMODULE_PATH,
+    add_ld_library_path
+)
 try:
     with add_path(SUBMODULE_PATH.joinpath("kernels")):
         from kernels.flash_attention import attention as triton_op_FA2
@@ -50,8 +54,8 @@ from typing import Callable, Optional
 
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
-from torchbenchmark import add_ld_library_path
-from torchbenchmark.util.kernels.triton_fused_attention import (
+
+from tritonbench.kernels.triton_fused_attention import (
     attention as triton_tutorial_FA2,
     attention_tma as triton_tutorial_FA2_tma,
 )

@@ -3,11 +3,12 @@ import os
 import pathlib
 from typing import List
 
-from torchbenchmark import dir_contains_file
-
 OPBENCH_DIR = "operators"
 INTERNAL_OPBENCH_DIR = "fb"
 
+def _dir_contains_file(dir, file_name) -> bool:
+    names = map(lambda x: x.name, filter(lambda x: x.is_file(), dir.iterdir()))
+    return file_name in names
 
 def _is_internal_operator(op_name: str) -> bool:
     p = (
@@ -27,14 +28,14 @@ def _list_opbench_paths() -> List[str]:
     opbench = sorted(
         str(child.absolute())
         for child in p.iterdir()
-        if child.is_dir() and dir_contains_file(child, "__init__.py")
+        if child.is_dir() and _dir_contains_file(child, "__init__.py")
     )
     p = p.joinpath(INTERNAL_OPBENCH_DIR)
     if p.exists():
         o = sorted(
             str(child.absolute())
             for child in p.iterdir()
-            if child.is_dir() and dir_contains_file(child, "__init__.py")
+            if child.is_dir() and _dir_contains_file(child, "__init__.py")
         )
         opbench.extend(o)
     return opbench

@@ -3,7 +3,7 @@ from typing import Callable, Generator, List, Optional
 
 import torch
 
-from torchbenchmark.util.triton_op import BenchmarkOperator, register_benchmark
+from tritonbench.utils.triton_op import BenchmarkOperator, register_benchmark
 
 try:
     from liger_kernel.transformers.fused_linear_cross_entropy import (

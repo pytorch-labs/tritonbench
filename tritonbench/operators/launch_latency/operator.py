@@ -1,7 +1,8 @@
 import triton.language as tl
 from torch import zeros
 from torch._C import _cuda_getCurrentRawStream as get_raw_stream
-from torchbenchmark.util.triton_op import (
+
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     register_benchmark,

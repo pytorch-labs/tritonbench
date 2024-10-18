@@ -3,18 +3,17 @@ import itertools
 import os
 from typing import Any, Callable, Generator, List, Optional, Tuple
 
-import numpy
 import torch
 import torch._inductor.config as inductor_config
 import triton
-from torchbenchmark import add_path, SUBMODULE_PATH
 
 try:
     from hammer.ops.triton.triton_hstu_linear import triton_addmm
 except ModuleNotFoundError:
     from .hstu import triton_addmm
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     register_benchmark,

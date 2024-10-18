@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 import torch
 import triton.language as tl
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     llama_shapes,

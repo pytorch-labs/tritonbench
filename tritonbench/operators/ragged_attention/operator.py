@@ -2,7 +2,7 @@ import argparse
 
 from typing import List, Optional
 
-from torchbenchmark.util.triton_op import BenchmarkOperator, register_benchmark
+from tritonbench.utils.triton_op import BenchmarkOperator, register_benchmark
 
 from .hstu import get_test_inputs, RaggedHSTUAttn
 

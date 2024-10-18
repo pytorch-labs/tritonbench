@@ -3,7 +3,7 @@ from typing import Callable, List
 import torch
 import torch.nn.functional as F
 import triton
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     Mode,

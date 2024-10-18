@@ -7,9 +7,27 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
-from torchbenchmark import Worker
-from torchbenchmark._components._impl.tasks import base as base_task
-from torchbenchmark._components._impl.workers import subprocess_worker
+from tritonbench.components.tasks import base as base_task
+from tritonbench.components.workers import subprocess_worker
+
+class Worker(subprocess_worker.SubprocessWorker):
+    """Run subprocess using taskset if CPU affinity is set.
+
+    When GOMP_CPU_AFFINITY is set, importing `torch` in the main process has
+    the very surprising effect of changing the threading behavior in the
+    subprocess. (See https://github.com/pytorch/pytorch/issues/49971 for
+    details.) This is a problem, because it means that the worker is not
+    hermetic and also tends to force the subprocess torch to run in single
+    threaded mode which drastically skews results.
+
+    This can be ameliorated by calling the subprocess using `taskset`, which
+    allows the subprocess PyTorch to properly bind threads.
+    """
+
+    @property
+    def args(self) -> List[str]:
+        affinity = os.environ.get("GOMP_CPU_AFFINITY", "")
+        return (["taskset", "--cpu-list", affinity] if affinity else []) + super().args
 
 
 @dataclasses.dataclass(frozen=True)
@@ -82,7 +100,7 @@ class OpTask(base_task.TaskBase):
         import os
         import traceback
 
-        from torchbenchmark.operators import load_opbench_by_name
+        from tritonbench.operators import load_opbench_by_name
 
         Operator = load_opbench_by_name(op_name)
 

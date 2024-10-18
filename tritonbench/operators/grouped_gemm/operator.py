@@ -4,7 +4,7 @@ import torch
 import triton
 import triton.language as tl
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     Mode,

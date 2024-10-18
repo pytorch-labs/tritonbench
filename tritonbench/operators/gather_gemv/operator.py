@@ -15,7 +15,7 @@ import torch
 import triton
 from torch._dynamo.testing import rand_strided
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     register_benchmark,

@@ -7,7 +7,7 @@ import fbgemm_gpu.experimental.gen_ai  # noqa: F401
 import torch
 import triton
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     gemm_shapes,

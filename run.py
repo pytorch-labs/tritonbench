@@ -5,26 +5,24 @@ import tempfile
 from typing import List
 
 from torch import version as torch_version
-from torchbenchmark.operator_loader import load_opbench_by_name_from_loader
-from torchbenchmark.operators import load_opbench_by_name
-from torchbenchmark.operators_collection import list_operators_by_collection
+from tritonbench.operator_loader import load_opbench_by_name_from_loader
+from tritonbench.operators import load_opbench_by_name
+from tritonbench.operators_collection import list_operators_by_collection
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperatorResult,
     DEFAULT_RUN_ITERS,
     DEFAULT_WARMUP,
 )
+from tritonbench.utils.gpu_utils import gpu_lockdown
 
 try:
-    import torch
-
-    if not hasattr(torch.version, "git_version"):
+    if not hasattr(torch_version, "git_version"):
         from pytorch.benchmark.fb.run_utils import usage_report_logger
     else:
         usage_report_logger = lambda *args, **kwargs: None
 except ImportError:
     usage_report_logger = lambda *args, **kwargs: None
-from .gpu import gpu_lockdown
 
 TRITON_BENCH_CSV_DUMP_PATH = tempfile.gettempdir() + "/tritonbench/"
 
