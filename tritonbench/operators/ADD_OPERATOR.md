@@ -1,4 +1,4 @@
-## How to add a custom operator benchmark
+## How to add a new operator
 
 1. Create a new folder in the `operators` directory.
 2. Add an `operator.py` and `__init__.py` file to the new folder.
