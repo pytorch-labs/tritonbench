@@ -243,3 +243,6 @@ def run(args: List[str] = []):
         for op in ops:
             args.op = op
             _run(args, extra_args)
+
+if __name__ == "__main__":
+    run()

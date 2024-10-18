@@ -488,7 +488,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     _input_iter: Optional[Generator] = None
     extra_args: List[str] = []
     example_inputs: Any = None
-    use_cuda_graphs: bool = True
+    use_cuda_graphs: bool = False
 
     """
     A base class for adding operators to torch benchmark.
@@ -522,8 +522,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self.extra_args = extra_args
         if self.name not in REGISTERED_X_VALS:
             REGISTERED_X_VALS[self.name] = "x_val"
-        # Handle the input data types with best effort
-        apply_precision(self, self.tb_args.precision)
         # We rely on each operator to correctly respect the input data dtype
         self.dtype = PRECISION_DTYPE_MAPPING.get(self.tb_args.precision, None)
         self.DEFAULT_METRICS.extend(
@@ -612,6 +610,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     lambda x: x.to(self.device),
                     self.example_inputs,
                 )
+                # Handle the input data types with best effort
+                apply_precision(self, self.tb_args.precision)
                 self.baseline_fn = None
                 self.baseline_metrics = None
                 self._op_flops = {}
