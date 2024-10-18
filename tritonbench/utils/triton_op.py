@@ -156,9 +156,9 @@ def _split_params_by_comma(params: Optional[str]) -> List[str]:
 
 
 def _find_op_name_from_module_path(module_path: str) -> str:
-    PATH_PREFIX = "torchbenchmark.operators."
+    PATH_PREFIX = "tritonbench.operators."
     # We have a separate operator loader for aten operator benchmark.
-    PATH_PREFIX_LOADER = "torchbenchmark.operator_loader."
+    PATH_PREFIX_LOADER = "tritonbench.operator_loader."
     assert (
         PATH_PREFIX in module_path or PATH_PREFIX_LOADER in module_path
     ), f"We rely on module path prefix to identify operator name. Expected {PATH_PREFIX}<operator_name>, get {module_path}."
@@ -963,7 +963,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     "_ncu_trace_in_task must be measured by itself. "
                     f"required_metrics: {self.required_metrics}, _only: {self._only}, _input_id: {self._input_id}"
                 )
-                from torchbenchmark._components.ncu import do_bench_in_task
+                from tritonbench.components.ncu import do_bench_in_task
 
                 do_bench_in_task(
                     fn=fn,
@@ -980,7 +980,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     "_nsys_rep_in_task must be measured by itself. "
                     f"required_metrics: {self.required_metrics}, _only: {self._only}, _input_id: {self._input_id}"
                 )
-                from torchbenchmark._components.ncu import do_bench_in_task
+                from tritonbench.components.ncu import do_bench_in_task
 
                 do_bench_in_task(
                     fn=fn,
@@ -1187,7 +1187,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def kineto_trace(self, input_id: int, fn: Callable) -> str:
         from pathlib import Path
 
-        from torchbenchmark._components.kineto import do_bench_kineto
+        from tritonbench.components.kineto import do_bench_kineto
 
         kineto_output_dir = self.get_temp_path(f"kineto_traces/{fn._name}_{input_id}")
         kineto_output_dir.mkdir(parents=True, exist_ok=True)
@@ -1202,7 +1202,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     ) -> float:
         # We need to spawn a subprocess when user wants to measure the compile time
         # of multiple sample inputs and backends.
-        from torchbenchmark.operators.op_task import OpTask
+        from tritonbench.operators.op_task import OpTask
 
         op_task_args = copy.deepcopy(self._raw_extra_args)
         for override_option in ["--only", "--input-id", "--num-inputs", "--metrics"]:
@@ -1233,7 +1233,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     def hw_roofline(self) -> float:
         """Hardware roofline in tflops."""
-        from torchbenchmark.util.hardware import HW_ROOFLINE_SPECS
+        from tritonbench.utils.gpu_utils import HW_ROOFLINE_SPECS
 
         device_name = torch.cuda.get_device_name()
         assert (

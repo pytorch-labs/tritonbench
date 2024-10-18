@@ -286,7 +286,7 @@ class Operator(BenchmarkOperator):
 
         save_path = (
             os.getcwd()
-            + f"/pytorch/benchmark/torchbenchmark/operators/jagged_mean/jagged_mean_performance/{plot_name}"
+            + f"/pytorch/tritonbench/tritonbench/operators/jagged_mean/jagged_mean_performance/{plot_name}"
         )
 
         if not os.path.exists(save_path):

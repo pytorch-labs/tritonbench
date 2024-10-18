@@ -42,7 +42,7 @@ else:
 
 try:
     torch.ops.load_library(
-        "//pytorch/benchmark/torchbenchmark/operators/gemm/cutlass:colfax_gemm_lib"
+        "//pytorch/tritonbench/tritonbench/operators/gemm/cutlass:colfax_gemm_lib"
     )
     colfax_gemm = torch.ops.cutlass.colfax_gemm
 except (ImportError, IOError, AttributeError) as e:
@@ -90,7 +90,7 @@ SPLIT_K_SHAPES = [
 
 
 def parse_args(args: List[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="TorchBench Gemm operator Benchmark")
+    parser = argparse.ArgumentParser(description="TritonBench Gemm operator Benchmark")
     parser.add_argument("--m", type=int)
     parser.add_argument("--k", type=int)
     parser.add_argument("--n", type=int)
@@ -105,7 +105,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
 
 def read_shapes_from_csv(csv_path: str) -> List[List[int]]:
     input_file_path = os.path.join(
-        REPO_PATH, "torchbenchmark", "operators", "gemm", csv_path
+        REPO_PATH, "tritonbench", "operators", "gemm", csv_path
     )
     shapes = []
     with open(input_file_path, "r") as f:

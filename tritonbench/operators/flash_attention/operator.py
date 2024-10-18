@@ -116,8 +116,7 @@ try:
         import h100_fwd_causal as tk_fwd_causal
     else:
         # causal is not supported right now
-        from userbenchmark.triton.loader import load_library
-
+        from tritonbench.utils.loader import load_library
         load_library("tk/tk_attn_h100_fwd.so")
         tk_fwd = torch.ops.tk
 except (ImportError, IOError, AttributeError):
@@ -126,9 +125,9 @@ except (ImportError, IOError, AttributeError):
 
 from typing import Any, Generator, List
 
-from torchbenchmark.util.input import input_filter
+from tritonbench.utils.input import input_filter
 
-from torchbenchmark.util.triton_op import (
+from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
     Mode as BenchmarkMode,

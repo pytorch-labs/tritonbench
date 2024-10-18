@@ -349,7 +349,7 @@ class Operator(BenchmarkOperator):
 
         save_path = (
             os.getcwd()
-            + f"/pytorch/benchmark/torchbenchmark/operators/sum/sum_performance/{plot_name}"
+            + f"/pytorch/benchmark/tritonbench/tritonbench/operators/sum/sum_performance/{plot_name}"
         )
 
         if not os.path.exists(save_path):

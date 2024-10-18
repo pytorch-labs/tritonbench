@@ -39,7 +39,7 @@ The `operator.py` file needs to implement the following:
 ### Example
 
 ```
-from torchbenchmark.util.benchmark_registry import register_benchmark
+from tritonbench.utils.triton_op import register_benchmark
 import triton
 class Model(torch.nn.Module):
     def __init__(self):

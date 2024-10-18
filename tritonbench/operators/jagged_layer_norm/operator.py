@@ -240,7 +240,7 @@ class Operator(BenchmarkOperator):
 
         save_path = (
             os.getcwd()
-            + f"/pytorch/benchmark/torchbenchmark/operators/jagged_layer_norm/jagged_layer_norm_performance/{plot_name}"
+            + f"/pytorch/tritonbench/tritonbench/operators/jagged_layer_norm/jagged_layer_norm_performance/{plot_name}"
         )
 
         if not os.path.exists(save_path):

@@ -1,6 +1,6 @@
 import torch
 import triton
-from torchbenchmark import add_path, SUBMODULE_PATH
+from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
 try:
     # Internal Import

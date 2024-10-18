@@ -4,7 +4,7 @@ import torch
 import triton
 import triton.language as tl
 
-from torchbenchmark.util.triton_op import IS_FBCODE
+from tritonbench.utils.triton_op import IS_FBCODE
 
 if not IS_FBCODE:
     import triton.tools.experimental_descriptor
