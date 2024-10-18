@@ -112,6 +112,7 @@ if __name__ == "__main__":
     pip_install_requirements("requirements.txt")
     # checkout submodules
     checkout_submodules(REPO_PATH)
+    # install submodules
     if args.fbgemm or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
@@ -134,6 +135,6 @@ if __name__ == "__main__":
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
     logger.info("[tritonbench] installation complete!")
-    # Run tests to check installation
+    # run tests to check installation
     if args.test:
         test_fbgemm()
