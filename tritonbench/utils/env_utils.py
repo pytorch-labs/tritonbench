@@ -3,7 +3,7 @@ import logging
 import shutil
 from contextlib import contextmanager, ExitStack
 
-from typing import Optional
+from typing import Optional, List
 
 log = logging.getLogger(__name__)
 
