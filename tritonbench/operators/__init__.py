@@ -6,9 +6,11 @@ from typing import List
 OPBENCH_DIR = "operators"
 INTERNAL_OPBENCH_DIR = "fb"
 
+
 def _dir_contains_file(dir, file_name) -> bool:
     names = map(lambda x: x.name, filter(lambda x: x.is_file(), dir.iterdir()))
     return file_name in names
+
 
 def _is_internal_operator(op_name: str) -> bool:
     p = (

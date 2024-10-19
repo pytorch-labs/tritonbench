@@ -1,5 +1,4 @@
 import subprocess
-import warnings
 from pathlib import Path
 
 from typing import List, Optional
@@ -35,7 +34,7 @@ def pip_install_requirements(
 
     constraints_file = REPO_DIR.joinpath("build", "constraints.txt")
     if not constraints_file.exists():
-        warnings.warn(
+        print(
             "The build/constrants.txt file is not found. "
             "Please consider rerunning the install.py script to generate it."
             "It is recommended to install with the build/constrants.txt file "
@@ -68,6 +67,7 @@ def pip_install_requirements(
         return (False, e)
     return True, None
 
+
 if __name__ == "__main__":
     import argparse
 
@@ -87,4 +87,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.create_conda_env:
         create_conda_env(args.pyver, args.create_conda_env)
-

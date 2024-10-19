@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_PATH = Path(os.path.abspath(__file__)).parent.parent
 SUBMODULE_PATH = REPO_PATH.joinpath("submodules")
 
+
 class add_path:
     def __init__(self, path):
         self.path = path

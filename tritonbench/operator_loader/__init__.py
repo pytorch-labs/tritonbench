@@ -10,10 +10,7 @@ from torch._inductor.utils import gen_gm_and_inputs
 from torch._ops import OpOverload
 from torch.utils._pytree import tree_map_only
 
-from tritonbench.utils.triton_op import (
-    BenchmarkOperator,
-    register_benchmark_mannually,
-)
+from tritonbench.utils.triton_op import BenchmarkOperator, register_benchmark_mannually
 
 from .operator_inp_utils import aten, OperatorInputsLoader, to_channels_last
 
