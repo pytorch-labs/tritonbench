@@ -38,11 +38,8 @@ import os
 import torch
 import triton  # @manual=//triton:triton
 
-from tritonbench.utils.path_utils import (
-    add_path,
-    SUBMODULE_PATH,
-    add_ld_library_path
-)
+from tritonbench.utils.path_utils import add_ld_library_path, add_path, SUBMODULE_PATH
+
 try:
     with add_path(SUBMODULE_PATH.joinpath("kernels")):
         from kernels.flash_attention import attention as triton_op_FA2
@@ -117,6 +114,7 @@ try:
     else:
         # causal is not supported right now
         from tritonbench.utils.loader import load_library
+
         load_library("tk/tk_attn_h100_fwd.so")
         tk_fwd = torch.ops.tk
 except (ImportError, IOError, AttributeError):

@@ -10,6 +10,7 @@ import torch
 from tritonbench.components.tasks import base as base_task
 from tritonbench.components.workers import subprocess_worker
 
+
 class Worker(subprocess_worker.SubprocessWorker):
     """Run subprocess using taskset if CPU affinity is set.
 

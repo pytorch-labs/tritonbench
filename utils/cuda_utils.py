@@ -88,7 +88,7 @@ def setup_cuda_softlink(cuda_version: str):
     if current_cuda_path.exists():
         assert (
             current_cuda_path.is_symlink()
-        ), f"Expected /usr/local/cuda to be a symlink."
+        ), "Expected /usr/local/cuda to be a symlink."
         current_cuda_path.unlink()
     os.symlink(str(cuda_path.resolve()), str(current_cuda_path.resolve()))
 
@@ -163,6 +163,7 @@ def install_torch_build_deps(cuda_version: str):
     cmd = ["conda", "install", "-y", "-c", "conda-forge"] + conda_deps
     subprocess.check_call(cmd)
 
+
 def get_torch_nightly_version(pkg_name: str):
     pkg = importlib.import_module(pkg_name)
     version = pkg.__version__
@@ -173,10 +174,8 @@ def get_torch_nightly_version(pkg_name: str):
 
 
 def check_torch_nightly_version(force_date: Optional[str] = None):
-    pkg_versions = dict(
-        map(get_torch_nightly_version, TORCH_NIGHTLY_PACKAGES)
-    )
-    pkg_dates = list(map(lambda x: x[1]["date"], pkg_versions.items()))
+    pkg_versions = dict(map(get_torch_nightly_version, TORCH_NIGHTLY_PACKAGES))
+    pkg_dates = [x[1]["date"] for x in pkg_versions.items()]
     if not len(set(pkg_dates)) == 1:
         raise RuntimeError(
             f"Found more than 1 dates in the torch nightly packages: {pkg_versions}."
@@ -193,6 +192,7 @@ def check_torch_nightly_version(force_date: Optional[str] = None):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--cudaver",
@@ -218,11 +218,6 @@ if __name__ == "__main__":
         "--install-torch-nightly", action="store_true", help="Install pytorch nightlies"
     )
     parser.add_argument(
-        "--install-torchbench-deps",
-        action="store_true",
-        help="Install torchbench conda dependencies",
-    )
-    parser.add_argument(
         "--check-torch-nightly-version",
         action="store_true",
         help="Validate pytorch nightly package consistency",
@@ -242,8 +237,6 @@ if __name__ == "__main__":
         install_torch_build_deps(cuda_version=args.cudaver)
     if args.install_torch_nightly:
         install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
-    if args.install_torchbench_deps:
-        install_torchbench_deps()
     if args.check_torch_nightly_version:
         assert (
             not args.install_torch_nightly

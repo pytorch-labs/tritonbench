@@ -5,15 +5,13 @@ from pathlib import Path
 import torch
 
 CUDA_HOME = (
-    "/usr/local/cuda" if not "CUDA_HOME" in os.environ else os.environ["CUDA_HOME"]
+    "/usr/local/cuda" if "CUDA_HOME" not in os.environ else os.environ["CUDA_HOME"]
 )
 REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
 FBGEMM_CUTLASS_PATH = FBGEMM_PATH.parent.joinpath("external", "cutlass")
 COLFAX_CUTLASS_PATH = REPO_PATH.joinpath("submodules", "cutlass-kernels")
-COLFAX_CUTLASS_TRITONBENCH_PATH = REPO_PATH.joinpath(
-    "utils", "cutlass_kernels"
-)
+COLFAX_CUTLASS_TRITONBENCH_PATH = REPO_PATH.joinpath("utils", "cutlass_kernels")
 
 TORCH_BASE_PATH = Path(torch.__file__).parent
 

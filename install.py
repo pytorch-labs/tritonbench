@@ -6,14 +6,15 @@ import sys
 from pathlib import Path
 
 from utils.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
-from utils.python_utils import pip_install_requirements
 from utils.git_utils import checkout_submodules
+from utils.python_utils import pip_install_requirements
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 REPO_PATH = Path(os.path.abspath(__file__)).parent
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
+
 
 def install_jax(cuda_version=DEFAULT_CUDA_VERSION):
     jax_package_name = CUDA_VERSION_MAP[cuda_version]["jax"]
@@ -53,6 +54,7 @@ def test_fbgemm():
 
 def install_cutlass():
     from utils.cutlass_kernels.install import install_colfax_cutlass
+
     install_colfax_cutlass()
 
 
@@ -83,6 +85,7 @@ def install_liger():
 
 def install_tk():
     from utils.tk.install import install_tk
+
     install_tk()
 
 
@@ -96,7 +99,9 @@ if __name__ == "__main__":
         "--fa2", action="store_true", help="Install optional flash_attention 2 kernels"
     )
     parser.add_argument(
-        "--fa2-compile", action="store_true", help="Install optional flash_attention 2 kernels from source."
+        "--fa2-compile",
+        action="store_true",
+        help="Install optional flash_attention 2 kernels from source.",
     )
     parser.add_argument(
         "--fa3", action="store_true", help="Install optional flash_attention 3 kernels"
@@ -104,7 +109,9 @@ if __name__ == "__main__":
     parser.add_argument("--jax", action="store_true", help="Install jax nightly")
     parser.add_argument("--tk", action="store_true", help="Install ThunderKittens")
     parser.add_argument("--liger", action="store_true", help="Install Liger-kernel")
-    parser.add_argument("--all", action="store_true", help="Install all custom kernel repos")
+    parser.add_argument(
+        "--all", action="store_true", help="Install all custom kernel repos"
+    )
     parser.add_argument("--test", action="store_true", help="Run tests")
     args = parser.parse_args()
 

@@ -9,9 +9,8 @@ import random
 import shlex
 import tempfile
 import time
-import warnings
 from collections import OrderedDict
-from dataclasses import asdict, dataclass, fields, make_dataclass
+from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from itertools import product
 from numbers import Number
@@ -24,7 +23,11 @@ import torch
 import triton
 
 from tritonbench.components.ncu import analyzer as ncu_analyzer
-from tritonbench.utils.env_utils import fresh_triton_cache, set_random_seed, apply_precision
+from tritonbench.utils.env_utils import (
+    apply_precision,
+    fresh_triton_cache,
+    set_random_seed,
+)
 from tritonbench.utils.input import input_cast
 
 try:
@@ -451,9 +454,9 @@ def register_metric(
 ):
     def decorator(func):
         metric_name = func.__name__
-        if not metric_name in BUILTIN_METRICS:
+        if metric_name not in BUILTIN_METRICS:
             operator_name = _find_op_name_from_module_path(func.__module__)
-            if not operator_name in REGISTERED_METRICS:
+            if operator_name not in REGISTERED_METRICS:
                 REGISTERED_METRICS[operator_name] = []
             REGISTERED_METRICS[operator_name].append(func.__name__)
         if skip_baseline:
@@ -602,7 +605,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self._cur_input_id = input_id
                 self.example_inputs = self.get_example_inputs()
                 if self.example_inputs is None:
-                    warnings.warn(
+                    logger.warn(
                         f"The input generator get_input_iter() has depleted at id {input_id}. Available number of "
                         f"inputs: {self._available_num_inputs}.",
                         stacklevel=1,
@@ -998,7 +1001,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 for metric_name in REGISTERED_METRICS[self.name]:
                     if metric_name in BUILTIN_METRICS:
                         continue
-                    if not metric_name in self.required_metrics:
+                    if metric_name not in self.required_metrics:
                         continue
                     func = getattr(self, metric_name)
                     metrics.extra_metrics[metric_name] = func(
@@ -1017,12 +1020,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def get_peak_mem(
         self, fn: Callable, metrics_memory_usage_backend: str
     ) -> Tuple[Optional[float], Optional[str], Optional[float]]:
-        return get_peak_memory(
-            func=fn,
-            device=self.device,
-            metrics_needed=["gpu_peak_mem", "cpu_peak_mem"],
-            metrics_gpu_backend=metrics_memory_usage_backend,
-        )
+        raise NotImplementedError("Peak GPU Memory is not supported yet.")
+        # return get_peak_memory(
+        #     func=fn,
+        #     device=self.device,
+        #     metrics_needed=["gpu_peak_mem", "cpu_peak_mem"],
+        #     metrics_gpu_backend=metrics_memory_usage_backend,
+        # )
 
     def nsys_rep(self, input_id: int, fn_name: str) -> str:
         import subprocess
@@ -1140,7 +1144,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             dyno_result = subprocess.run(disable_dyno_dcgm).returncode
             systemctl_result = subprocess.run(disable_dcgm_service).returncode
             if dyno_result != 0 and systemctl_result != 0:
-                warnings.warn(
+                logger.warn(
                     "DCGM may not have been successfully disabled. Proceeding to collect NCU trace anyway..."
                 )
         ncu_output_dir = self.get_temp_path(f"ncu_traces/{fn_name}_{input_id}")
@@ -1188,8 +1192,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         return str(ncu_output_file.resolve())
 
     def kineto_trace(self, input_id: int, fn: Callable) -> str:
-        from pathlib import Path
-
         from tritonbench.components.kineto import do_bench_kineto
 
         kineto_output_dir = self.get_temp_path(f"kineto_traces/{fn._name}_{input_id}")
@@ -1288,7 +1290,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             return total_flops
 
         fn = self._get_bm_func(fn_name)
-        if not fn in self._op_flops:
+        if fn not in self._op_flops:
             self._op_flops[fn] = _get_flops(self, fn)
         op_flops = self._op_flops[fn]
         return op_flops / metrics.latency / 1e12 * 1e3

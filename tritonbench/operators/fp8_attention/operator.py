@@ -5,11 +5,12 @@ https://research.colfax-intl.com/adding-fp8-to-flashattention/
 
 import argparse
 import math
+
+from typing import Any, Callable, Generator, List, Optional, Tuple
+
 import torch
 
-from tritonbench.kernels.triton_fused_attention import (
-    attention as triton_attention,
-)
+from tritonbench.kernels.triton_fused_attention import attention as triton_attention
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
@@ -17,8 +18,6 @@ from tritonbench.utils.triton_op import (
     register_benchmark,
     register_metric,
 )
-
-from typing import Any, Callable, Generator, List, Optional, Tuple
 
 try:
     # colfax Flash Attention V2 on FP8 for Hopper

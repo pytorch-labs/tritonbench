@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 
 CUDA_HOME = (
-    "/usr/local/cuda" if not "CUDA_HOME" in os.environ else os.environ["CUDA_HOME"]
+    "/usr/local/cuda" if "CUDA_HOME" not in os.environ else os.environ["CUDA_HOME"]
 )
 REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent
 TK_PATH = REPO_PATH.joinpath("submodules", "ThunderKittens")

@@ -1,7 +1,5 @@
 from tritonbench.operators_collection.all import get_operators as get_all_operators
-from tritonbench.operators_collection.liger import (
-    get_operators as get_liger_operators,
-)
+from tritonbench.operators_collection.liger import get_operators as get_liger_operators
 
 
 def get_operators():

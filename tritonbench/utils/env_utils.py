@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 import shutil
 from contextlib import contextmanager, ExitStack
 
@@ -20,6 +20,7 @@ AVAILABLE_PRECISIONS = [
     "amp_bf16",
     "fp8",
 ]
+
 
 def set_random_seed():
     """Make torch manual seed deterministic. Helps with accuracy testing."""
@@ -48,6 +49,7 @@ def set_random_seed():
     numpy.random.seed(MAIN_RANDOM_SEED)
     torch.manual_seed = deterministic_torch_manual_seed
 
+
 @contextmanager
 def nested(*contexts):
     """
@@ -57,6 +59,7 @@ def nested(*contexts):
         for ctx in contexts:
             stack.enter_context(ctx())
         yield contexts
+
 
 @contextmanager
 def fresh_inductor_cache(parallel_compile=False):
@@ -116,6 +119,7 @@ def apply_precision(
         op.enable_bf16()
     elif precision == "tf32":
         import torch
+
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
     else:

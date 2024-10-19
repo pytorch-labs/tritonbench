@@ -1,5 +1,6 @@
 from .path_utils import REPO_PATH
 
+
 def load_library(library_path: str):
     import torch
 

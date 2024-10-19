@@ -5,7 +5,10 @@ import statistics
 from typing import Any, List, Optional
 
 import torch
+import triton
 import triton.language as tl
+
+from triton.runtime.jit import reinterpret
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -14,8 +17,6 @@ from tritonbench.utils.triton_op import (
     register_benchmark,
     register_metric,
 )
-
-from triton.runtime.jit import reinterpret
 
 from .tutorial import matmul as tutorial_matmul
 

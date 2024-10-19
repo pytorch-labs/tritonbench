@@ -7,15 +7,15 @@ from typing import List
 from tritonbench.operator_loader import load_opbench_by_name_from_loader
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
+from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
+from tritonbench.utils.gpu_utils import gpu_lockdown
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperatorResult,
-    IS_FBCODE,
     DEFAULT_RUN_ITERS,
     DEFAULT_WARMUP,
+    IS_FBCODE,
 )
-from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
-from tritonbench.utils.gpu_utils import gpu_lockdown
 
 try:
     if IS_FBCODE:
@@ -55,8 +55,12 @@ def get_parser(args=None):
         action="store_true",
         help="Run both forward and backward pass.",
     )
-    parser.add_argument("--fwd-no-grad", action="store_true", help="Run forward pass without grad.")
-    parser.add_argument("--precision", "--dtype",
+    parser.add_argument(
+        "--fwd-no-grad", action="store_true", help="Run forward pass without grad."
+    )
+    parser.add_argument(
+        "--precision",
+        "--dtype",
         choices=AVAILABLE_PRECISIONS,
         default="bypass",
         help="Specify operator input dtype/precision. Default to `bypass` - using DEFAULT_PRECISION defined in the operator.",
@@ -231,6 +235,7 @@ def run(args: List[str] = []):
     args, extra_args = parser.parse_known_args(args)
     if args.ci:
         from .ci import run_ci
+
         run_ci()
         return
 
@@ -243,6 +248,7 @@ def run(args: List[str] = []):
         for op in ops:
             args.op = op
             _run(args, extra_args)
+
 
 if __name__ == "__main__":
     run()
