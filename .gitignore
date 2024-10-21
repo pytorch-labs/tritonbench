@@ -1,3 +1,17 @@
 __pycache__/
 .data/
 .DS_Store
+._*
+*/**/__pycache__
+*/**/*.pkl
+*/**/*.pt
+*/**/*.pyc
+*/**/*.tar.gz
+.vscode/
+*.out*
+*.swp
+*.swo
+.DS_Store
+.ipynb_checkpoints/
+.idea
+torchbench.egg-info/
