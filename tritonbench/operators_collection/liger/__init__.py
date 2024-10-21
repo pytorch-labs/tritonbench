@@ -1,11 +1,4 @@
-liger_operators = [
-    # @TODO: fix the names after previous PR is merged
-    "FusedLinearCrossEntropy",
-    "cross_entropy",
-    "geglu",
-    "kl_div",
-    "swiglu",
-]
+liger_operators = ["FusedLinearCrossEntropy"]
 
 
 def get_operators():
