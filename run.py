@@ -1,3 +1,10 @@
+"""
+Tritonbench benchmark runner.
+
+Note: make sure to `python install.py` first or otherwise make sure the benchmark you are going to run
+      has been installed. This script intentionally does not automate or enforce setup steps.
+"""
+
 import argparse
 import os
 import sys
@@ -211,9 +218,16 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             from .fb.utils import log_benchmark
 
             if "hardware" in args:
-                log_benchmark(metrics, args.op, args.hardware)
+                log_benchmark(
+                    metrics=metrics,
+                    bencmark_name=args.op,
+                    device=args.device,
+                    hardware=args.hardware,
+                )
             else:
-                log_benchmark(metrics, args.op)
+                log_benchmark(
+                    metrics=metrics, bencmark_name=args.op, device=args.device
+                )
         if args.plot:
             try:
                 opbench.plot()
