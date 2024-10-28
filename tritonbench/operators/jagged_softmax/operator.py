@@ -73,6 +73,8 @@ def parse_op_args(args: List[str]):
 class Operator(BenchmarkOperator):
 
     DEFAULT_METRICS = ["latency", "accuracy", "best_config"]
+    DEFAULT_PRECISION = "fp32"
+
     use_cuda_graphs = (
         False  # enables GPU/CPU sync (for methods like NestedTensor unbind)
     )

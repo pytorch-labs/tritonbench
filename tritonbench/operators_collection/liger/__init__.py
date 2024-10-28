@@ -3,6 +3,7 @@ liger_operators = [
     "embedding",
     "rms_norm",
     "rope",
+    "jsd",
 ]
 
 
