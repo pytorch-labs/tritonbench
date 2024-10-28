@@ -1,6 +1,5 @@
 __pycache__/
 .data/
-.DS_Store
 ._*
 */**/__pycache__
 */**/*.pkl
