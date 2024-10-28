@@ -99,7 +99,7 @@ try:
         # colfax Flash Attention V2 for Hopper
         torch.ops.load_library("//ai_codesign/gen_ai/cutlass-kernels:fmha_forward_lib")
     else:
-        from userbenchmark.triton.loader import load_library
+        from tritonbench.utils.loader import load_library
 
         load_library("cutlass_kernels/fmha_forward_lib.so")
     colfax_cutlass_fmha = torch.ops.cutlass.fmha_forward
