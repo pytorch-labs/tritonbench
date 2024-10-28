@@ -11,19 +11,19 @@ import sys
 import tempfile
 from typing import List
 
-from pytorch.tritonbench.tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
-from pytorch.tritonbench.tritonbench.utils.gpu_utils import gpu_lockdown
+from tritonbench.operator_loader import load_opbench_by_name_from_loader
+from tritonbench.operators import load_opbench_by_name
+from tritonbench.operators_collection import list_operators_by_collection
 
-from pytorch.tritonbench.tritonbench.utils.triton_op import (
+from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
+from tritonbench.utils.gpu_utils import gpu_lockdown
+
+from tritonbench.utils.triton_op import (
     BenchmarkOperatorResult,
     DEFAULT_RUN_ITERS,
     DEFAULT_WARMUP,
     IS_FBCODE,
 )
-
-from tritonbench.operator_loader import load_opbench_by_name_from_loader
-from tritonbench.operators import load_opbench_by_name
-from tritonbench.operators_collection import list_operators_by_collection
 
 try:
     if IS_FBCODE:
