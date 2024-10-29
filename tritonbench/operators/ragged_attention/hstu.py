@@ -4,7 +4,7 @@ from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
 try:
     # Internal Import
-    from hammer.generative_recommenders.ops.triton.triton_ragged_hstu_attention import (
+    from hammer.oss.generative_recommenders.ops.triton.triton_ragged_hstu_attention import (
         _ragged_hstu_attn_fwd,
         _ragged_hstu_attn_fwd_persistent,
     )

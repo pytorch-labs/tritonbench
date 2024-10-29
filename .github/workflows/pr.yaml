@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout Tritonbench
         uses: actions/checkout@v3
+        with:
+          # no need to checkout submodules recursively
+          submodules: true
       - name: Tune Nvidia GPU
         run: |
           sudo nvidia-smi -pm 1
@@ -27,9 +30,3 @@ jobs:
       - name: Test Tritonbench operators
         run: |
           bash ./.ci/tritonbench/test-operators.sh
-      - name: Clean up Conda env
-        if: always()
-        run: |
-          . "${SETUP_SCRIPT}"
-          conda deactivate && conda deactivate
-          conda remove -n "${CONDA_ENV}" --all
