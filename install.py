@@ -82,12 +82,17 @@ def install_liger():
     cmd = ["pip", "install", "liger-kernel", "--no-deps"]
     subprocess.check_call(cmd)
 
-
 def install_tk():
     from utils.tk.install import install_tk
 
     install_tk()
 
+def install_xformers():
+    os_env = os.environ.copy()
+    os_env["TORCH_CUDA_ARCH_LIST"] = "8.0;9.0;9.0a"
+    XFORMERS_PATH = REPO_PATH.joinpath("submodules", "xformers")
+    cmd = ["pip", "install", "-e", XFORMERS_PATH]
+    subprocess.check_call(cmd, env=os_env)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(allow_abbrev=False)
@@ -109,6 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--jax", action="store_true", help="Install jax nightly")
     parser.add_argument("--tk", action="store_true", help="Install ThunderKittens")
     parser.add_argument("--liger", action="store_true", help="Install Liger-kernel")
+    parser.add_argument("--xformers", action="store_true", help="Install xformers")
     parser.add_argument(
         "--all", action="store_true", help="Install all custom kernel repos"
     )
@@ -141,6 +147,9 @@ if __name__ == "__main__":
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
+    if args.xformers or args.all:
+        logger.info("[tritonbench] installing xformers...")
+        install_xformers()
     logger.info("[tritonbench] installation complete!")
     # run tests to check installation
     if args.test:
