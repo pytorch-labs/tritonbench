@@ -1,0 +1,35 @@
+name: TritonBench PR Test
+on:
+  pull_request:
+    paths:
+      - .ci/*
+      - tritonbench/*
+      - .github/workflows/pr.yaml
+
+jobs:
+  h100-pytorch-test:
+    # Don't run on forked repos
+    if: github.repository_owner == 'pytorch-labs'
+    runs-on: [gcp-h100-runner]
+    timeout-minutes: 240
+    environment: docker-s3-upload
+    env:
+      CONDA_ENV: "pytorch"
+      SETUP_SCRIPT: "/workspace/setup_instance.sh"
+    steps:
+      - name: Checkout Tritonbench
+        uses: actions/checkout@v3
+      - name: Tune Nvidia GPU
+        run: |
+          sudo nvidia-smi -pm 1
+          sudo ldconfig
+          nvidia-smi
+      - name: Test Tritonbench operators
+        run: |
+          bash ./.ci/tritonbench/test-operators.sh
+      - name: Clean up Conda env
+        if: always()
+        run: |
+          . "${SETUP_SCRIPT}"
+          conda deactivate && conda deactivate
+          conda remove -n "${CONDA_ENV}" --all
