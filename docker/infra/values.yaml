@@ -245,8 +245,6 @@ template:
           nvidia.com/gpu: 1 # requesting 1 GPU
         limits:
           nvidia.com/gpu: 1 # limiting 1 GPU
-    imagePullSecrets:
-    - name: regcred
     volumes:
     - name: nvidia-lib
       hostPath:
