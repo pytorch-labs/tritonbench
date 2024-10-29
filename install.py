@@ -82,10 +82,12 @@ def install_liger():
     cmd = ["pip", "install", "liger-kernel", "--no-deps"]
     subprocess.check_call(cmd)
 
+
 def install_tk():
     from utils.tk.install import install_tk
 
     install_tk()
+
 
 def install_xformers():
     os_env = os.environ.copy()
@@ -93,6 +95,7 @@ def install_xformers():
     XFORMERS_PATH = REPO_PATH.joinpath("submodules", "xformers")
     cmd = ["pip", "install", "-e", XFORMERS_PATH]
     subprocess.check_call(cmd, env=os_env)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(allow_abbrev=False)
