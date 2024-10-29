@@ -4,8 +4,6 @@ import math
 import os
 from typing import Callable, Generator, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
-
 import torch
 import triton
 import triton.language as tl
