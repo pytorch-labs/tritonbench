@@ -1,9 +1,11 @@
 liger_operators = [
-    "FusedLinearCrossEntropy",
     "embedding",
     "rms_norm",
     "rope",
     "jsd",
+    "cross_entropy",
+    "fused_linear_cross_entropy",
+    "geglu",
 ]
 
 
