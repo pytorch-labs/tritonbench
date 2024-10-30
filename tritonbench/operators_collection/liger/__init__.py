@@ -3,6 +3,7 @@ liger_operators = [
     "rms_norm",
     "rope",
     "jsd",
+    "fused_linear_jsd",
     "cross_entropy",
     "fused_linear_cross_entropy",
     "geglu",

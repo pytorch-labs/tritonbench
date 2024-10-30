@@ -3,6 +3,8 @@ import triton
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
 try:
+    from hammer.ops.triton.utils import prev_power_of_2
+
     # Internal Import
     from hammer.oss.generative_recommenders.ops.triton.triton_ragged_hstu_attention import (
         _ragged_hstu_attn_fwd,
@@ -21,6 +23,19 @@ except ModuleNotFoundError:
             triton_ragged_hstu_attention._ragged_hstu_attn_fwd_persistent
         )
 
+    @torch.fx.wrap
+    def prev_power_of_2(x: int) -> int:
+        if torch.compiler.is_compiling():
+            # Re-write to make Dynamo happy
+            x_tensor = torch.scalar_tensor(x, dtype=torch.int64)  # type: ignore[arg-type]
+            x_tensor_orig = x_tensor.clone()
+            out = triton.next_power_of_2(x_tensor)  # type: ignore[arg-type]
+            return int(torch.where(torch.lt(x_tensor_orig, out), out // 2, out).item())  # type: ignore[return-value]
+        else:
+            out = triton.next_power_of_2(x)
+            return out // 2 if out > x else out
+
+
 from typing import Tuple
 
 
@@ -33,11 +48,11 @@ class RaggedHSTUAttn(torch.nn.Module):
         num_buckets,
         persistent_kernel: bool = False,
     ) -> None:
+        super().__init__()
         self.batch_size = batch_size
         self.num_heads = num_heads
         self.max_seq_len = max_seq_len
         self.num_buckets = num_buckets
-        super().__init__()
         self.all_ts_weights = torch.nn.Parameter(
             torch.randn(
                 (self.num_buckets + 1,),
@@ -55,6 +70,7 @@ class RaggedHSTUAttn(torch.nn.Module):
     def forward(
         self, qkv: torch.Tensor, seq_offsets: torch.Tensor, timestamps: torch.Tensor
     ) -> torch.Tensor:
+        NUM_BUCKETS = self.num_buckets
         torch._check(timestamps.size(0) + 1 == seq_offsets.size(0))
 
         q = qkv[:, :, :128]
@@ -96,10 +112,11 @@ class RaggedHSTUAttn(torch.nn.Module):
             "Z": Z,
             "H": H,
             "MAX_SEQ_LEN": N,
+            "AUTOTUNE_MAX_SEQ_LEN": prev_power_of_2(N),
             "DimQ": DimQ,
             "DimV": DimV,
             "DeltaSize": None,
-            "num_buckets": self.num_buckets,
+            "num_buckets": NUM_BUCKETS,
             "max_pos_ind": None,
             "time_bucket_incr": 60.0,
             "time_bucket_div": 1.0,
@@ -119,17 +136,19 @@ class RaggedHSTUAttn(torch.nn.Module):
             "BLOCK_D_V": DimV,
             "max_attn_len": 0,
             "HAS_MAX_ATTN_LEN": False,
+            "HAS_CONTEXTUAL_SEQ_LEN": False,
+            "contextual_seq_len": 0,
+            "HAS_SORT_BY_LENGTH_INDICES": False,
+            "sort_by_length_indices": None,
         }
         if self.persistent_kernel:
             grid = (1216,)
-            # pyre-fixme[16]: Module `triton_ragged_hstu_attention` has no attribute
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
         else:
             grid = lambda meta: (  # noqa E731
                 triton.cdiv(N, meta["BLOCK_M"]),
                 Z * H,
             )
-            # pyre-fixme[16]: Module `triton_ragged_hstu_attention` has no attribute
             _ragged_hstu_attn_fwd[grid](**kwargs)
 
         return out

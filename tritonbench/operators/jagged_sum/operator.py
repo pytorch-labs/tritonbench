@@ -94,6 +94,7 @@ def execute_kernel_variable_length_loop(x, sum_then_buffer):
 class Operator(BenchmarkOperator):
 
     DEFAULT_METRICS = ["latency", "accuracy", "best_config"]
+    DEFAULT_PRECISION = "fp32"
     use_cuda_graphs = (
         False  # enables GPU/CPU sync (for methods like NestedTensor unbind)
     )
