@@ -5,9 +5,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from utils.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
-from utils.git_utils import checkout_submodules
-from utils.python_utils import pip_install_requirements
+from tools.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
+from tools.git_utils import checkout_submodules
+from tools.python_utils import pip_install_requirements
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
