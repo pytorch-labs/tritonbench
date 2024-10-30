@@ -1,0 +1,1 @@
+from .test import load_cpu_tests
