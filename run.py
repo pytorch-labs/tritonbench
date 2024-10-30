@@ -215,7 +215,7 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             else:
                 print(metrics)
         if IS_FBCODE and args.log_scuba:
-            from .fb.utils import log_benchmark
+            from .fb.utils import log_benchmark  # @manual
 
             if "hardware" in args:
                 log_benchmark(
@@ -249,7 +249,7 @@ def run(args: List[str] = []):
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
     if args.ci:
-        from .ci import run_ci
+        from .ci import run_ci  # @manual
 
         run_ci()
         return
