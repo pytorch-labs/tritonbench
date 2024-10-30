@@ -2,4 +2,4 @@
 
 set -x
 
-python -m unittest test.test_cpu
+python -m unittest test.test_cpu.main
