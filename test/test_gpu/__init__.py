@@ -1,1 +1,0 @@
-from .test import load_gpu_tests
