@@ -146,6 +146,9 @@ def get_parser(args=None):
         action="store_true",
         help="Benchmarking aten ops in tritonbench/operator_loader.",
     )
+    parser.add_argument(
+        "--cudagraph", action="store_true", help="Benchmark with CUDA graph."
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")

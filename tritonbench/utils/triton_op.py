@@ -551,6 +551,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self.name = _find_op_name_from_module_path(self.__class__.__module__)
         self._raw_extra_args = copy.deepcopy(extra_args)
         self.tb_args = tb_args
+        self.use_cuda_graphs = (
+            self.tb_args.cudagraph if self.tb_args.cudagraph else self.use_cuda_graphs
+        )
         # we accept both "fwd" and "eval"
         if self.tb_args.mode == "fwd":
             self.mode = Mode.FWD
