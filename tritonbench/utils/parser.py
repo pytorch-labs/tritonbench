@@ -54,6 +54,7 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--iter",
+        type=int,
         default=DEFAULT_RUN_ITERS,
         help="Num of reps for each benchmark run.",
     )
