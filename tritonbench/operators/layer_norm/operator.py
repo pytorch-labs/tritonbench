@@ -15,8 +15,10 @@ from . import tutorial
 
 try:
     from liger_kernel.ops.layer_norm import LigerLayerNormFunction
+    HAS_LIGER_KERNEL = True
 except ModuleNotFoundError:
     LigerLayerNormFunction = None
+    HAS_LIGER_KERNEL = False
 
 class Operator(BenchmarkOperator):
     @register_benchmark()
@@ -35,7 +37,7 @@ class Operator(BenchmarkOperator):
 
         return lambda: inner(*args)
 
-    @register_benchmark(enabled=True, ci=False)
+    @register_benchmark(ci=HAS_LIGER_KERNEL)
     def liger_layer_norm(self, *args):
         (x, w_shape, weight, bias, eps) = args
         return lambda: LigerLayerNormFunction.apply(x, weight, bias, eps)
