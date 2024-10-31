@@ -13,6 +13,14 @@ from tritonbench.utils.triton_op import (
 
 from . import tutorial
 
+try:
+    from liger_kernel.ops.layer_norm import LigerLayerNormFunction
+
+    HAS_LIGER_KERNEL = True
+except ModuleNotFoundError:
+    LigerLayerNormFunction = None
+    HAS_LIGER_KERNEL = False
+
 
 class Operator(BenchmarkOperator):
     @register_benchmark()
@@ -30,6 +38,11 @@ class Operator(BenchmarkOperator):
             return F.layer_norm(*args)
 
         return lambda: inner(*args)
+
+    @register_benchmark(ci=HAS_LIGER_KERNEL)
+    def liger_layer_norm(self, *args):
+        (x, w_shape, weight, bias, eps) = args
+        return lambda: LigerLayerNormFunction.apply(x, weight, bias, eps)
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         y = fwd_fn()
