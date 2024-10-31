@@ -18,10 +18,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import numpy
+import psutil
 import tabulate
 import torch
 import triton
-import psutil
 from tritonbench.components.ncu import analyzer as ncu_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
@@ -62,7 +62,7 @@ ENABLED_BENCHMARKS: Dict[str, List[str]] = {}
 REGISTERED_METRICS: Dict[str, List[str]] = {}
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
-BASELINE_SKIP_METRICS = set(["speedup", "accuracy", "mem_footprint"])
+BASELINE_SKIP_METRICS = {"speedup", "accuracy", "mem_footprint"}
 X_ONLY_METRICS = set(["hw_roofline"])
 PRECISION_DTYPE_MAPPING = {
     "fp32": torch.float32,
@@ -905,7 +905,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             fn = self._get_bm_func(fn_name)
             if baseline:
                 self.baseline_fn = fn
-            if set(["latency", "tflops", "speedup", "compile_time"]) & set(
+            if {"latency", "tflops", "speedup", "compile_time"} & set(
                 self.required_metrics
             ):
                 if self.use_cuda_graphs:
@@ -924,7 +924,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         return_mode="median",
                         grad_to_none=self.get_grad_to_none(self.example_inputs),
                     )
-            if set(["gpu_peak_mem", "gpu_mem_footprint", "cpu_peak_mem"]) & set(
+            if {"gpu_peak_mem", "gpu_mem_footprint", "cpu_peak_mem"} & set(
                 self.required_metrics
             ):
                 metrics.cpu_peak_mem, metrics.gpu_peak_mem = self.get_peak_mem(
@@ -1105,7 +1105,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         torch.cuda.synchronize()
         g = torch.cuda.CUDAGraph()
         with torch.cuda.graph(g):
-            for i in range(n_repeat):
+            for _ in range(n_repeat):
                 if grad_to_none is not None:
                     for x in grad_to_none:
                         x.grad = None
@@ -1118,7 +1118,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         fn()
         di.synchronize()
         # benchmark
-        for i in range(n_repeat):
+        for _ in range(n_repeat):
             if grad_to_none is not None:
                 for x in grad_to_none:
                     x.grad = None
@@ -1166,7 +1166,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 fn, n_repeat=2, grad_to_none=grad_to_none, device_type=device_type
             )
         if device_type == "cuda" and (
-            set(["gpu_peak_mem", "mem_footprint"]) & set(required_metrics)
+            {"gpu_peak_mem", "mem_footprint"} & set(required_metrics)
         ):
             gpu_peak_mem = torch.cuda.max_memory_allocated() / 10**9
         if "cpu_peak_mem" in required_metrics:
