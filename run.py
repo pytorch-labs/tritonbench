@@ -21,7 +21,7 @@ from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 
 try:
     if IS_FBCODE:
-        from .fb.run_utils import usage_report_logger
+        from .fb.run_utils import usage_report_logger  # @manual
     else:
         usage_report_logger = lambda *args, **kwargs: None
 except ImportError:
