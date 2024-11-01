@@ -23,7 +23,7 @@ from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 
 try:
     if IS_FBCODE:
-        from .fb.run_utils import usage_report_logger  # @manual
+        from .fb.utils import usage_report_logger  # @manual
     else:
         usage_report_logger = lambda *args, **kwargs: None
 except ImportError:
@@ -80,13 +80,13 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             if "hardware" in args:
                 log_benchmark(
                     metrics=metrics,
-                    bencmark_name=args.op,
+                    benchmark_name=args.op,
                     device=args.device,
                     hardware=args.hardware,
                 )
             else:
                 log_benchmark(
-                    metrics=metrics, bencmark_name=args.op, device=args.device
+                    metrics=metrics, benchmark_name=args.op, device=args.device
                 )
         if args.plot:
             try:

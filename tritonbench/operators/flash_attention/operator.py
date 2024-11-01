@@ -67,7 +67,9 @@ try:
 except (ImportError, IOError, AttributeError):
     pass
 
-HAS_CUDA_124 = torch.cuda.is_available() and torch.version.cuda >= "12.4"
+HAS_CUDA_124 = (
+    torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
+)
 
 # [Optional] flash_attn v3
 HAS_FLASH_V3 = True
