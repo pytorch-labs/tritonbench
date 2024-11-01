@@ -972,9 +972,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         # Get the full NCU metric name and add it to our list
                         full_metric_name = ncu_analyzer.short_ncu_metric_name[short_ncu_metric]
                         ncu_metrics.append(full_metric_name)
+            extend_ncu_args = (
+                ["--metrics", ",".join(ncu_metrics)] if ncu_metrics else None
+            )
             if ncu_metrics or "ncu_rep" in self.required_metrics:
                 metrics.ncu_rep = self.ncu_trace(
-                    input_id, fn_name, replay=True, extend_ncu_args=ncu_metrics
+                    input_id, fn_name, replay=True, extend_ncu_args=extend_ncu_args
                 )
             # Read and update NCU metrics if any required metrics match the NCU metrics
             if ncu_metrics:
