@@ -1,11 +1,15 @@
 import argparse
-from typing import Callable, Generator, List, Optional
+from typing import Callable, Generator, List, Optional, Tuple
 
 import torch
 
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaMLP
-from tritonbench.utils.triton_op import BenchmarkOperator, register_benchmark
+from tritonbench.utils.triton_op import (
+    BenchmarkOperator,
+    register_benchmark,
+    register_x_val,
+)
 
 
 try:
@@ -46,17 +50,25 @@ class Operator(BenchmarkOperator):
             yield (input,)
 
     @register_benchmark(baseline=True)
-    def LlamaMLP(self, input) -> Callable:
+    def torch_geglu(self, input) -> Callable:
         return lambda: self.baseline_model(input)
 
     @register_benchmark()
-    def LigerGEGLUMLP(self, input) -> Callable:
+    def liger_geglu(self, input) -> Callable:
         return lambda: self.liger_model(input)
 
     @register_benchmark()
-    def InductorLlamaMLP(self, input) -> Callable:
+    def inductor_geglu(self, input) -> Callable:
         compiled = torch.compile(self.baseline_model, dynamic=False)
         return lambda: compiled(input)
+
+    @register_x_val(label="(B, T, H)")
+    def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
+        return (
+            example_inputs[0].size(0),
+            example_inputs[0].size(1),
+            example_inputs[0].size(2),
+        )
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         y = fwd_fn()
