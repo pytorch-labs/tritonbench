@@ -964,13 +964,18 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             # metrics. Only profile with the necessary metrics to avoid excessive
             # overhead.
             ncu_metrics = []
-            for bench_metric, short_ncu_metrics in ncu_analyzer.bench_metric_to_short_ncu_metric.items():
+            for (
+                bench_metric,
+                short_ncu_metrics,
+            ) in ncu_analyzer.bench_metric_to_short_ncu_metric.items():
                 # Only process metrics that are required
                 if bench_metric in self.required_metrics:
                     # For each short metric name in the list of metrics for this benchmark metric
                     for short_ncu_metric in short_ncu_metrics:
                         # Get the full NCU metric name and add it to our list
-                        full_metric_name = ncu_analyzer.short_ncu_metric_name[short_ncu_metric]
+                        full_metric_name = ncu_analyzer.short_ncu_metric_name[
+                            short_ncu_metric
+                        ]
                         ncu_metrics.append(full_metric_name)
             extend_ncu_args = (
                 ["--metrics", ",".join(ncu_metrics)] if ncu_metrics else None
