@@ -290,7 +290,7 @@ class Operator(BenchmarkOperator):
         )
         return fhma_input
 
-    @register_benchmark(enabled=False, ci=False)
+    @register_benchmark(enabled=False)
     def xformers(
         self,
         q: torch.Tensor,
@@ -301,7 +301,7 @@ class Operator(BenchmarkOperator):
         xformers_cutlass_fhma = xformers.ops.fmha.cutlass.FwOp
         return lambda: xformers_cutlass_fhma().apply(fhma_input, needs_gradient=False)
 
-    @register_benchmark(enabled=False, ci=False)
+    @register_benchmark(enabled=False)
     def xformers_splitk(
         self,
         q: torch.Tensor,
@@ -319,7 +319,7 @@ class Operator(BenchmarkOperator):
             torch.transpose(v, 1, 2),
         )
 
-    @register_benchmark(enabled=False, ci=False)
+    @register_benchmark(enabled=False)
     def colfax_cutlass(self, q, k, v):
         default_scale = 1.0 / math.sqrt(float(self.D_HEAD))
         colfax_q, colfax_k, colfax_v = self.colfax_cutlass_preprocess(q, k, v)
@@ -333,7 +333,7 @@ class Operator(BenchmarkOperator):
             default_scale,
         )
 
-    @register_benchmark(enabled=False, ci=False)
+    @register_benchmark(enabled=False)
     def tk(self, q, k, v):
         o = torch.zeros_like(v)
 
@@ -346,9 +346,7 @@ class Operator(BenchmarkOperator):
 
         return tk_dispatcher
 
-    @register_benchmark(
-        enabled=False, label=f"cudnn_{torch.backends.cudnn.version()}", ci=False
-    )
+    @register_benchmark(enabled=False, label=f"cudnn_{torch.backends.cudnn.version()}")
     def cudnn(self, q, k, v):
         os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
 

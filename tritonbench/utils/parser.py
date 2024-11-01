@@ -104,7 +104,12 @@ def get_parser(args=None):
     parser.add_argument(
         "--only",
         default=None,
-        help="Specify one or multiple operator implementations to run.",
+        help="Specify one or multiple kernel implementations to run.",
+    )
+    parser.add_argument(
+        "--skip",
+        default=None,
+        help="Specify one or multiple kernel implementations to skip.",
     )
     parser.add_argument(
         "--baseline", type=str, default=None, help="Override default baseline."

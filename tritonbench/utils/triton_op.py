@@ -590,6 +590,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         if self.tb_args.baseline:
             BASELINE_BENCHMARKS[self.name] = self.tb_args.baseline
         self._only = _split_params_by_comma(self.tb_args.only)
+        self._skip = _split_params_by_comma(self.tb_args.skip)
         self._input_id = self.tb_args.input_id
         self._num_inputs = self.tb_args.num_inputs
 
@@ -673,6 +674,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
+                elif self._skip:
+                    benchmarks = [
+                        bm
+                        for bm in REGISTERED_BENCHMARKS[self.name].keys()
+                        if bm not in self._skip
+                    ]
                 else:
                     benchmarks = (
                         [bm for bm in ENABLED_BENCHMARKS[self.name]]

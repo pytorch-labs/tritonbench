@@ -162,7 +162,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE, ci=False)
+    @register_benchmark(enabled=not IS_FBCODE)
     def triton_tma_persistent_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if not bias == None:
@@ -170,7 +170,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_tma_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE, ci=False)
+    @register_benchmark(enabled=not IS_FBCODE)
     def triton_tma_persistent_cached_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if not bias == None:
@@ -198,7 +198,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: hstu_triton_matmul(a, b)
 
-    @register_benchmark(enabled=bool(colfax_gemm), ci=False)
+    @register_benchmark(enabled=bool(colfax_gemm))
     def colfax_cutlass_matmul(self, a, b, bias) -> Callable:
         assert colfax_gemm, f"colfax_gemm operator is not available."
         if not bias == None:
