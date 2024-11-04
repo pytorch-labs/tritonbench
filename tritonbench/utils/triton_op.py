@@ -416,7 +416,6 @@ def register_x_val(label: str = "x_val"):
 def register_benchmark(
     baseline: bool = False,
     enabled: bool = True,
-    ci: bool = True,
     label: Optional[str] = None,
 ):
     def decorator(function):
@@ -425,8 +424,7 @@ def register_benchmark(
             name=function.__name__,
             label=label if label else function.__name__,
             baseline=baseline,
-            enabled=enabled if ci else False,
-            ci=ci,
+            enabled=enabled,
         )
         if not operator_name in REGISTERED_BENCHMARKS:
             REGISTERED_BENCHMARKS[operator_name] = OrderedDict()
@@ -452,7 +450,6 @@ def register_benchmark_mannually(
     baseline: bool = False,
     enabled: bool = True,
     label: Optional[str] = None,
-    ci: bool = True,
 ):
     """
     Manually register a benchmark function for a given operator.
@@ -479,7 +476,6 @@ def register_benchmark_mannually(
         label=label if label else func_name,
         baseline=baseline,
         enabled=enabled,
-        ci=ci,
     )
     if baseline:
         BASELINE_BENCHMARKS[operator_name] = func_name
