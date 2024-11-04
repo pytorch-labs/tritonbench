@@ -124,7 +124,7 @@ def run(args: List[str] = []):
         for op in ops:
             args.op = op
             if args.isolate:
-                _run_in_task(op)
+                run_in_task(op)
             else:
                 _run(args, extra_args)
 
