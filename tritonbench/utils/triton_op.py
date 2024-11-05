@@ -418,7 +418,6 @@ def register_x_val(label: str = "x_val"):
 def register_benchmark(
     baseline: bool = False,
     enabled: bool = True,
-    ci: bool = True,
     label: Optional[str] = None,
 ):
     def decorator(function):
@@ -427,8 +426,7 @@ def register_benchmark(
             name=function.__name__,
             label=label if label else function.__name__,
             baseline=baseline,
-            enabled=enabled if ci else False,
-            ci=ci,
+            enabled=enabled,
         )
         if not operator_name in REGISTERED_BENCHMARKS:
             REGISTERED_BENCHMARKS[operator_name] = OrderedDict()
@@ -454,7 +452,6 @@ def register_benchmark_mannually(
     baseline: bool = False,
     enabled: bool = True,
     label: Optional[str] = None,
-    ci: bool = True,
 ):
     """
     Manually register a benchmark function for a given operator.
@@ -481,7 +478,6 @@ def register_benchmark_mannually(
         label=label if label else func_name,
         baseline=baseline,
         enabled=enabled,
-        ci=ci,
     )
     if baseline:
         BASELINE_BENCHMARKS[operator_name] = func_name
@@ -592,6 +588,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         if self.tb_args.baseline:
             BASELINE_BENCHMARKS[self.name] = self.tb_args.baseline
         self._only = _split_params_by_comma(self.tb_args.only)
+        self._skip = _split_params_by_comma(self.tb_args.skip)
         self._input_id = self.tb_args.input_id
         self._num_inputs = self.tb_args.num_inputs
 
@@ -675,6 +672,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
+                elif self._skip:
+                    benchmarks = [
+                        bm
+                        for bm in REGISTERED_BENCHMARKS[self.name].keys()
+                        if bm not in self._skip
+                    ]
                 else:
                     benchmarks = (
                         [bm for bm in ENABLED_BENCHMARKS[self.name]]

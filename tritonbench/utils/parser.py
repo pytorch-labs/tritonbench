@@ -1,7 +1,8 @@
 import argparse
 
-from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
+from typing import List
 
+from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
 from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP, IS_FBCODE
 
 
@@ -103,7 +104,12 @@ def get_parser(args=None):
     parser.add_argument(
         "--only",
         default=None,
-        help="Specify one or multiple operator implementations to run.",
+        help="Specify one or multiple kernel implementations to run.",
+    )
+    parser.add_argument(
+        "--skip",
+        default=None,
+        help="Specify one or multiple kernel implementations to skip.",
     )
     parser.add_argument(
         "--baseline", type=str, default=None, help="Override default baseline."
@@ -149,9 +155,20 @@ def get_parser(args=None):
     parser.add_argument(
         "--cudagraph", action="store_true", help="Benchmark with CUDA graph."
     )
+    parser.add_argument(
+        "--isolate",
+        action="store_true",
+        help="Run each operator in a separate child process. By default, it will always continue on failure.",
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
+        parser.add_argument(
+            "--logging-name",
+            type=str,
+            default=None,
+            help="Override default name for logging in scuba.",
+        )
 
     args, extra_args = parser.parse_known_args(args)
     if args.op and args.ci:
@@ -161,3 +178,27 @@ def get_parser(args=None):
             "Neither operator nor operator collection is specified. Running all operators in the default collection."
         )
     return parser
+
+
+def _find_param_loc(params, key: str) -> int:
+    try:
+        return params.index(key)
+    except ValueError:
+        return -1
+
+
+def _remove_params(params, loc):
+    if loc == -1:
+        return params
+    return params[:loc] + params[loc + 2 :]
+
+
+def add_cmd_parameter(args: List[str], name: str, value: str) -> List[str]:
+    args.append(name)
+    args.append(value)
+    return args
+
+
+def remove_cmd_parameter(args: List[str], name: str) -> List[str]:
+    loc = _find_param_loc(args, name)
+    return _remove_params(args, loc)

@@ -1,9 +1,13 @@
 import argparse
-from typing import Callable, Generator, List, Optional
+from typing import Callable, Generator, List, Optional, Tuple
 
 import torch
 
-from tritonbench.utils.triton_op import BenchmarkOperator, register_benchmark
+from tritonbench.utils.triton_op import (
+    BenchmarkOperator,
+    register_benchmark,
+    register_x_val,
+)
 
 try:
     from liger_kernel.transformers.fused_linear_cross_entropy import (
@@ -91,17 +95,21 @@ class Operator(BenchmarkOperator):
             yield _input, target
 
     @register_benchmark(baseline=True)
-    def LMHeadCE(self, input, target) -> Callable:
+    def torch_lm_head_ce(self, input, target) -> Callable:
         return lambda: self.baseline_model(input, target)
 
     @register_benchmark()
-    def LigerLMHeadCE(self, input, target) -> Callable:
+    def liger_lm_head_ce(self, input, target) -> Callable:
         return lambda: self.liger_model(input, target)
 
     @register_benchmark()
     def inductor_fused_linear_cross_entropy(self, input, target) -> Callable:
         compiled = torch.compile(self.baseline_model, dynamic=False)
         return lambda: compiled(input, target)
+
+    @register_x_val(label="(B*T, H)")
+    def get_x_val(self, example_inputs) -> Tuple[int, int]:
+        return (example_inputs[0].size(0), example_inputs[0].size(1))
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         y = fwd_fn()
