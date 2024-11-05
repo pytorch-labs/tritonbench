@@ -1012,6 +1012,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
                 for metric_name, metric_value in ncu_analyzer_results.items():
                     metrics.extra_metrics[metric_name] = metric_value
+                if "arithmetic_intensity" in self.required_metrics:
+                    logger.warning(
+                        "Arithmetic intensity only supports FP32 and FP64 for now."
+                    )
             if "ncu_rep_ir" in self.required_metrics:
                 metrics.ncu_rep_ir = self.ncu_trace(
                     input_id, fn_name, replay=True, profile_ir=True
