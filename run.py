@@ -6,7 +6,9 @@ Note: make sure to `python install.py` first or otherwise make sure the benchmar
 """
 
 import argparse
+import copy
 import os
+import subprocess
 import sys
 import tempfile
 from typing import List
@@ -15,19 +17,37 @@ from tritonbench.operator_loader import load_opbench_by_name_from_loader
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.gpu_utils import gpu_lockdown
-from tritonbench.utils.parser import get_parser
+from tritonbench.utils.parser import add_cmd_parameter, get_parser, remove_cmd_parameter
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 
 try:
     if IS_FBCODE:
-        from .fb.run_utils import usage_report_logger  # @manual
+        from .fb.utils import usage_report_logger  # @manual
     else:
         usage_report_logger = lambda *args, **kwargs: None
 except ImportError:
     usage_report_logger = lambda *args, **kwargs: None
 
 TRITON_BENCH_CSV_DUMP_PATH = tempfile.gettempdir() + "/tritonbench/"
+
+
+def _run_in_task(op: str) -> None:
+    op_task_cmd = [] if IS_FBCODE else [sys.executable]
+    copy_sys_argv = copy.deepcopy(sys.argv)
+    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
+    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
+    add_cmd_parameter(copy_sys_argv, "--op", op)
+    op_task_cmd.extend(copy_sys_argv)
+    try:
+        print("[tritonbench] running command: " + " ".join(op_task_cmd))
+        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr)
+    except subprocess.CalledProcessError:
+        # By default, we will continue on the failed operators
+        pass
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt received, exiting...")
+        sys.exit(1)
 
 
 def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorResult:
@@ -60,13 +80,17 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             if "hardware" in args:
                 log_benchmark(
                     metrics=metrics,
-                    bencmark_name=args.op,
+                    benchmark_name=args.op,
                     device=args.device,
                     hardware=args.hardware,
+                    logging_op_name=args.logging_name,
                 )
             else:
                 log_benchmark(
-                    metrics=metrics, bencmark_name=args.op, device=args.device
+                    metrics=metrics,
+                    benchmark_name=args.op,
+                    device=args.device,
+                    logging_op_name=args.logging_name,
                 )
         if args.plot:
             try:
@@ -102,7 +126,10 @@ def run(args: List[str] = []):
     with gpu_lockdown(args.gpu_lockdown):
         for op in ops:
             args.op = op
-            _run(args, extra_args)
+            if args.isolate:
+                _run_in_task(op)
+            else:
+                _run(args, extra_args)
 
 
 if __name__ == "__main__":

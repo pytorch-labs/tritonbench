@@ -39,7 +39,7 @@ class Operator(BenchmarkOperator):
 
         return lambda: inner(*args)
 
-    @register_benchmark(ci=HAS_LIGER_KERNEL)
+    @register_benchmark()
     def liger_layer_norm(self, *args):
         (x, w_shape, weight, bias, eps) = args
         return lambda: LigerLayerNormFunction.apply(x, weight, bias, eps)

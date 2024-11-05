@@ -1,2 +1,3 @@
 packaging
 pynvml
+transformers==4.46.1
