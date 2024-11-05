@@ -984,16 +984,23 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             # Collect NCU metrics if any required metrics match the ncu analyzer
             # metrics. Only profile with the necessary metrics to avoid excessive
             # overhead.
-            ncu_metrics = [
-                ncu_analyzer.short_ncu_metric_name[short_ncu_metric]
-                for bench_metric, short_ncu_metrics in ncu_analyzer.bench_metric_to_short_ncu_metric.items()
-                if bench_metric in self.required_metrics
-                for short_ncu_metric in short_ncu_metrics
-            ]
-            if ncu_metrics:
-                extend_ncu_args = ["--metrics", ",".join(ncu_metrics)]
-            else:
-                extend_ncu_args = None
+            ncu_metrics = []
+            for (
+                bench_metric,
+                short_ncu_metrics,
+            ) in ncu_analyzer.bench_metric_to_short_ncu_metric.items():
+                # Only process metrics that are required
+                if bench_metric in self.required_metrics:
+                    # For each short metric name in the list of metrics for this benchmark metric
+                    for short_ncu_metric in short_ncu_metrics:
+                        # Get the full NCU metric name and add it to our list
+                        full_metric_name = ncu_analyzer.short_ncu_metric_name[
+                            short_ncu_metric
+                        ]
+                        ncu_metrics.append(full_metric_name)
+            extend_ncu_args = (
+                ["--metrics", ",".join(ncu_metrics)] if ncu_metrics else None
+            )
             if ncu_metrics or "ncu_rep" in self.required_metrics:
                 metrics.ncu_rep = self.ncu_trace(
                     input_id, fn_name, replay=True, extend_ncu_args=extend_ncu_args
@@ -1005,6 +1012,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
                 for metric_name, metric_value in ncu_analyzer_results.items():
                     metrics.extra_metrics[metric_name] = metric_value
+                if "arithmetic_intensity" in self.required_metrics:
+                    logger.warning(
+                        "Arithmetic intensity only supports FP32 and FP64 for now."
+                    )
             if "ncu_rep_ir" in self.required_metrics:
                 metrics.ncu_rep_ir = self.ncu_trace(
                     input_id, fn_name, replay=True, profile_ir=True

@@ -21,6 +21,7 @@ short_ncu_metric_name = {
     "dram_bytes_write": "dram__bytes_write.sum",
     "dram_bytes_read": "dram__bytes_read.sum",
     "dram_bytes_per_second": "dram__bytes.sum.per_second",
+    "dram_bytes": "dram__bytes.sum",
     "sm_freq": "smsp__cycles_elapsed.avg.per_second",
     "dram_bandwidth": "dram__bytes.sum.per_second",
     "duration": "gpu__time_duration.sum",
@@ -40,6 +41,7 @@ bench_metric_to_short_ncu_metric = {
         "inst_executed_dfma",
         "dram_bytes_write",
         "dram_bytes_read",
+        "dram_bytes",
         "sm_freq",
         "dram_bandwidth",
         "duration",
@@ -81,7 +83,7 @@ def get_duration(kernel):
 
 # Reference: ncu_install_path/sections/SpeedOfLight_Roofline.py
 # and ncu_install_path/sections/SpeedOfLight_RooflineChart.section
-def get_arithmetic_intensity(kernel):
+def get_flops(kernel):
     fp32_add_achieved = kernel.metric_by_name(
         short_ncu_metric_name["inst_executed_fadd"]
     ).value()
@@ -105,9 +107,14 @@ def get_arithmetic_intensity(kernel):
     sm_freq = kernel.metric_by_name(short_ncu_metric_name["sm_freq"]).value()
     fp32_flops = fp32_achieved * sm_freq
     fp64_flops = fp64_achieved * sm_freq
+    return fp32_flops, fp64_flops
+
+
+def get_arithmetic_intensity(kernel):
     dram_bandwidth = kernel.metric_by_name(
         short_ncu_metric_name["dram_bandwidth"]
     ).value()
+    fp32_flops, fp64_flops = get_flops(kernel)
     fp32_arithmetic_intensity = fp32_flops / dram_bandwidth
     fp64_arithmetic_intensity = fp64_flops / dram_bandwidth
     return fp32_arithmetic_intensity, fp64_arithmetic_intensity
@@ -131,22 +138,25 @@ def read_ncu_report(report_path: str, required_metrics: List[str]):
         default_range.num_actions() > 0
     ), f"No profile data found in the default range of the NCU report at {report_path}"
     total_duration = 0
+    total_dram_bytes = 0
     weighted_fp32_ai_sum = 0
     weighted_fp64_ai_sum = 0
     for i in range(default_range.num_actions()):
         kernel = default_range.action_by_idx(i)
         duration = get_duration(kernel)
+        dram_bytes = kernel.metric_by_name(short_ncu_metric_name["dram_bytes"]).value()
         if "memory_traffic" in required_metrics:
             results["memory_traffic_raw"].append(get_mem_traffic(kernel))
         if "arithmetic_intensity" in required_metrics:
             fp32_ai, fp64_ai = get_arithmetic_intensity(kernel)
-            weighted_fp32_ai_sum += fp32_ai * duration
-            weighted_fp64_ai_sum += fp64_ai * duration
+            weighted_fp32_ai_sum += fp32_ai * dram_bytes
+            weighted_fp64_ai_sum += fp64_ai * dram_bytes
             # do not use the arithmetic_intensity_raw in benchmark metric argument
             # because metric printer will only print the first element of the list
             results["arithmetic_intensity_raw"].append((fp32_ai, fp64_ai))
             results["durations"].append(duration)
         total_duration += duration
+        total_dram_bytes += dram_bytes
     if "memory_traffic" in required_metrics:
         memory_traffic_read = [item[0] for item in results["memory_traffic_raw"]]
         memory_traffic_write = [item[1] for item in results["memory_traffic_raw"]]
@@ -158,10 +168,10 @@ def read_ncu_report(report_path: str, required_metrics: List[str]):
         )
     if "arithmetic_intensity" in required_metrics:
         results["weighted_fp32_arithmetic_intensity"] = (
-            weighted_fp32_ai_sum / total_duration
+            weighted_fp32_ai_sum / total_dram_bytes
         )
         results["weighted_fp64_arithmetic_intensity"] = (
-            weighted_fp64_ai_sum / total_duration
+            weighted_fp64_ai_sum / total_dram_bytes
         )
         results["arithmetic_intensity"] = (
             results["weighted_fp32_arithmetic_intensity"],
