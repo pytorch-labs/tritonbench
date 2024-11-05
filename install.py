@@ -53,7 +53,7 @@ def test_fbgemm():
 
 
 def install_cutlass():
-    from utils.cutlass_kernels.install import install_colfax_cutlass
+    from tools.cutlass_kernels.install import install_colfax_cutlass
 
     install_colfax_cutlass()
 
@@ -84,7 +84,7 @@ def install_liger():
 
 
 def install_tk():
-    from utils.tk.install import install_tk
+    from tools.tk.install import install_tk
 
     install_tk()
 
