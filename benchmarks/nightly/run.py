@@ -6,6 +6,9 @@ from tritonbench.utils.parser import run_in_task
 
 OPERATORS = [
     "launch_latency",
+    "addmm",
+    "gemm",
+    "flash_attention",
 ]
 
 
