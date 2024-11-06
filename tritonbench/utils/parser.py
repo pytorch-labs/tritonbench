@@ -1,8 +1,4 @@
 import argparse
-import copy
-import sys
-import subprocess
-
 from typing import List
 
 from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
@@ -82,11 +78,6 @@ def get_parser(args=None):
         "--plot",
         action="store_true",
         help="Plot the result.",
-    )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="Run in the CI mode.",
     )
     parser.add_argument(
         "--metrics",
@@ -226,20 +217,3 @@ def add_cmd_parameter(args: List[str], name: str, value: str) -> List[str]:
 def remove_cmd_parameter(args: List[str], name: str) -> List[str]:
     loc = _find_param_loc(args, name)
     return _remove_params(args, loc)
-
-def run_in_task(op: str) -> None:
-    op_task_cmd = [] if IS_FBCODE else [sys.executable]
-    copy_sys_argv = copy.deepcopy(sys.argv)
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
-    add_cmd_parameter(copy_sys_argv, "--op", op)
-    op_task_cmd.extend(copy_sys_argv)
-    try:
-        print("[tritonbench] running command: " + " ".join(op_task_cmd))
-        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr)
-    except subprocess.CalledProcessError:
-        # By default, we will continue on the failed operators
-        pass
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt received, exiting...")
-        sys.exit(1)

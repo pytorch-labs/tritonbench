@@ -17,7 +17,7 @@ from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.gpu_utils import gpu_lockdown
 from tritonbench.utils.parser import get_parser
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
-
+from tritonbench.utils.runner import run_in_task
 from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 
 try:
@@ -105,11 +105,6 @@ def run(args: List[str] = []):
     usage_report_logger(benchmark_name="tritonbench")
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
-    if args.ci:
-        from .ci import run_ci  # @manual
-
-        run_ci()
-        return
 
     if args.op:
         ops = args.op.split(",")

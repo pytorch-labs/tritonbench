@@ -5,7 +5,6 @@ import os
 import sys
 from os.path import abspath, exists
 
-
 def setup_tritonbench_cwd():
     original_dir = abspath(os.getcwd())
 
@@ -33,10 +32,12 @@ OPERATORS = [
 
 def run():
     setup_tritonbench_cwd()
-    from tritonbench.utils.parser import run_in_task
-    for op in OPERATORS:
-        run_in_task(op)
-
+    from tritonbench.utils.runner import tritonbench_run
+    from tritonbench.utils.parser import get_parser
+    args = ["--op", ",".join(OPERATORS), "--isolate"]
+    parser = get_parser()
+    args, extra_args = parser.parse_known_args(args)
+    tritonbench_run(args, extra_args)
 
 if __name__ == "__main__":
     run()
