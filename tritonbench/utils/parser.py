@@ -181,8 +181,6 @@ def get_parser(args=None):
         )
 
     args, extra_args = parser.parse_known_args(args)
-    if args.op and args.ci:
-        parser.error("cannot specify operator when in CI mode")
     if not args.op and not args.op_collection:
         print(
             "Neither operator nor operator collection is specified. Running all operators in the default collection."

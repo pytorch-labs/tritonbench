@@ -32,12 +32,15 @@ OPERATORS = [
 
 def run():
     setup_tritonbench_cwd()
-    from tritonbench.utils.runner import tritonbench_run
     from tritonbench.utils.parser import get_parser
-    args = ["--op", ",".join(OPERATORS), "--isolate"]
-    parser = get_parser()
-    args, extra_args = parser.parse_known_args(args)
-    tritonbench_run(args, extra_args)
+    from tritonbench.utils.runner import run_in_task, tritonbench_run
+    if "--op" in sys.argv:
+        parser = get_parser()
+        args, extra_args = parser.parse_args(sys.argv[2:])
+        tritonbench_run(args, extra_args)
+    for op in OPERATORS:
+        run_in_task(op)
+
 
 if __name__ == "__main__":
     run()
