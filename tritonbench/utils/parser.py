@@ -190,6 +190,8 @@ def _find_param_loc(params, key: str) -> int:
 def _remove_params(params, loc):
     if loc == -1:
         return params
+    if params[loc + 1].startswith("--"):
+        return params[:loc] + params[loc + 1 :]
     return params[:loc] + params[loc + 2 :]
 
 
