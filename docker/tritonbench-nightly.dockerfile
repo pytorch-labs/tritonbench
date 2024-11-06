@@ -16,19 +16,19 @@ RUN git clone --recurse-submodules -b "${TRITONBENCH_BRANCH}" --single-branch \
 # Setup conda env and CUDA
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
-    python ./utils/python_utils.py --create-conda-env ${CONDA_ENV} && \
+    python tools/python_utils.py --create-conda-env ${CONDA_ENV} && \
     echo "if [ -z \${CONDA_ENV} ]; then export CONDA_ENV=${CONDA_ENV}; fi" >> /workspace/setup_instance.sh && \
     echo "conda activate \${CONDA_ENV}" >> /workspace/setup_instance.sh
 
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
-    sudo python ./utils/cuda_utils.py --setup-cuda-softlink
+    sudo python tools/cuda_utils.py --setup-cuda-softlink
 
 # Install PyTorch nightly and verify the date is correct
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
-    python utils/cuda_utils.py --install-torch-deps && \
-    python utils/cuda_utils.py --install-torch-nightly
+    python tools/cuda_utils.py --install-torch-deps && \
+    python tools/cuda_utils.py --install-torch-nightly
 
 # Check the installed version of nightly if needed
 RUN cd /workspace/tritonbench && \
@@ -37,9 +37,9 @@ RUN cd /workspace/tritonbench && \
         echo "torch version check skipped"; \
     elif [ -z "${FORCE_DATE}" ]; then \
         FORCE_DATE=$(date '+%Y%m%d') \
-        python utils/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
+        python tools/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     else \
-        python utils/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
+        python tools/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     fi
 
 # Tritonbench library build and test require libcuda.so.1
