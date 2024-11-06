@@ -36,8 +36,9 @@ def run():
     from tritonbench.utils.runner import run_in_task, tritonbench_run
     if "--op" in sys.argv:
         parser = get_parser()
-        args, extra_args = parser.parse_args(sys.argv[2:])
+        args, extra_args = parser.parse_known_args(sys.argv[1:])
         tritonbench_run(args, extra_args)
+        return
     for op in OPERATORS:
         run_in_task(op)
 
