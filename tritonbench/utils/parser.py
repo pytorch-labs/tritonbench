@@ -1,5 +1,5 @@
 import argparse
-from typing import List
+from typing import List, Optional
 
 from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
 from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP, IS_FBCODE
@@ -206,9 +206,10 @@ def _remove_params(params, loc):
     return params[:loc] + params[loc + 2 :]
 
 
-def add_cmd_parameter(args: List[str], name: str, value: str) -> List[str]:
+def add_cmd_parameter(args: List[str], name: str, value: Optional[str]=None) -> List[str]:
     args.append(name)
-    args.append(value)
+    if value:
+        args.append(value)
     return args
 
 
