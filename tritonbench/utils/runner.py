@@ -69,11 +69,19 @@ def tritonbench_run(args: argparse.Namespace, extra_args: List[str]) -> Benchmar
         return metrics
 
 def run_in_task(op: str) -> None:
+    if "--child" in sys.argv:
+        sys.argv = remove_cmd_parameter(sys.argv, "--child")
+        from tritonbench.utils.parser import get_parser
+        parser = get_parser()
+        args, extra_args = parser.parse_known_args(sys.argv[1:])
+        tritonbench_run(args, extra_args)
+        return
     op_task_cmd = [] if IS_FBCODE else [sys.executable]
     copy_sys_argv = copy.deepcopy(sys.argv)
     copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
     copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
     add_cmd_parameter(copy_sys_argv, "--op", op)
+    add_cmd_parameter(copy_sys_argv, "--child")
     op_task_cmd.extend(copy_sys_argv)
     try:
         print("[tritonbench] running command: " + " ".join(op_task_cmd))
