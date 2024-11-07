@@ -34,11 +34,13 @@ It benchmarks the following FMHA kernels:
 import argparse
 import math
 import os
+from itertools import chain
 
 import torch
 import triton  # @manual=//triton:triton
 
 from tritonbench.utils.path_utils import add_ld_library_path, add_path, SUBMODULE_PATH
+from tritonbench.utils.triton_op import IS_FBCODE
 
 try:
     with add_path(SUBMODULE_PATH.joinpath("kernels")):
@@ -413,11 +415,20 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self) -> Generator:
         D_HEAD = self.D_HEAD
-        ctx_vals = [2**i for i in range(9, 15)]
+
+        def get_ctx_vals():
+            for i in range(9, 15):
+                N_CTX = 2**i
+                BATCH = 16384 // N_CTX
+                H = 2048 // D_HEAD
+                yield (BATCH, H, N_CTX, D_HEAD)
+
+        ctx_vals = get_ctx_vals()
+        shapes = self.__additional_example_input(ctx_vals)
         requires_grad = True
-        for N_CTX in ctx_vals:
-            BATCH = 16384 // N_CTX
-            H = 2048 // D_HEAD
+        for shape in shapes:
+            print(shape)
+            BATCH, H, N_CTX, D_HEAD = shape
             q = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
                 dtype=self.dtype,
@@ -438,39 +449,20 @@ class Operator(BenchmarkOperator):
             )
             self.N_CTX = N_CTX
             yield (q, k, v)
-        for q, k, v in self.__llama_example_input(
-            self.device, self.dtype, requires_grad
-        ):
-            yield (q, k, v)
 
-    def __llama_example_input(self, device, dtype, requires_grad):
-        shapes = [
+    def __additional_example_input(self, standard_shapes: Generator) -> Generator:
+        llama_shapes = [
             (4, 32, 19, 128),
             (4, 32, 1, 128),
             # currently we are only able to use the same shape for q, k, v but in prod q shape is (4, 32, 1, 128) here
             (4, 32, 511, 128),
         ]
-        for shape in shapes:
-            yield (
-                torch.randn(
-                    shape,
-                    dtype=dtype,
-                    device=device,
-                    requires_grad=requires_grad,
-                ),
-                torch.randn(
-                    shape,
-                    dtype=dtype,
-                    device=device,
-                    requires_grad=requires_grad,
-                ),
-                torch.randn(
-                    shape,
-                    dtype=dtype,
-                    device=device,
-                    requires_grad=requires_grad,
-                ),
-            )
+        shapes = chain(standard_shapes, llama_shapes)
+        if self.add_production_shapes:
+            from ...utils.fb.durin_data import get_shapes_from_frozen_durin
+
+            shapes = chain(shapes, get_shapes_from_frozen_durin("attention"))
+        return shapes
 
     @register_x_val(label="(Batch, Heads, SeqLen, Dhead)")
     def get_x_val(self, example_inputs) -> float:

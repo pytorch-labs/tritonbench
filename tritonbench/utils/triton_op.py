@@ -368,8 +368,8 @@ class BenchmarkOperatorResult:
                 )
                 if value is None:
                     continue
-                agg_data[agg_metric_name] = agg_data.get(agg_metric_name, 0) + value
-        final_agg_data = {k: v / num_rows for k, v in agg_data.items()}
+                agg_data[agg_metric_name] = agg_data.get(agg_metric_name, []) + [value]
+        final_agg_data = {k: sum(v) / len(v) for k, v in agg_data.items()}
         userbenchmark_metrics_dict.update(final_agg_data)
 
         return userbenchmark_metrics_dict
@@ -549,6 +549,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self.name = _find_op_name_from_module_path(self.__class__.__module__)
         self._raw_extra_args = copy.deepcopy(extra_args)
         self.tb_args = tb_args
+        self.add_production_shapes = (
+            self.tb_args.production_shapes if IS_FBCODE else False
+        )
         self.use_cuda_graphs = (
             self.tb_args.cudagraph if self.tb_args.cudagraph else self.use_cuda_graphs
         )
@@ -920,13 +923,16 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                             grad_to_none=self.get_grad_to_none(self.example_inputs),
                         )
                 else:
-                    metrics.latency = triton.testing.do_bench(
-                        fn,
-                        warmup=warmup,
-                        rep=rep,
-                        return_mode="median",
-                        grad_to_none=self.get_grad_to_none(self.example_inputs),
-                    )
+                    try:
+                        metrics.latency = triton.testing.do_bench(
+                            fn,
+                            warmup=warmup,
+                            rep=rep,
+                            return_mode="median",
+                            grad_to_none=self.get_grad_to_none(self.example_inputs),
+                        )
+                    except Exception:
+                        metrics.latency = None
             if {"gpu_peak_mem", "gpu_mem_footprint", "cpu_peak_mem"} & set(
                 self.required_metrics
             ):

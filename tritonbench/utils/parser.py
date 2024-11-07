@@ -169,6 +169,11 @@ def get_parser(args=None):
             default=None,
             help="Override default name for logging in scuba.",
         )
+        parser.add_argument(
+            "--production-shapes",
+            action="store_true",
+            help="whether or not to take specific production shapes as input",
+        )
 
     args, extra_args = parser.parse_known_args(args)
     if args.op and args.ci:
