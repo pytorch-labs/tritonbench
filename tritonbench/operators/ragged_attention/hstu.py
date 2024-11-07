@@ -135,7 +135,6 @@ class RaggedHSTUAttn(torch.nn.Module):
             "BLOCK_D_Q": DimQ,
             "BLOCK_D_V": DimV,
             "max_attn_len": 0,
-            "HAS_MAX_ATTN_LEN": False,
             "HAS_CONTEXTUAL_SEQ_LEN": False,
             "contextual_seq_len": 0,
             "HAS_SORT_BY_LENGTH_INDICES": False,
