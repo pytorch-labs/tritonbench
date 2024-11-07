@@ -56,6 +56,7 @@ from torch.nn.functional import scaled_dot_product_attention as sdpa
 
 from tritonbench.kernels.triton_fused_attention import (
     attention as triton_tutorial_FA2,
+    attention_ws as triton_tutorial_FA2_ws,
     attention_tma as triton_tutorial_FA2_tma,
 )
 
@@ -142,6 +143,7 @@ from tritonbench.utils.triton_op import (
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=4, help="Batch size")
+    parser.add_argument("--seq-len", type=int, default=11, help="Batch size")
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
     parser.add_argument("--causal", action="store_true", help="enable causal")
@@ -162,6 +164,7 @@ class Operator(BenchmarkOperator):
         args = parse_op_args(self.extra_args)
         self.use_cuda_graphs = False
         self.BATCH = args.batch
+        self.SEQ_LEN = args.seq_len
         self.H = args.n_heads
         self.D_HEAD = args.d_head
         self.N_CTX = None
@@ -255,6 +258,15 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ) -> Callable:
         return lambda: triton_tutorial_FA2_tma(q, k, v, self.causal, self.sm_scale)
+
+    @register_benchmark(enabled=HAS_CUDA_124)
+    def triton_tutorial_flash_v2_ws(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        return lambda: triton_tutorial_FA2_ws(q, k, v, self.causal, self.sm_scale)
 
     @register_benchmark(enabled=HAS_KERNELS)
     def triton_op_flash_v2(
@@ -415,11 +427,12 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self) -> Generator:
         D_HEAD = self.D_HEAD
+        BATCH = self.BATCH
 
         def get_ctx_vals():
-            for i in range(9, 15):
+            for i in range(self.SEQ_LEN, 15):
                 N_CTX = 2**i
-                BATCH = 16384 // N_CTX
+                #BATCH = 16384 // N_CTX
                 H = 2048 // D_HEAD
                 yield (BATCH, H, N_CTX, D_HEAD)
 
