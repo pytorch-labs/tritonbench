@@ -94,23 +94,23 @@ def get_duration(kernel):
 def get_flops(kernel):
     """
     Calculate the achieved floating point operations per second (FLOPS) for both FP32 and FP64 operations.
-    
+
     This function calculates FLOPS by:
     1. Summing up the achieved ADD, MUL and FMA operations (FMA counts as 2 operations)
     2. Multiplying by the SM frequency to get operations per second
-    
+
     Args:
         kernel: An NCU kernel object containing the profiling metrics
-        
+
     Returns:
         tuple: A pair of (fp32_flops, fp64_flops) containing:
             - fp32_flops: Achieved single precision (FP32) FLOPS
             - fp64_flops: Achieved double precision (FP64) FLOPS
-            
-    Reference: 
-        Implementation based on NVIDIA Nsight Compute's SpeedOfLight_Roofline.py and 
+
+    Reference:
+        Implementation based on NVIDIA Nsight Compute's SpeedOfLight_Roofline.py and
         SpeedOfLight_RooflineChart.section
-    
+
     TODO: Add Tensor FLOPS and Half Precision FLOPS
     """
     fp32_add_achieved = kernel.metric_by_name(
@@ -137,6 +137,7 @@ def get_flops(kernel):
     fp32_flops = fp32_achieved * sm_freq
     fp64_flops = fp64_achieved * sm_freq
     return fp32_flops, fp64_flops
+
 
 def get_arithmetic_intensity(kernel):
     dram_bandwidth = kernel.metric_by_name(
@@ -221,8 +222,12 @@ def read_ncu_report(report_path: str, required_metrics: List[str]):
             flop[1] * dur
             for flop, dur in zip(results["ncu_tflops_raw"], results["durations"])
         )
-        weighted_fp32_tflops_sum = weighted_fp32_flops_sum / (10**12)  # Convert to TFLOPS
-        weighted_fp64_tflops_sum = weighted_fp64_flops_sum / (10**12)  # Convert to TFLOPS
+        weighted_fp32_tflops_sum = weighted_fp32_flops_sum / (
+            10**12
+        )  # Convert to TFLOPS
+        weighted_fp64_tflops_sum = weighted_fp64_flops_sum / (
+            10**12
+        )  # Convert to TFLOPS
         results["ncu_tflops"] = (
             weighted_fp32_tflops_sum / total_duration,
             weighted_fp64_tflops_sum / total_duration,
