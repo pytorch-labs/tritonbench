@@ -160,6 +160,11 @@ def get_parser(args=None):
         action="store_true",
         help="Run each operator in a separate child process. By default, it will always continue on failure.",
     )
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="stops run on operator failure. Helpful for local development",
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
