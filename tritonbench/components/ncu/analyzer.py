@@ -46,6 +46,16 @@ bench_metric_to_short_ncu_metric = {
         "dram_bandwidth",
         "duration",
     ],
+    "ncu_tflops": [
+        "inst_executed_fadd",
+        "inst_executed_fmul",
+        "inst_executed_ffma",
+        "inst_executed_dadd",
+        "inst_executed_dmul",
+        "inst_executed_dfma",
+        "duration",
+        "sm_freq",
+    ],
 }
 
 
@@ -81,9 +91,28 @@ def get_duration(kernel):
     return kernel.metric_by_name(short_ncu_metric_name["duration"]).value()
 
 
-# Reference: ncu_install_path/sections/SpeedOfLight_Roofline.py
-# and ncu_install_path/sections/SpeedOfLight_RooflineChart.section
 def get_flops(kernel):
+    """
+    Calculate the achieved floating point operations per second (FLOPS) for both FP32 and FP64 operations.
+
+    This function calculates FLOPS by:
+    1. Summing up the achieved ADD, MUL and FMA operations (FMA counts as 2 operations)
+    2. Multiplying by the SM frequency to get operations per second
+
+    Args:
+        kernel: An NCU kernel object containing the profiling metrics
+
+    Returns:
+        tuple: A pair of (fp32_flops, fp64_flops) containing:
+            - fp32_flops: Achieved single precision (FP32) FLOPS
+            - fp64_flops: Achieved double precision (FP64) FLOPS
+
+    Reference:
+        Implementation based on NVIDIA Nsight Compute's SpeedOfLight_Roofline.py and
+        SpeedOfLight_RooflineChart.section
+
+    TODO: Add Tensor FLOPS and Half Precision FLOPS
+    """
     fp32_add_achieved = kernel.metric_by_name(
         short_ncu_metric_name["inst_executed_fadd"]
     ).value()
@@ -143,20 +172,26 @@ def read_ncu_report(report_path: str, required_metrics: List[str]):
     weighted_fp64_ai_sum = 0
     for i in range(default_range.num_actions()):
         kernel = default_range.action_by_idx(i)
-        duration = get_duration(kernel)
-        dram_bytes = kernel.metric_by_name(short_ncu_metric_name["dram_bytes"]).value()
+        if set(required_metrics) & {"arithmetic_intensity", "ncu_tflops"}:
+            duration = get_duration(kernel)
+            results["durations"].append(duration)
+            total_duration += duration
         if "memory_traffic" in required_metrics:
             results["memory_traffic_raw"].append(get_mem_traffic(kernel))
         if "arithmetic_intensity" in required_metrics:
+            dram_bytes = kernel.metric_by_name(
+                short_ncu_metric_name["dram_bytes"]
+            ).value()
             fp32_ai, fp64_ai = get_arithmetic_intensity(kernel)
             weighted_fp32_ai_sum += fp32_ai * dram_bytes
             weighted_fp64_ai_sum += fp64_ai * dram_bytes
             # do not use the arithmetic_intensity_raw in benchmark metric argument
             # because metric printer will only print the first element of the list
             results["arithmetic_intensity_raw"].append((fp32_ai, fp64_ai))
-            results["durations"].append(duration)
-        total_duration += duration
-        total_dram_bytes += dram_bytes
+            total_dram_bytes += dram_bytes
+        if "ncu_tflops" in required_metrics:
+            results["ncu_tflops_raw"].append(get_flops(kernel))
+
     if "memory_traffic" in required_metrics:
         memory_traffic_read = [item[0] for item in results["memory_traffic_raw"]]
         memory_traffic_write = [item[1] for item in results["memory_traffic_raw"]]
@@ -176,5 +211,25 @@ def read_ncu_report(report_path: str, required_metrics: List[str]):
         results["arithmetic_intensity"] = (
             results["weighted_fp32_arithmetic_intensity"],
             results["weighted_fp64_arithmetic_intensity"],
+        )
+    if "ncu_tflops" in required_metrics:
+        assert results["durations"], "No kernel durations found in the NCU report."
+        weighted_fp32_flops_sum = sum(
+            flop[0] * dur
+            for flop, dur in zip(results["ncu_tflops_raw"], results["durations"])
+        )
+        weighted_fp64_flops_sum = sum(
+            flop[1] * dur
+            for flop, dur in zip(results["ncu_tflops_raw"], results["durations"])
+        )
+        weighted_fp32_tflops_sum = weighted_fp32_flops_sum / (
+            10**12
+        )  # Convert to TFLOPS
+        weighted_fp64_tflops_sum = weighted_fp64_flops_sum / (
+            10**12
+        )  # Convert to TFLOPS
+        results["ncu_tflops"] = (
+            weighted_fp32_tflops_sum / total_duration,
+            weighted_fp64_tflops_sum / total_duration,
         )
     return results
