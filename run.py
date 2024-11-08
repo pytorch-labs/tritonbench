@@ -83,6 +83,10 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
                 "device": args.device,
                 "logging_group": args.logging_group,
             }
+            if args.production_shapes:
+                from tritonbench.utils.fb.durin_data import productionDataLoader
+
+                kwargs["weights_loader"] = productionDataLoader
 
             if "hardware" in args:
                 kwargs["hardware"] = args.hardware

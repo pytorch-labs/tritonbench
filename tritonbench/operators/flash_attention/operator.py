@@ -427,7 +427,6 @@ class Operator(BenchmarkOperator):
         shapes = self.__additional_example_input(ctx_vals)
         requires_grad = True
         for shape in shapes:
-            print(shape)
             BATCH, H, N_CTX, D_HEAD = shape
             q = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
@@ -459,9 +458,14 @@ class Operator(BenchmarkOperator):
         ]
         shapes = chain(standard_shapes, llama_shapes)
         if self.add_production_shapes:
-            from ...utils.fb.durin_data import get_shapes_from_frozen_durin
+            from ...utils.fb.durin_data import productionDataLoader
 
-            shapes = chain(shapes, get_shapes_from_frozen_durin("attention"))
+            shapes = chain(
+                shapes,
+                productionDataLoader.get_shapes_from_frozen_durin(
+                    self.name, "attention"
+                ),
+            )
         return shapes
 
     @register_x_val(label="(Batch, Heads, SeqLen, Dhead)")
