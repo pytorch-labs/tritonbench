@@ -144,8 +144,14 @@ class RaggedHSTUAttn(torch.nn.Module):
         if not IS_FBCODE:
             del kwargs["MAX_ATTN_LEN"]
             del kwargs["HAS_CONTEXTUAL_SEQ_LEN"]
+            del kwargs["contextual_seq_len"]
+            del kwargs["AUTOTUNE_MAX_SEQ_LEN"]
+            del kwargs["HAS_SORT_BY_LENGTH_INDICES"]
+            del kwargs["sort_by_length_indices"]
+            del kwargs["AUTOTUNE_MAX_SEQ_LEN"]
             kwargs["HAS_MAX_ATTN_LEN"] = False
             kwargs["max_attn_len"] = 0
+
         if self.persistent_kernel:
             grid = (1216,)
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
