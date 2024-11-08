@@ -77,21 +77,17 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
         if IS_FBCODE and args.log_scuba:
             from .fb.utils import log_benchmark  # @manual
 
+            kwargs = {
+                "metrics": metrics,
+                "benchmark_name": args.op,
+                "device": args.device,
+                "logging_group": args.logging_group,
+            }
+
             if "hardware" in args:
-                log_benchmark(
-                    metrics=metrics,
-                    benchmark_name=args.op,
-                    device=args.device,
-                    hardware=args.hardware,
-                    logging_op_name=args.logging_name,
-                )
-            else:
-                log_benchmark(
-                    metrics=metrics,
-                    benchmark_name=args.op,
-                    device=args.device,
-                    logging_op_name=args.logging_name,
-                )
+                kwargs["hardware"] = args.hardware
+            log_benchmark(**kwargs)
+
         if args.plot:
             try:
                 opbench.plot()

@@ -169,7 +169,7 @@ def get_parser(args=None):
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
         parser.add_argument(
-            "--logging-name",
+            "--logging-group",
             type=str,
             default=None,
             help="Override default name for logging in scuba.",
