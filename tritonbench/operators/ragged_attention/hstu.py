@@ -134,7 +134,7 @@ class RaggedHSTUAttn(torch.nn.Module):
             "ALLOW_TF32": True,
             "BLOCK_D_Q": DimQ,
             "BLOCK_D_V": DimV,
-            "max_attn_len": 0,
+            "MAX_ATTN_LEN": 0,
             "HAS_CONTEXTUAL_SEQ_LEN": False,
             "contextual_seq_len": 0,
             "HAS_SORT_BY_LENGTH_INDICES": False,

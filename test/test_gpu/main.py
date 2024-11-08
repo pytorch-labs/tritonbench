@@ -39,9 +39,8 @@ def check_ci_output(op):
 
     output = op.output
     output_impls = output.result[0][1].keys()
-    skiped_impls = op.tb_args.skip if op.tb_args.skip else []
     ci_enabled_impls = [
-        x for x in REGISTERED_BENCHMARKS[output.op_name].keys() if x not in skiped_impls
+        x for x in REGISTERED_BENCHMARKS[output.op_name].keys() if x not in op._skip
     ]
     # Make sure that all the ci_enabled impls are in the output
     logger.info(f"output impls: {output_impls}, ci_enabled impls: {ci_enabled_impls}")
