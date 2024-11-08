@@ -145,7 +145,6 @@ class RaggedHSTUAttn(torch.nn.Module):
             del kwargs["MAX_ATTN_LEN"]
             del kwargs["HAS_CONTEXTUAL_SEQ_LEN"]
             del kwargs["contextual_seq_len"]
-            del kwargs["AUTOTUNE_MAX_SEQ_LEN"]
             del kwargs["HAS_SORT_BY_LENGTH_INDICES"]
             del kwargs["sort_by_length_indices"]
             del kwargs["AUTOTUNE_MAX_SEQ_LEN"]
