@@ -1,5 +1,6 @@
 import torch
 import triton
+from tritonbench.utils.triton_op import IS_FBCODE
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
 try:
@@ -140,6 +141,10 @@ class RaggedHSTUAttn(torch.nn.Module):
             "HAS_SORT_BY_LENGTH_INDICES": False,
             "sort_by_length_indices": None,
         }
+        if not IS_FBCODE:
+            del kwargs["MAX_ATTN_LEN"]
+            kwargs["HAS_MAX_ATTN_LEN"] = False
+            kwargs["max_attn_len"] = 0
         if self.persistent_kernel:
             grid = (1216,)
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
