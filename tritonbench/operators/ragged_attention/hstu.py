@@ -143,6 +143,7 @@ class RaggedHSTUAttn(torch.nn.Module):
         }
         if not IS_FBCODE:
             del kwargs["MAX_ATTN_LEN"]
+            del kwargs["HAS_CONTEXTUAL_SEQ_LEN"]
             kwargs["HAS_MAX_ATTN_LEN"] = False
             kwargs["max_attn_len"] = 0
         if self.persistent_kernel:
