@@ -1,3 +1,7 @@
 [tool.ufmt]
 formatter = "ruff-api"
 excludes = ["submodules/"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
