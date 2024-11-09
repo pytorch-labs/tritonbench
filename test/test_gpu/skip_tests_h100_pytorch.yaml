@@ -9,6 +9,7 @@ flash_attention:
   - triton_op_flash_v2
   - xformers_splitk
   - colfax_cutlass
+  - tk
 fp8_attention:
   - colfax_fmha
 fp8_fused_quant_gemm_rowwise:
