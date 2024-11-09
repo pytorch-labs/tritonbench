@@ -6,6 +6,7 @@ bf16xint16_gemm:
   - bf16xint16
 flash_attention:
   - triton_tutorial_flash_v2_tma
+  - triton_op_flash_v2
 fp8_attention:
   - colfax_fmha
 fp8_fused_quant_gemm_rowwise:
