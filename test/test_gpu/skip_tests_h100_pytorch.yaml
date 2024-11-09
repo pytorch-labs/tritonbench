@@ -1,9 +1,11 @@
 # Tests we skip in OSS CI
 # This file is regarding to the Triton version bundled with pytorch
-# Use <op-name> to skip an entire operator
-# Use <op-name/impl-name> to skip an impl
+# Use <op-name:> to skip an entire operator
+# Use <op-name:\n  - impl-name> to skip an impl
 bf16xint16_gemm:
   - bf16xint16
+flash_attention:
+  - triton_tutorial_flash_v2_tma
 fp8_attention:
   - colfax_fmha
 fp8_fused_quant_gemm_rowwise:
