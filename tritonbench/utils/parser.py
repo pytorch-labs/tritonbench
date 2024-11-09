@@ -161,9 +161,9 @@ def get_parser(args=None):
         help="Run each operator in a separate child process. By default, it will always continue on failure.",
     )
     parser.add_argument(
-        "--fail-fast",
+        "--bypass-fail",
         action="store_true",
-        help="stops run on operator failure. Helpful for local development",
+        help="bypass and continue on operator failure.",
     )
 
     if IS_FBCODE:

@@ -932,7 +932,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                             grad_to_none=self.get_grad_to_none(self.example_inputs),
                         )
                     except Exception as e:
-                        if self.tb_args.fail_fast:
+                        if not self.tb_args.bypass_fail:
                             raise e
                         metrics.latency = None
             if {"gpu_peak_mem", "gpu_mem_footprint", "cpu_peak_mem"} & set(
