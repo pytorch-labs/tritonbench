@@ -18,7 +18,11 @@ if IS_FBCODE:
     fbcode_skip_file_path = "fb/skip_tests_h100_fbcode.yaml"
     SKIP_FILE = importlib.resources.files(__package__).joinpath(fbcode_skip_file_path)
 else:
-    SKIP_FILE = "skip_tests_h100_pytorch.yaml"
+    import os
+
+    SKIP_FILE = os.path.abspath(
+        os.path.dirname(__file__).join("skip_tests_h100_pytorch.yaml")
+    )
 
 with open(SKIP_FILE, "r") as f:
     skip_tests = yaml.safe_load(f)
