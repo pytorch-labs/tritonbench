@@ -21,7 +21,7 @@ else:
     import os
 
     SKIP_FILE = os.path.abspath(
-        os.path.dirname(__file__).join("skip_tests_h100_pytorch.yaml")
+        os.path.join(os.path.dirname(__file__), "skip_tests_h100_pytorch.yaml")
     )
 
 with open(SKIP_FILE, "r") as f:
