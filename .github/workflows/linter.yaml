@@ -1,0 +1,26 @@
+name: TritonBench Linter
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+
+jobs:
+  pylint:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        with:
+          path: tritonbench
+      - name: Check Formatting
+        uses: omnilib/ufmt@action-v1
+        with:
+          path: tritonbench
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true

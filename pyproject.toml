@@ -1,0 +1,3 @@
+[tool.ufmt]
+formatter = "ruff-api"
+excludes = ["submodules/"]
