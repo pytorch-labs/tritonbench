@@ -59,7 +59,7 @@ def _run_one_operator(
 ):
     if tb_args.op in skip_tests:
         # If the op itself is in the skip list, skip all tests
-        if skip_tests[tb_args.op] is None:
+        if not skip_tests[tb_args.op]:
             return
         tb_args.skip = ",".join(skip_tests[tb_args.op])
     Operator = load_opbench_by_name(tb_args.op)

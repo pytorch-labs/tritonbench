@@ -2,23 +2,25 @@
 # This file is regarding to the Triton version bundled with pytorch
 # Use <op-name> to skip an entire operator
 # Use <op-name/impl-name> to skip an impl
-- bf16xint16_gemm/bf16xint16
-- fp8_attention/colfax_fmha
-- fp8_fused_quant_gemm_rowwise
-- fp8_gemm/triton_persistent_fp8_gemm
-- fp8_gemm/triton_tma_persistent_fp8_gemm
-- fp8_gemm_rowwise
-- gemm
-- grouped_gemm
-- int4_gemm
-- jagged_layer_norm
-- jagged_mean
-- jagged_softmax
-- jagged_sum
-- layer_norm
-- low_mem_dropout
-- rms_norm
-- rope
-- swiglu
-- template_attention
-- test_op
+bf16xint16_gemm:
+  - bf16xint16
+fp8_attention:
+  - colfax_fmha
+fp8_fused_quant_gemm_rowwise:
+fp8_gemm:
+  - triton_persistent_fp8_gemm
+  - triton_tma_persistent_fp8_gemm
+fp8_gemm_rowwise:
+gemm:
+grouped_gemm:
+int4_gemm:
+jagged_layer_norm:
+jagged_mean:
+jagged_softmax:
+jagged_sum:
+layer_norm:
+low_mem_dropout:
+rms_norm:
+rope:
+template_attention:
+test_op:
