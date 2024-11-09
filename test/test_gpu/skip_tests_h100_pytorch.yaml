@@ -10,6 +10,7 @@ flash_attention:
   - xformers_splitk
   - colfax_cutlass
   - tk
+  - sdpa
 fp8_attention:
   - colfax_fmha
 fp8_fused_quant_gemm_rowwise:
