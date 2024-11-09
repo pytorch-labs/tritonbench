@@ -5,6 +5,9 @@ on:
       - .ci/*
       - tritonbench/*
       - .github/workflows/pr.yaml
+  push:
+    branches:
+      - main
 
 jobs:
   h100-pytorch-test:
