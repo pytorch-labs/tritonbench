@@ -11,6 +11,7 @@ flash_attention:
   - colfax_cutlass
   - tk
   - sdpa
+  - cudnn
 fp8_attention:
   - colfax_fmha
 fp8_fused_quant_gemm_rowwise:
