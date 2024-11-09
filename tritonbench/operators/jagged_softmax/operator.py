@@ -71,7 +71,6 @@ def parse_op_args(args: List[str]):
 
 
 class Operator(BenchmarkOperator):
-
     DEFAULT_METRICS = ["latency", "accuracy", "best_config"]
     DEFAULT_PRECISION = "fp32"
 
@@ -83,8 +82,8 @@ class Operator(BenchmarkOperator):
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
-        self.sizes = list(range(2, 12, 4)) + list(
-            range(12, 23, 3)
+        self.sizes = (
+            list(range(2, 12, 4)) + list(range(12, 23, 3))
         )  # bias towards larger sizes, which are more representative of real-world shapes
 
         args = parse_op_args(self.extra_args)
@@ -114,7 +113,9 @@ class Operator(BenchmarkOperator):
         def _inner():
             padded = torch.ops.aten._jagged_to_padded_dense_forward(
                 x.values(),
-                [x.offsets()],  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `offsets`.
+                [
+                    x.offsets()
+                ],  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `offsets`.
                 max_lengths=[seqlen],  # max length of ragged dimension
                 padding_value=float("-inf"),  # e^-inf = 0
             )
@@ -153,7 +154,9 @@ class Operator(BenchmarkOperator):
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
         def _inner(x: torch.Tensor):  # softmax along ragged dimension
-            return torch.softmax(x, dim=x._ragged_idx)  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `_ragged_idx`.
+            return torch.softmax(
+                x, dim=x._ragged_idx
+            )  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `_ragged_idx`.
 
         torch_compile_func = torch.compile(_inner)
         return lambda: torch_compile_func(

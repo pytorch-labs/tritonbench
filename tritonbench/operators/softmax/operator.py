@@ -13,7 +13,6 @@ from tritonbench.utils.triton_op import (
 
 
 class Operator(BenchmarkOperator):
-
     @register_benchmark()
     def triton_softmax(self, x):
         n_rows, n_cols = x.shape

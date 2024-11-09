@@ -35,7 +35,6 @@ else:
 
 
 class TmaAutoTuneHelper:
-
     # duck typing wrapper to implement the same interface as TmaDescKernelParam in Triton PR #4498
     class KernelParamWrapper:
         def __init__(self, desc):
@@ -457,7 +456,6 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     HEAD_DIM: tl.constexpr,  #
     STAGE: tl.constexpr,  #
 ):
-
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     start_m = tl.program_id(0)
     off_hz = tl.program_id(1)
@@ -569,7 +567,14 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
 
 @triton.jit
 def _attn_bwd_preprocess(
-    O, DO, Delta, Z, H, N_CTX, BLOCK_M: tl.constexpr, HEAD_DIM: tl.constexpr  #  #  #  #
+    O,
+    DO,
+    Delta,
+    Z,
+    H,
+    N_CTX,
+    BLOCK_M: tl.constexpr,
+    HEAD_DIM: tl.constexpr,  #  #  #  #
 ):
     off_m = tl.program_id(0) * BLOCK_M + tl.arange(0, BLOCK_M)
     off_hz = tl.program_id(1)
@@ -900,7 +905,6 @@ def _attn_bwd(
 
 
 class _attention(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, q, k, v, causal, sm_scale):
         # shape constraints
@@ -949,7 +953,7 @@ class _attention(torch.autograd.Function):
             N_CTX=q.shape[2],  #
             HEAD_DIM=HEAD_DIM_K,  #
             STAGE=stage,  #
-            **extra_kern_args
+            **extra_kern_args,
         )
 
         ctx.save_for_backward(q, k, v, o, M)
@@ -1021,7 +1025,6 @@ class _attention(torch.autograd.Function):
 
 
 class _attention_tma(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, q, k, v, causal, sm_scale):
         # shape constraints
@@ -1175,7 +1178,7 @@ class _attention_tma(torch.autograd.Function):
             N_CTX=q.shape[2],  #
             HEAD_DIM=HEAD_DIM_K,  #
             STAGE=stage,  #
-            **extra_kern_args
+            **extra_kern_args,
         )
 
         ctx.save_for_backward(q, k, v, o, M)

@@ -17,6 +17,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: tritonbench
+      - name: Install deps
+        run: |
+          pip install ruff-api
       - name: Check Formatting
         uses: omnilib/ufmt@action-v1
         with:

@@ -7,7 +7,6 @@ from tritonbench.utils.parser import get_parser
 
 
 class TestTritonbenchCpu(unittest.TestCase):
-
     def _get_test_op(self):
         parser = get_parser(["--device", "cpu", "--op", "test_op"])
         tb_args, extra_args = parser.parse_known_args(

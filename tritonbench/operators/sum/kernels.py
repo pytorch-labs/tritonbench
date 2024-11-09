@@ -16,8 +16,8 @@ def triton_sum_kernel_scalar_result(
 
     block_start = pid * BLOCK_SIZE_M
     # offsets have shape equal to input shape
-    offsets = block_start + tl.arange(
-        0, BLOCK_SIZE_M
+    offsets = (
+        block_start + tl.arange(0, BLOCK_SIZE_M)
     )  # create 1D vector (input shape) ranging from beginning to end of this program's block
 
     # mask has shape equal to input shape
@@ -133,7 +133,8 @@ def triton_sum_kernel_1D_result_sum_then_buffer(
             num_warps=w,
         )
         for b, w in itertools.product(
-            [2, 4, 8, 16], [2, 4, 8]  # block sizes  # number of warps
+            [2, 4, 8, 16],
+            [2, 4, 8],  # block sizes  # number of warps
         )
     ],
     key=["M", "N"],
@@ -206,7 +207,8 @@ def triton_sum_kernel_1D_result_buffer_then_sum(
             num_warps=w,
         )
         for b, w in itertools.product(
-            [2, 4, 16, 32, 128, 256], [2, 4, 8]  # block sizes, number of warps
+            [2, 4, 16, 32, 128, 256],
+            [2, 4, 8],  # block sizes, number of warps
         )
     ],
     key=["N"],

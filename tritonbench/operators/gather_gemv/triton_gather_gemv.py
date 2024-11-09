@@ -82,7 +82,7 @@ def triton_red_fused_mv_0(
     rbase = tl.arange(0, RBLOCK)[None, :].to(tl.int64)
     x0 = xindex
     # x0 // rnumel should have the same value of either 0 or 1
-    tmp0 = tl.load(in_ptr0 + ((x0 // rnumel)), None, eviction_policy="evict_last")
+    tmp0 = tl.load(in_ptr0 + (x0 // rnumel), None, eviction_policy="evict_last")
     _tmp11 = tl.full([XBLOCK, RBLOCK], 0, tl.float32)
     for roffset in range(0, rnumel, RBLOCK):
         rindex = roffset + rbase
