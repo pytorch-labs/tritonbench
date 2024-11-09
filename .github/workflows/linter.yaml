@@ -1,4 +1,4 @@
-name: TritonBench Linter
+name: Linter
 on:
   pull_request:
   push:
