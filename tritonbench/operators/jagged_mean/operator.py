@@ -92,7 +92,6 @@ def execute_kernel_variable_length_loop(x, sum_then_buffer):
 
 
 class Operator(BenchmarkOperator):
-
     DEFAULT_METRICS = ["latency", "accuracy"]
     DEFAULT_PRECISION = "fp32"
 
@@ -104,8 +103,8 @@ class Operator(BenchmarkOperator):
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
-        self.sizes = list(range(2, 12, 4)) + list(
-            range(12, 23, 3)
+        self.sizes = (
+            list(range(2, 12, 4)) + list(range(12, 23, 3))
         )  # bias towards larger sizes, which are more representative of real-world shapes
 
         args = parse_op_args(self.extra_args)
@@ -130,28 +129,37 @@ class Operator(BenchmarkOperator):
     def torch_jagged_mean_torch_nanmean(
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
-        return lambda: torch.nanmean(
-            torch.ops.aten._jagged_to_padded_dense_forward(
-                x.values(),
-                [x.offsets()],  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `offsets`.
-                max_lengths=[seqlen],  # max length of ragged dimension
-                padding_value=float("nan"),
-            ),
-            dim=1,
+        return (
+            lambda: torch.nanmean(
+                torch.ops.aten._jagged_to_padded_dense_forward(
+                    x.values(),
+                    [
+                        x.offsets()
+                    ],  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `offsets`.
+                    max_lengths=[seqlen],  # max length of ragged dimension
+                    padding_value=float("nan"),
+                ),
+                dim=1,
+            )
         )
 
     @register_benchmark()
     def torch_jagged_mean_torch_sum(
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
-        return lambda: torch.sum(
-            torch.ops.aten._jagged_to_padded_dense_forward(
-                x.values(),
-                [x.offsets()],  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `offsets`.
-                max_lengths=[seqlen],  # max length of ragged dimension
-            ),
-            dim=1,
-        ) / x.offsets().diff().unsqueeze(1)
+        return (
+            lambda: torch.sum(
+                torch.ops.aten._jagged_to_padded_dense_forward(
+                    x.values(),
+                    [
+                        x.offsets()
+                    ],  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `offsets`.
+                    max_lengths=[seqlen],  # max length of ragged dimension
+                ),
+                dim=1,
+            )
+            / x.offsets().diff().unsqueeze(1)
+        )
 
     @register_benchmark()
     def triton_jagged_mean_simple_fused(
@@ -176,7 +184,9 @@ class Operator(BenchmarkOperator):
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
         def _inner(x: torch.Tensor):  # mean along ragged dimension (dim == 1)
-            return torch.mean(x, dim=x._ragged_idx, keepdim=True)  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `_ragged_idx`.
+            return torch.mean(
+                x, dim=x._ragged_idx, keepdim=True
+            )  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `_ragged_idx`.
 
         torch_compile_func = torch.compile(_inner)
         return lambda: torch_compile_func(x)

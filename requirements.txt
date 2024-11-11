@@ -1,3 +1,5 @@
 packaging
 pynvml
+psutil
+tabulate
 transformers==4.46.1

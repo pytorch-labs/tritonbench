@@ -36,7 +36,6 @@ def parse_op_args(args: List[str]):
 
 
 class Operator(BenchmarkOperator):
-
     DEFAULT_METRICS = ["latency", "accuracy"]
     DEFAULT_PRECISION = "fp32"
 
@@ -48,8 +47,8 @@ class Operator(BenchmarkOperator):
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
-        self.sizes = list(range(2, 12, 4)) + list(
-            range(12, 23, 3)
+        self.sizes = (
+            list(range(2, 12, 4)) + list(range(12, 23, 3))
         )  # bias towards larger sizes, which are more representative of real-world shapes
 
         args = parse_op_args(self.extra_args)
@@ -105,8 +104,8 @@ class Operator(BenchmarkOperator):
             )  # a sum over (1, 2) ensures layer norm, whereas a sum over (1) would be an instance norm
 
             padded_normalized = (
-                padded_values - mean
-            ) * padded_mask_values  # mask elements outside of the ragged dimension size for correct variance calculation
+                (padded_values - mean) * padded_mask_values
+            )  # mask elements outside of the ragged dimension size for correct variance calculation
 
             variance = (
                 torch.sum(

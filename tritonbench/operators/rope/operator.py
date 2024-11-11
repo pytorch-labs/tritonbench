@@ -58,9 +58,10 @@ class Operator(BenchmarkOperator):
             requires_grad=True,
             dtype=self.dtype,
         ).transpose(1, 2)
-        dq, dk = torch.randn_like(
-            q, device=self.device, dtype=self.dtype
-        ), torch.randn_like(k, device=self.device)
+        dq, dk = (
+            torch.randn_like(q, device=self.device, dtype=self.dtype),
+            torch.randn_like(k, device=self.device),
+        )
         pos_ids = torch.arange(
             seq_length, device=self.device, dtype=torch.long
         ).unsqueeze(0)

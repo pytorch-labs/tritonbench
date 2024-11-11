@@ -1,11 +1,37 @@
 # Tests we skip in OSS CI
 # This file is regarding to the Triton version bundled with pytorch
-# Use <op-name> to skip an entire operator
-# Use <op-name/impl-name> to skip an impl
-- test_op
-- bf16xint16_gemm/bf16xint16
-- fp8_attention/colfax_fmha
-- fp8_fused_quant_gemm_rowwise
-- fp8_gemm/triton_persistent_fp8_gemm
-- fp8_gemm/triton_tma_persistent_fp8_gemm
-- fp8_gemm_rowwise
+# Use <op-name:> to skip an entire operator
+# Use <op-name:\n  - impl-name> to skip an impl
+bf16xint16_gemm:
+  - bf16xint16
+# TODO: we have many buggy backends for flash_attention
+# Need to fix them in the CI
+flash_attention:
+#   - triton_tutorial_flash_v2_tma
+#   - triton_op_flash_v2
+#   - xformers_splitk
+#   - colfax_cutlass
+#   - tk
+#   - sdpa
+#   - cudnn
+#   - flex_attention
+fp8_attention:
+  - colfax_fmha
+fp8_fused_quant_gemm_rowwise:
+fp8_gemm:
+  - triton_persistent_fp8_gemm
+  - triton_tma_persistent_fp8_gemm
+fp8_gemm_rowwise:
+gemm:
+grouped_gemm:
+int4_gemm:
+jagged_layer_norm:
+jagged_mean:
+jagged_softmax:
+jagged_sum:
+layer_norm:
+low_mem_dropout:
+rms_norm:
+rope:
+template_attention:
+test_op:

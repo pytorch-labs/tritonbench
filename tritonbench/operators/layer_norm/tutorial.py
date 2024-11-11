@@ -233,7 +233,6 @@ def _layer_norm_bwd_dwdb(
 
 
 class LayerNorm(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, x, normalized_shape, weight, bias, eps):
         # allocate output

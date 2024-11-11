@@ -26,7 +26,6 @@ from .triton_gather_gemv import triton_gemv_0 as triton_test_0
 
 
 class Operator(BenchmarkOperator):
-
     @register_metric()
     def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
         arg0_1, arg1_1, arg2_1 = example_inputs

@@ -54,8 +54,9 @@ def triton_jagged_softmax_kernel_simple_fused_buffer_then_sum(
     offsets_m = block_start_m + tl.arange(0, BLOCK_SIZE_M)
     mask_m = offsets_m < M
 
-    ragged_start, ragged_end = tl.load(input_ptr_offsets + pid_b), tl.load(
-        input_ptr_offsets + (pid_b + 1)
+    ragged_start, ragged_end = (
+        tl.load(input_ptr_offsets + pid_b),
+        tl.load(input_ptr_offsets + (pid_b + 1)),
     )  # load start and end offsets for current program, similar to offsets[i] and offsets[i + 1]
 
     buffer_max_all = tl.full(
@@ -163,8 +164,9 @@ def triton_jagged_softmax_kernel_variable_length_loop_buffer_then_sum(
     offsets_m = block_start_m + tl.arange(0, BLOCK_SIZE_M)
     mask_m = offsets_m < M
 
-    ragged_start, ragged_end = tl.load(input_ptr_offsets + pid_b), tl.load(
-        input_ptr_offsets + (pid_b + 1)
+    ragged_start, ragged_end = (
+        tl.load(input_ptr_offsets + pid_b),
+        tl.load(input_ptr_offsets + (pid_b + 1)),
     )  # load start and end offsets for current program, similar to offsets[i] and offsets[i + 1]
 
     buffer_max_all = tl.full(

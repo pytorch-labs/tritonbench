@@ -29,7 +29,7 @@ class Operator(BenchmarkOperator):
         self.max_seq_len = 2**args.max_seq_len_log2
         self.num_buckets = args.num_buckets
         # set a default number of inputs
-        self._num_inputs = 10
+        self._num_inputs = 10 if self._num_inputs is None else self._num_inputs
 
     @register_benchmark()
     def hstu_triton_ragged_attention(self, qkv, seq_offsets, timestamps):

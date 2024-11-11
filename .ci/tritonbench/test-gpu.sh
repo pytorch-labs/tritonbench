@@ -8,4 +8,7 @@ fi
 
 . "${SETUP_SCRIPT}"
 
+# install deps
+pip install psutil tabulate
+
 python -m unittest test.test_gpu.main

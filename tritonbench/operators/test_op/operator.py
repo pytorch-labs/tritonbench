@@ -12,7 +12,6 @@ from tritonbench.utils.triton_op import (
 
 
 class Operator(BenchmarkOperator):
-
     DEFAULT_METRICS = ["test_metric"]
 
     def __init__(

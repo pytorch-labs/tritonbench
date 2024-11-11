@@ -18,7 +18,11 @@ if IS_FBCODE:
     fbcode_skip_file_path = "fb/skip_tests_h100_fbcode.yaml"
     SKIP_FILE = importlib.resources.files(__package__).joinpath(fbcode_skip_file_path)
 else:
-    SKIP_FILE = "skip_tests_h100_pytorch.yaml"
+    import os
+
+    SKIP_FILE = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "skip_tests_h100_pytorch.yaml")
+    )
 
 with open(SKIP_FILE, "r") as f:
     skip_tests = yaml.safe_load(f)
@@ -55,7 +59,7 @@ def _run_one_operator(
 ):
     if tb_args.op in skip_tests:
         # If the op itself is in the skip list, skip all tests
-        if skip_tests[tb_args.op] is None:
+        if not skip_tests[tb_args.op]:
             return
         tb_args.skip = ",".join(skip_tests[tb_args.op])
     Operator = load_opbench_by_name(tb_args.op)

@@ -57,7 +57,6 @@ class OpDetails:
 
 
 class OpTask(base_task.TaskBase):
-
     # The worker may (and often does) consume significant system resources.
     # In order to ensure that runs do not interfere with each other, we only
     # allow a single OpTask to exist at a time.

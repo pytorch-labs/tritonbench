@@ -146,7 +146,6 @@ def execute_kernel_2D_result(x):
 
 
 class Operator(BenchmarkOperator):
-
     DEFAULT_METRICS = ["latency", "accuracy", "best_config"]
 
     def __init__(

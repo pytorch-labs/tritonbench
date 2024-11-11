@@ -238,7 +238,5 @@ if __name__ == "__main__":
     if args.install_torch_nightly:
         install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
     if args.check_torch_nightly_version:
-        assert (
-            not args.install_torch_nightly
-        ), "Error: Can't run install torch nightly and check version in the same command."
+        assert not args.install_torch_nightly, "Error: Can't run install torch nightly and check version in the same command."
         check_torch_nightly_version(args.force_date)

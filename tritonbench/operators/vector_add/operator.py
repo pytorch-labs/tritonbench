@@ -15,7 +15,6 @@ from .kernels import triton_add_kernel
 
 
 class Operator(BenchmarkOperator):
-
     @register_metric()
     def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
         return (
@@ -28,7 +27,6 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def triton_add(self, x: torch.Tensor, y: torch.Tensor):
-
         # We need to preallocate the output.
         output = torch.empty_like(x)
         n_elements = output.numel()
@@ -78,7 +76,6 @@ class Operator(BenchmarkOperator):
             )
         )
         def _plot(size, provider):
-
             gbps, max_gbps, min_gbps = self.output.get_y_vals(size, provider, "gbps")
             return gbps, max_gbps, min_gbps
 
