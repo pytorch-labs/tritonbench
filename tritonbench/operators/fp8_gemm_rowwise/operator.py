@@ -6,6 +6,7 @@ import fbgemm_gpu.experimental.gen_ai  # noqa: F401
 
 import torch
 import triton
+from tritonbench.utils.data_utils import get_production_shapes
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -113,7 +114,9 @@ class Operator(BenchmarkOperator):
         super().__init__(tb_args, extra_args)
         self.use_cuda_graphs = True
         addmm_args = parse_args(self.extra_args)
-        if addmm_args.m and addmm_args.n and addmm_args.k:
+        if tb_args.production_shapes:
+            self.shapes = get_production_shapes(self.name, "fp8_gemm")
+        elif addmm_args.m and addmm_args.n and addmm_args.k:
             self.shapes = [(addmm_args.m, addmm_args.n, addmm_args.k)]
         elif addmm_args.llama:
             self.shapes = gemm_shapes()

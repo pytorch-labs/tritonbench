@@ -8,6 +8,7 @@ import numpy
 import torch
 import torch._inductor.config as inductor_config
 import triton
+from tritonbench.utils.data_utils import get_production_shapes
 
 from tritonbench.utils.path_utils import REPO_PATH
 
@@ -129,7 +130,9 @@ class Operator(BenchmarkOperator):
         self.use_cuda_graphs = False
         gemm_args = parse_args(self.extra_args)
         self.layout = gemm_args.layout
-        if gemm_args.input:
+        if IS_FBCODE and tb_args.production_shapes:
+            self.shapes = get_production_shapes(self.name, f"{tb_args.precision}_gemm")
+        elif gemm_args.input:
             self.shapes = read_shapes_from_csv(gemm_args.input)
         elif gemm_args.splitk:
             self.shapes = SPLIT_K_SHAPES
@@ -286,7 +289,13 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self) -> Generator:
         for shape in self.shapes:
-            m, n, k, bias = shape
+            if len(shape) == 4:
+                m, n, k, bias = shape
+            elif len(shape) == 3:
+                m, n, k = shape
+                bias = None
+            else:
+                raise ValueError(f"Invalid shape {shape}")
             a = self._scaled_randn(
                 (m, k), scale=k, device=self.device, dtype=self.dtype
             )

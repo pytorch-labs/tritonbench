@@ -3,10 +3,12 @@ from typing import Generator, List
 import torch
 import triton
 import triton.language as tl
+from tritonbench.utils.data_utils import get_production_shapes
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
+    IS_FBCODE,
     register_benchmark,
     register_metric,
 )
@@ -101,13 +103,15 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self):
         M = 4096
-        for i in range(2, 100):
-            N = 128 * i
+        shapes = (tuple(M, 128 * i) for i in range(2, 100))
+        if IS_FBCODE and self.tb_args.production_shapes:
+            shapes = get_production_shapes(self.name, "softmax")
+        for M, N in shapes:
             yield (torch.randn([M, N], dtype=self.dtype, device=self.device),)
 
     def get_x_val(self, example_inputs) -> int:
         shape = example_inputs[0].size()
-        return shape[1]
+        return [shape[0], shape[1]]
 
     @register_metric()
     def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics) -> float:
