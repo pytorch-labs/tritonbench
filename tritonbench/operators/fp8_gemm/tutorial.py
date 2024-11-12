@@ -341,7 +341,7 @@ def get_hip_autotune_config():
                 "waves_per_eu": 2,
             },
             num_warps=4,
-            num_stages=0,
+            num_stages=2,
         ),
         triton.Config(
             {
@@ -352,7 +352,7 @@ def get_hip_autotune_config():
                 "waves_per_eu": 2,
             },
             num_warps=8,
-            num_stages=0,
+            num_stages=2,
         ),
         triton.Config(
             {
@@ -363,7 +363,7 @@ def get_hip_autotune_config():
                 "waves_per_eu": 2,
             },
             num_warps=8,
-            num_stages=0,
+            num_stages=2,
         ),
         triton.Config(
             {
@@ -374,7 +374,7 @@ def get_hip_autotune_config():
                 "waves_per_eu": 3,
             },
             num_warps=4,
-            num_stages=0,
+            num_stages=2,
         ),
         triton.Config(
             {
@@ -385,7 +385,7 @@ def get_hip_autotune_config():
                 "waves_per_eu": 8,
             },
             num_warps=4,
-            num_stages=0,
+            num_stages=2,
         ),
     ]
 
