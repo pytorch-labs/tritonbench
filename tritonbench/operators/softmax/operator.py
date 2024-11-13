@@ -103,7 +103,7 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self):
         M = 4096
-        shapes = (tuple(M, 128 * i) for i in range(2, 100))
+        shapes = [(M, 128 * i) for i in range(2, 100)]
         if IS_FBCODE and self.tb_args.production_shapes:
             shapes = get_production_shapes(self.name, "softmax")
         for M, N in shapes:

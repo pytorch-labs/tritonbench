@@ -1,4 +1,4 @@
-from .triton_ops import IS_FBCODE
+from .triton_op import IS_FBCODE
 
 
 def get_production_shapes(op_name, op_type):
