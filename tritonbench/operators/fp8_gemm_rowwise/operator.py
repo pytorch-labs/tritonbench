@@ -117,7 +117,7 @@ class Operator(BenchmarkOperator):
         super().__init__(tb_args, extra_args)
         self.use_cuda_graphs = True
         addmm_args = parse_args(self.extra_args)
-        if tb_args.production_shapes:
+        if hasattr(tb_args, "production_shapes") and tb_args.production_shapes:
             self.shapes = get_production_shapes(self.name, "fp8_gemm")
         elif addmm_args.m and addmm_args.n and addmm_args.k:
             self.shapes = [(addmm_args.m, addmm_args.n, addmm_args.k)]
