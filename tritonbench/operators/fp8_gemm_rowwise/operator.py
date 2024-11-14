@@ -43,8 +43,11 @@ try:
         matmul_fp8_row as triton_fp8_row,
     )
 
+    assert hasattr(
+        triton.runtime.driver.active.utils, "fill_1d_tma_descriptor"
+    ), "TMA is required by the Triton kernel."
     HAS_TRITON = True
-except ImportError:
+except (ImportError, AssertionError):
     HAS_TRITON = False
 
 
