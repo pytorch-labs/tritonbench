@@ -1,10 +1,17 @@
 import argparse
-import torch
 
-from typing import List, Optional, Callable, Any
+from typing import Any, Callable, List, Optional
+
+import torch
 from tritonbench.utils.input import input_filter
 
-from tritonbench.utils.triton_op import BenchmarkOperator, BenchmarkOperatorMetrics, register_benchmark, Mode, register_metric
+from tritonbench.utils.triton_op import (
+    BenchmarkOperator,
+    BenchmarkOperatorMetrics,
+    Mode,
+    register_benchmark,
+    register_metric,
+)
 
 from .hstu import get_test_inputs, RaggedHSTUAttn
 
@@ -64,7 +71,9 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self):
         for _input_id in range(self._num_inputs):
-            inputs = get_test_inputs(self.batch_size, self.num_heads, self.max_seq_len, self.requires_grad)
+            inputs = get_test_inputs(
+                self.batch_size, self.num_heads, self.max_seq_len, self.requires_grad
+            )
             yield inputs
 
     def get_bwd_fn(self, fwd_fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -73,16 +82,14 @@ class Operator(BenchmarkOperator):
             lambda x: isinstance(x, torch.Tensor),
             o,
         )
+        print(o)
         do = torch.rand_like(o_tensor)
         fn = lambda: o_tensor.backward(do, retain_graph=True)
         return fn
 
     @register_metric()
     def tflops(
-        self,
-        fn_name,
-        example_inputs,
-        metrics: BenchmarkOperatorMetrics
+        self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics
     ) -> float:
         ratio = 2.0  # triangular masking
         f1 = 0.0
@@ -97,7 +104,9 @@ class Operator(BenchmarkOperator):
 
         for i in range(self.batch_size):
             seq_len = (
-                int((seq_offsets[i + 1] - seq_offsets[i]).item()) if jagged else max_seqlen
+                int((seq_offsets[i + 1] - seq_offsets[i]).item())
+                if jagged
+                else max_seqlen
             )
             # (QK^T), dQ = d(QK^T)K, dK^T = Q^Td(QK^T)
             f1 += 2 * self.num_heads * attn_dim * seq_len**2 // ratio
