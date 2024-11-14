@@ -13,8 +13,6 @@ try:
     )
 except ModuleNotFoundError:
     # OSS Import
-    import importlib
-
     with add_path(str(SUBMODULE_PATH.joinpath("generative-recommenders"))):
         from generative_recommenders.ops.triton import triton_ragged_hstu_attention
         _ragged_hstu_attn_fwd_persistent = (
@@ -147,11 +145,11 @@ class RaggedHSTUAttn(torch.nn.Module):
             kwargs = {
                 "max_seq_len": self.max_seq_len,
                 "alpha": kwargs["alpha"],
-                "q": kwargs["q"],
-                "k": kwargs["k"],
-                "v":kwargs["v"],
+                "q": kwargs["Q"],
+                "k": kwargs["K"],
+                "v":kwargs["V"],
                 "seq_offsets": kwargs["seq_offsets"],
-                "invalid_attn_mask_type": kwargs["invalid_attn_mask_type"],
+                "invalid_attn_mask_type": kwargs["INVALID_MASK_TYPE"],
                 "num_targets": kwargs["num_targets"],
             }
             _RaggedAttentionRelativeBiasFunction.apply(**kwargs)
