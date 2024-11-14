@@ -143,14 +143,29 @@ class RaggedHSTUAttn(torch.nn.Module):
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
         else:
             _RaggedAttentionRelativeBiasFunction.apply(
-                self.max_seq_len,
+                self.max_seq_len, # N
                 kwargs["alpha"],
                 q,
                 k,
                 v,
                 kwargs["seq_offsets"],
                 kwargs["INVALID_MASK_TYPE"],
-                kwargs["num_targets"]
+                timestamps,
+                self.all_ts_weights, # ts_weights
+                self.all_pos_weights, # pos_weights
+                kwargs["CAUSAL"], # causal,
+                kwargs["num_buckets"], # num_buckets
+                "sqrt", # time_bucket_fn
+                kwargs["time_bucket_incr"], # time_bucket_incr
+                kwargs["time_bucket_div"], # time_bucket_div
+                kwargs["time_delta"], # time_delta
+                kwargs["max_pos_ind"], # max_pos_ind
+                kwargs["num_targets"],
+                None, # attn_scale
+                kwargs["ATTN_BIAS_TYPE"], # relative_bias_type
+                kwargs["MAX_ATTN_LEN"], # max_attn_len
+                kwargs["contextual_seq_len"], # contextual_seq_len
+                kwargs["sort_by_length_indices"] # sort_by_length
             )
 
         return out
