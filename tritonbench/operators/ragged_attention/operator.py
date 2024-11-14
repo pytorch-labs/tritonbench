@@ -82,7 +82,6 @@ class Operator(BenchmarkOperator):
             lambda x: isinstance(x, torch.Tensor),
             o,
         )
-        print(o)
         do = torch.rand_like(o_tensor)
         fn = lambda: o_tensor.backward(do, retain_graph=True)
         return fn

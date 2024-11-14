@@ -150,7 +150,7 @@ class RaggedHSTUAttn(torch.nn.Module):
             grid = (1216,)
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
         else:
-            _RaggedAttentionRelativeBiasFunction.apply(
+            out = _RaggedAttentionRelativeBiasFunction.apply(
                 self.max_seq_len,  # N
                 kwargs["alpha"],
                 q,
