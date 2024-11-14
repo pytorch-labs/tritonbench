@@ -15,10 +15,8 @@ except ModuleNotFoundError:
     # OSS Import
     import importlib
 
-    with add_path(str(SUBMODULE_PATH)):
-        triton_ragged_hstu_attention = importlib.import_module(
-            "generative-recommenders.ops.triton.triton_ragged_hstu_attention"
-        )
+    with add_path(str(SUBMODULE_PATH.joinpath("generative-recommenders"))):
+        from generative_recommenders.ops.triton import triton_ragged_hstu_attention
         _ragged_hstu_attn_fwd_persistent = (
             triton_ragged_hstu_attention._ragged_hstu_attn_fwd_persistent
         )
@@ -147,7 +145,7 @@ class RaggedHSTUAttn(torch.nn.Module):
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
         else:
             kwargs = {
-                "max_seq_len": kwargs["max_seq_len"],
+                "max_seq_len": self.max_seq_len,
                 "alpha": kwargs["alpha"],
                 "q": kwargs["q"],
                 "k": kwargs["k"],
