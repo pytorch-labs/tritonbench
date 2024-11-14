@@ -43,6 +43,7 @@ class RaggedHSTUAttn(torch.nn.Module):
         num_heads,
         max_seq_len,
         num_buckets,
+        requires_grad,
         persistent_kernel: bool = False,
     ) -> None:
         super().__init__()
@@ -54,13 +55,13 @@ class RaggedHSTUAttn(torch.nn.Module):
             torch.randn(
                 (self.num_buckets + 1,),
                 dtype=torch.bfloat16,
-            ).cuda()
+            ).requires_grad_(requires_grad).cuda()
         )
         self.all_pos_weights = torch.nn.Parameter(
             torch.randn(
                 (2 * self.max_seq_len - 1,),
                 dtype=torch.bfloat16,
-            ).cuda()
+            ).requires_grad_(requires_grad).cuda()
         )
         self.persistent_kernel = persistent_kernel
 
@@ -179,7 +180,6 @@ def get_test_inputs(
             86400,
             size=(batch_size, max_seq_len + 1),
         )
-        .requires_grad_(requires_grad)
         .cuda()
     )
     timestamps = timestamp_deltas.cumsum(dim=1)
@@ -189,7 +189,6 @@ def get_test_inputs(
             max_seq_len + 1,
             size=(batch_size,),
         )
-        .requires_grad_(requires_grad)
         .cuda()
     )
     seq_offsets = (
@@ -197,7 +196,6 @@ def get_test_inputs(
             (batch_size + 1,),
             dtype=torch.int64,
         )
-        .requires_grad_(requires_grad)
         .cuda()
     )
     seq_offsets[1:] = torch.cumsum(

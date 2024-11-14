@@ -32,6 +32,7 @@ class Operator(BenchmarkOperator):
         self.num_buckets = args.num_buckets
         # set a default number of inputs
         self._num_inputs = 10 if self._num_inputs is None else self._num_inputs
+        self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
 
     @register_benchmark()
     def hstu_triton_ragged_attention(self, qkv, seq_offsets, timestamps):
@@ -40,6 +41,7 @@ class Operator(BenchmarkOperator):
             self.num_heads,
             self.max_seq_len,
             self.num_buckets,
+            self.requires_grad,
             persistent_kernel=False,
         )
         return lambda: attn(qkv, seq_offsets, timestamps)
@@ -52,6 +54,7 @@ class Operator(BenchmarkOperator):
             self.num_heads,
             self.max_seq_len,
             self.num_buckets,
+            self.requires_grad,
             persistent_kernel=True,
         )
         return lambda: attn(qkv, seq_offsets, timestamps)
@@ -60,9 +63,8 @@ class Operator(BenchmarkOperator):
         return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets)
 
     def get_input_iter(self):
-        requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
         for _input_id in range(self._num_inputs):
-            inputs = get_test_inputs(self.batch_size, self.num_heads, self.max_seq_len, requires_grad)
+            inputs = get_test_inputs(self.batch_size, self.num_heads, self.max_seq_len, self.requires_grad)
             yield inputs
 
     def get_bwd_fn(self, fwd_fn: Callable[..., Any]) -> Callable[..., Any]:
