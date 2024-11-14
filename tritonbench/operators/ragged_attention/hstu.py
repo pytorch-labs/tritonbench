@@ -172,14 +172,14 @@ class RaggedHSTUAttn(torch.nn.Module):
 
 
 def get_test_inputs(
-    batch_size, num_heads, max_seq_len
+    batch_size, num_heads, max_seq_len, requires_grad
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     timestamp_deltas: torch.Tensor = (
         torch.randint(
             86400,
             size=(batch_size, max_seq_len + 1),
         )
-        .requires_grad_(False)
+        .requires_grad_(requires_grad)
         .cuda()
     )
     timestamps = timestamp_deltas.cumsum(dim=1)
@@ -189,7 +189,7 @@ def get_test_inputs(
             max_seq_len + 1,
             size=(batch_size,),
         )
-        .requires_grad_(False)
+        .requires_grad_(requires_grad)
         .cuda()
     )
     seq_offsets = (
@@ -197,7 +197,7 @@ def get_test_inputs(
             (batch_size + 1,),
             dtype=torch.int64,
         )
-        .requires_grad_(False)
+        .requires_grad_(requires_grad)
         .cuda()
     )
     seq_offsets[1:] = torch.cumsum(
@@ -211,7 +211,7 @@ def get_test_inputs(
             (L, num_heads, 512),
             dtype=torch.bfloat16,
         )
-        .requires_grad_(False)
+        .requires_grad_(requires_grad)
         .cuda()
     )
     return qkv, seq_offsets, timestamps

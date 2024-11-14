@@ -60,8 +60,9 @@ class Operator(BenchmarkOperator):
         return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets)
 
     def get_input_iter(self):
+        requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
         for _input_id in range(self._num_inputs):
-            inputs = get_test_inputs(self.batch_size, self.num_heads, self.max_seq_len)
+            inputs = get_test_inputs(self.batch_size, self.num_heads, self.max_seq_len, requires_grad)
             yield inputs
 
     def get_bwd_fn(self, fwd_fn: Callable[..., Any]) -> Callable[..., Any]:
