@@ -59,7 +59,7 @@ class RaggedHSTUAttn(torch.nn.Module):
                 (self.num_buckets + 1,),
                 dtype=torch.bfloat16,
             )
-            .requires_grad_(True)
+            .requires_grad_(requires_grad)
             .cuda()
         )
         self.all_pos_weights = torch.nn.Parameter(
@@ -67,7 +67,7 @@ class RaggedHSTUAttn(torch.nn.Module):
                 (2 * self.max_seq_len - 1,),
                 dtype=torch.bfloat16,
             )
-            .requires_grad_(True)
+            .requires_grad_(requires_grad)
             .cuda()
         )
         self.persistent_kernel = persistent_kernel
@@ -207,7 +207,7 @@ def get_test_inputs(
             (L, num_heads, 512),
             dtype=torch.bfloat16,
         )
-        .requires_grad_(True)
+        .requires_grad_(requires_grad)
         .cuda()
     )
     return qkv, seq_offsets, timestamps
