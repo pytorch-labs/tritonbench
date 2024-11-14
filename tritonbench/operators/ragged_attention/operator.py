@@ -85,12 +85,12 @@ class Operator(BenchmarkOperator):
         f1 = 0.0
         f2 = 0.0
         jagged = True
-        seq_offsets = example_inputs["seq_offsets"]
-        q = example_inputs["qkv"][:, :, :128]
-        v = example_inputs["qkv"][:, :, 256:384]
+        qkv, seq_offsets, timestamps = example_inputs
+        q = qkv[:, :, :128]
+        v = qkv[:, :, 256:384]
         _, nheads, attn_dim = q.shape
         _, _, hidden_dim = v.shape
-        max_seqlen = example_inputs["timestamps"].size(1) - 1
+        max_seqlen = timestamps.size(1) - 1
 
         for i in range(self.batch_size):
             seq_len = (
