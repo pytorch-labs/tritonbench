@@ -13,15 +13,14 @@ try:
     )
 except ModuleNotFoundError:
     # OSS Import
-    import importlib
+    with add_path(str(SUBMODULE_PATH.joinpath("generative-recommenders"))):
+        from generative_recommenders.ops.triton import triton_ragged_hstu_attention
 
-    with add_path(str(SUBMODULE_PATH)):
-        triton_ragged_hstu_attention = importlib.import_module(
-            "generative-recommenders.ops.triton.triton_ragged_hstu_attention"
-        )
-        _ragged_hstu_attn_fwd = triton_ragged_hstu_attention._ragged_hstu_attn_fwd
         _ragged_hstu_attn_fwd_persistent = (
             triton_ragged_hstu_attention._ragged_hstu_attn_fwd_persistent
+        )
+        _RaggedAttentionRelativeBiasFunction = (
+            triton_ragged_hstu_attention._RaggedAttentionRelativeBiasFunction
         )
 
     @torch.fx.wrap
@@ -47,6 +46,7 @@ class RaggedHSTUAttn(torch.nn.Module):
         num_heads,
         max_seq_len,
         num_buckets,
+        requires_grad,
         persistent_kernel: bool = False,
     ) -> None:
         super().__init__()
@@ -58,13 +58,17 @@ class RaggedHSTUAttn(torch.nn.Module):
             torch.randn(
                 (self.num_buckets + 1,),
                 dtype=torch.bfloat16,
-            ).cuda()
+            )
+            .requires_grad_(requires_grad)
+            .cuda()
         )
         self.all_pos_weights = torch.nn.Parameter(
             torch.randn(
                 (2 * self.max_seq_len - 1,),
                 dtype=torch.bfloat16,
-            ).cuda()
+            )
+            .requires_grad_(requires_grad)
+            .cuda()
         )
         self.persistent_kernel = persistent_kernel
 
@@ -141,57 +145,57 @@ class RaggedHSTUAttn(torch.nn.Module):
             "HAS_SORT_BY_LENGTH_INDICES": False,
             "sort_by_length_indices": None,
         }
-        if not IS_FBCODE:
-            del kwargs["MAX_ATTN_LEN"]
-            del kwargs["HAS_CONTEXTUAL_SEQ_LEN"]
-            del kwargs["contextual_seq_len"]
-            del kwargs["HAS_SORT_BY_LENGTH_INDICES"]
-            del kwargs["sort_by_length_indices"]
-            kwargs["HAS_MAX_ATTN_LEN"] = False
-            kwargs["max_attn_len"] = 0
 
         if self.persistent_kernel:
             grid = (1216,)
             _ragged_hstu_attn_fwd_persistent[grid](**kwargs)
         else:
-            grid = lambda meta: (  # noqa E731
-                triton.cdiv(N, meta["BLOCK_M"]),
-                Z * H,
+            out = _RaggedAttentionRelativeBiasFunction.apply(
+                self.max_seq_len,  # N
+                kwargs["alpha"],
+                q,
+                k,
+                v,
+                kwargs["seq_offsets"],
+                kwargs["INVALID_MASK_TYPE"],
+                timestamps,
+                self.all_ts_weights,  # ts_weights
+                self.all_pos_weights,  # pos_weights
+                kwargs["CAUSAL"],  # causal,
+                kwargs["num_buckets"],  # num_buckets
+                "sqrt",  # time_bucket_fn
+                kwargs["time_bucket_incr"],  # time_bucket_incr
+                kwargs["time_bucket_div"],  # time_bucket_div
+                kwargs["time_delta"],  # time_delta
+                kwargs["max_pos_ind"],  # max_pos_ind
+                kwargs["num_targets"],
+                None,  # attn_scale
+                kwargs["ATTN_BIAS_TYPE"],  # relative_bias_type
+                kwargs["MAX_ATTN_LEN"],  # max_attn_len
+                kwargs["contextual_seq_len"],  # contextual_seq_len
+                kwargs["sort_by_length_indices"],  # sort_by_length
             )
-            _ragged_hstu_attn_fwd[grid](**kwargs)
 
         return out
 
 
 def get_test_inputs(
-    batch_size, num_heads, max_seq_len
+    batch_size, num_heads, max_seq_len, requires_grad
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    timestamp_deltas: torch.Tensor = (
-        torch.randint(
-            86400,
-            size=(batch_size, max_seq_len + 1),
-        )
-        .requires_grad_(False)
-        .cuda()
-    )
+    timestamp_deltas: torch.Tensor = torch.randint(
+        86400,
+        size=(batch_size, max_seq_len + 1),
+    ).cuda()
     timestamps = timestamp_deltas.cumsum(dim=1)
 
-    lengths = (
-        torch.randint(
-            max_seq_len + 1,
-            size=(batch_size,),
-        )
-        .requires_grad_(False)
-        .cuda()
-    )
-    seq_offsets = (
-        torch.zeros(
-            (batch_size + 1,),
-            dtype=torch.int64,
-        )
-        .requires_grad_(False)
-        .cuda()
-    )
+    lengths = torch.randint(
+        max_seq_len + 1,
+        size=(batch_size,),
+    ).cuda()
+    seq_offsets = torch.zeros(
+        (batch_size + 1,),
+        dtype=torch.int64,
+    ).cuda()
     seq_offsets[1:] = torch.cumsum(
         lengths,
         dim=0,
@@ -203,7 +207,7 @@ def get_test_inputs(
             (L, num_heads, 512),
             dtype=torch.bfloat16,
         )
-        .requires_grad_(False)
+        .requires_grad_(requires_grad)
         .cuda()
     )
     return qkv, seq_offsets, timestamps

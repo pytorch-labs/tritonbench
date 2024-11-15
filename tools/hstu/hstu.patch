@@ -1,0 +1,13 @@
+diff --git a/generative_recommenders/ops/triton/triton_ragged_hstu_attention.py b/generative_recommenders/ops/triton/triton_ragged_hstu_attention.py
+index b4e318b..d6bc894 100644
+--- a/generative_recommenders/ops/triton/triton_ragged_hstu_attention.py
++++ b/generative_recommenders/ops/triton/triton_ragged_hstu_attention.py
+@@ -36,7 +36,7 @@ try:
+         VersionedSpec,
+     )
+ except ImportError:
+-    from hammer.oss.generative_recommenders.ops.triton.utils import (
++    from generative_recommenders.ops.triton.utils import (
+         _switch_to_contiguous_if_needed,
+         autotune_max_seq_len,
+         NamedSpecType,

@@ -1,8 +1,17 @@
 import argparse
 
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
-from tritonbench.utils.triton_op import BenchmarkOperator, register_benchmark
+import torch
+from tritonbench.utils.input import input_filter
+
+from tritonbench.utils.triton_op import (
+    BenchmarkOperator,
+    BenchmarkOperatorMetrics,
+    Mode,
+    register_benchmark,
+    register_metric,
+)
 
 from .hstu import get_test_inputs, RaggedHSTUAttn
 
@@ -30,6 +39,7 @@ class Operator(BenchmarkOperator):
         self.num_buckets = args.num_buckets
         # set a default number of inputs
         self._num_inputs = 10 if self._num_inputs is None else self._num_inputs
+        self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
 
     @register_benchmark()
     def hstu_triton_ragged_attention(self, qkv, seq_offsets, timestamps):
@@ -38,17 +48,20 @@ class Operator(BenchmarkOperator):
             self.num_heads,
             self.max_seq_len,
             self.num_buckets,
+            self.requires_grad,
             persistent_kernel=False,
         )
         return lambda: attn(qkv, seq_offsets, timestamps)
 
-    @register_benchmark()
+    # TODO: enable persistent kernels when the OSS backward is ready
+    @register_benchmark(enabled=False)
     def hstu_triton_ragged_attention_persistent(self, qkv, seq_offsets, timestamps):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
             self.max_seq_len,
             self.num_buckets,
+            self.requires_grad,
             persistent_kernel=True,
         )
         return lambda: attn(qkv, seq_offsets, timestamps)
@@ -58,5 +71,50 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self):
         for _input_id in range(self._num_inputs):
-            inputs = get_test_inputs(self.batch_size, self.num_heads, self.max_seq_len)
+            inputs = get_test_inputs(
+                self.batch_size, self.num_heads, self.max_seq_len, self.requires_grad
+            )
             yield inputs
+
+    def get_bwd_fn(self, fwd_fn: Callable[..., Any]) -> Callable[..., Any]:
+        o = fwd_fn()
+        o_tensor = input_filter(
+            lambda x: isinstance(x, torch.Tensor),
+            o,
+        )
+        do = torch.rand_like(o_tensor)
+        fn = lambda: o_tensor.backward(do, retain_graph=True)
+        return fn
+
+    @register_metric()
+    def tflops(
+        self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics
+    ) -> float:
+        ratio = 2.0  # triangular masking
+        f1 = 0.0
+        f2 = 0.0
+        jagged = True
+        qkv, seq_offsets, timestamps = example_inputs
+        q = qkv[:, :, :128]
+        v = qkv[:, :, 256:384]
+        _, nheads, attn_dim = q.shape
+        _, _, hidden_dim = v.shape
+        max_seqlen = timestamps.size(1) - 1
+
+        for i in range(self.batch_size):
+            seq_len = (
+                int((seq_offsets[i + 1] - seq_offsets[i]).item())
+                if jagged
+                else max_seqlen
+            )
+            # (QK^T), dQ = d(QK^T)K, dK^T = Q^Td(QK^T)
+            f1 += 2 * self.num_heads * attn_dim * seq_len**2 // ratio
+            # (QK^T)V, d(QK^T) = dOV^T, dV = (QK^T)^TdO,
+            f2 += 2 * self.num_heads * hidden_dim * seq_len**2 // ratio
+        if self.mode == Mode.FWD:
+            tflops = f1 + f2  # computes (QK^T) and (QK^T)V
+        elif self.mode == Mode.BWD:
+            tflops = 3 * f1 + 2 * f2  # computes (QK^T), dQ, dK, dV, d(QK^T)
+        elif self.mode == Mode.FWD_BWD:
+            tflops = 4 * f1 + 3 * f2
+        return tflops / metrics.latency * 1e-9
