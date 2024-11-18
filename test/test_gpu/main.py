@@ -102,9 +102,8 @@ def _run_operator_in_task(op: str, args: List[str]):
         task.run()
         task.check_output()
     except NotImplementedError:
-        logger.info(
-            f"Operator {op} does not support backward, skipping backward test."
-        )
+        # Operator does not support backward, skip the test
+        pass
 
 
 def make_test(operator):
