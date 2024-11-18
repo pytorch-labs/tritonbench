@@ -9,6 +9,7 @@ fi
 . "${SETUP_SCRIPT}"
 
 # FIXME: patch hstu
+sudo apt-get install  -y patch
 python install.py --hstu
 
 python -m unittest test.test_gpu.main -v
