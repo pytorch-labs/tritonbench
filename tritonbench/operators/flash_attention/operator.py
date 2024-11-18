@@ -55,9 +55,7 @@ from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
 
 from tritonbench.kernels.triton_fused_attention import (
-    attention as triton_tutorial_FA2,
-    attention_tma as triton_tutorial_FA2_tma,
-    attention_ws as triton_tutorial_FA2_ws,
+    attention_opt as triton_tutorial_FA2_opt,
 )
 
 # [Optional] flash_attn v2
@@ -248,7 +246,22 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        return lambda: triton_tutorial_FA2(q, k, v, self.causal, self.sm_scale)
+        # base: do not enable TMA/WarpSpec/CompPipe
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "base"
+        )
+
+    @register_benchmark(enabled=HAS_CUDA_124)
+    def triton_tutorial_flash_v2_opt(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        # autotune CompPipe
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "opt"
+        )
 
     @register_benchmark(enabled=HAS_CUDA_124)
     def triton_tutorial_flash_v2_tma(
@@ -257,7 +270,10 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        return lambda: triton_tutorial_FA2_tma(q, k, v, self.causal, self.sm_scale)
+        # autotune TMA/CompPipe
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "tma"
+        )
 
     @register_benchmark(enabled=HAS_CUDA_124)
     def triton_tutorial_flash_v2_ws(
@@ -266,7 +282,22 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        return lambda: triton_tutorial_FA2_ws(q, k, v, self.causal, self.sm_scale)
+        # autotune WarpSpec/CompPipe
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "ws"
+        )
+
+    @register_benchmark(enabled=HAS_CUDA_124)
+    def triton_tutorial_flash_v2_tma_ws(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        # autotune TMA/WarpSpec/CompPipe
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "tma_ws"
+        )
 
     @register_benchmark(enabled=HAS_KERNELS)
     def triton_op_flash_v2(
