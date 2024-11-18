@@ -8,9 +8,6 @@ fi
 
 . "${SETUP_SCRIPT}"
 
-# install deps
-pip install psutil tabulate
-
 # FIXME: patch hstu
 python install.py --hstu
 
