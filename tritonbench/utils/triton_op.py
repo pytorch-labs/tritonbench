@@ -556,15 +556,15 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             self.tb_args.cudagraph if self.tb_args.cudagraph else self.use_cuda_graphs
         )
         # we accept both "fwd" and "eval"
-        if self.tb_args.mode == "fwd":
+        if self.tb_args.mode == "fwd" or self.tb_args.fwd:
             self.mode = Mode.FWD
-        elif self.tb_args.mode == "fwd_bwd":
+        elif self.tb_args.mode == "fwd_bwd" or self.tb_args.fwd_bwd:
             self.mode = Mode.FWD_BWD
-        elif self.tb_args.mode == "fwd_no_grad":
+        elif self.tb_args.mode == "fwd_no_grad" or self.tb_args.fwd_no_grad:
             self.mode = Mode.FWD_NO_GRAD
         else:
             assert (
-                self.tb_args.mode == "bwd"
+                self.tb_args.mode == "bwd" or self.tb_args.bwd
             ), f"We only accept 3 test modes: fwd(eval), fwd_bwd(train), or bwd."
             self.mode = Mode.BWD
         self.device = tb_args.device
