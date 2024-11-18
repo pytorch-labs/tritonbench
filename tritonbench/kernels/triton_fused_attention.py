@@ -38,7 +38,6 @@ else:
 
 
 class TmaAutoTuneHelper:
-
     # duck typing wrapper to implement the same interface as TmaDescKernelParam in Triton PR #4498
     class KernelParamWrapper:
         def __init__(self, desc):
@@ -156,9 +155,7 @@ def _attn_fwd_inner(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(
-        lo, hi, BLOCK_N, loop_schedule=LOOP_SCHEDULE
-    ):
+    for start_n in tl.range(lo, hi, BLOCK_N, loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
@@ -262,9 +259,7 @@ def _attn_fwd_inner_ws(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(
-        lo, hi, BLOCK_N, loop_schedule=LOOP_SCHEDULE
-    ):
+    for start_n in tl.range(lo, hi, BLOCK_N, loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         with tl.async_task([0]):
@@ -342,7 +337,12 @@ schedList = ["FA_secondDot"] if PEEL_LAST else schedList
 configsOpt = [
     (
         triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": enable_tma, "LOOP_SCHEDULE": sched},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+            },
             num_stages=4 if sched == "FA_firstDot" or sched == "FA_secondDot" else 3,
             num_warps=w,
             num_buffers_warp_spec=0,
@@ -350,9 +350,14 @@ configsOpt = [
         )
         if has_warp_spec
         else triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": enable_tma, "LOOP_SCHEDULE": sched},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+            },
             num_stages=4 if sched == "FA_firstDot" or sched == "FA_secondDot" else 3,
-            num_warps=w
+            num_warps=w,
         )
     )
     for BM in [128]
@@ -365,7 +370,12 @@ configsOpt = [
 configsTma = [
     (
         triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": enable_tma, "LOOP_SCHEDULE": sched},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+            },
             num_stages=4 if sched == "FA_firstDot" or sched == "FA_secondDot" else 3,
             num_warps=w,
             num_buffers_warp_spec=0,
@@ -373,9 +383,14 @@ configsTma = [
         )
         if has_warp_spec
         else triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": enable_tma, "LOOP_SCHEDULE": sched},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+            },
             num_stages=4 if sched == "FA_firstDot" or sched == "FA_secondDot" else 3,
-            num_warps=w
+            num_warps=w,
         )
     )
     for BM in [128]
@@ -400,7 +415,7 @@ configsWS = [
         else triton.Config(
             {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": False, "LOOP_SCHEDULE": sched},
             num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
-            num_warps=w
+            num_warps=w,
         )
     )
     for BM in [128]
@@ -416,25 +431,44 @@ configsWS = [
 configsOrig = [
     (
         triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": False, "LOOP_SCHEDULE": "default"},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": False,
+                "LOOP_SCHEDULE": "default",
+            },
             num_stages=s,
             num_warps=w,
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
         if has_warp_spec
-        else triton.Config({"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": False, "LOOP_SCHEDULE": "default"}, num_stages=s, num_warps=w)
+        else triton.Config(
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": False,
+                "LOOP_SCHEDULE": "default",
+            },
+            num_stages=s,
+            num_warps=w,
+        )
     )
-    for BM in [128] #64, 128]
-    for BN in [128] #64, 128]
-    for s in [3] #, 4, 7]
-    for w in [8] #4, 8]
+    for BM in [128]  # 64, 128]
+    for BN in [128]  # 64, 128]
+    for s in [3]  # , 4, 7]
+    for w in [8]  # 4, 8]
 ]
 # TMA, WS, and CompPipe
 configsTmaWS = [
     (
         triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": enable_tma, "LOOP_SCHEDULE": sched},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+            },
             num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
             num_warps=w,
             num_buffers_warp_spec=buf,
@@ -444,9 +478,14 @@ configsTmaWS = [
         )
         if has_warp_spec
         else triton.Config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": enable_tma, "LOOP_SCHEDULE": sched},
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+            },
             num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
-            num_warps=w
+            num_warps=w,
         )
     )
     for BM in [128]
@@ -1570,7 +1609,6 @@ def _attn_bwd(
 
 
 class _attention_opt(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, q, k, v, causal, sm_scale, baseVariant):
         # shape constraints
@@ -1593,13 +1631,11 @@ class _attention_opt(torch.autograd.Function):
         desc_helper.init_tma_descriptor("o")
 
         def grid_tma(META):
-            if META['ENABLE_TMA'] == False:
+            if META["ENABLE_TMA"] == False:
                 return (
                     # grid partitioning: num_consumer_groups * BLOCK_M
                     # data partitioning: BLOCK_M
-                    triton.cdiv(
-                        q.shape[2], META["BLOCK_M"]
-                    ),  # num_consumer_groups
+                    triton.cdiv(q.shape[2], META["BLOCK_M"]),  # num_consumer_groups
                     q.shape[0] * q.shape[1],
                     1,
                 )
@@ -1639,7 +1675,7 @@ class _attention_opt(torch.autograd.Function):
                 BATCH * H * N_CTX,
                 HEAD_DIM_Q,
                 META["BLOCK_M"]
-                // (2 if META['ENABLE_WS'] else 1),  # data partitioning: halve
+                // (2 if META["ENABLE_WS"] else 1),  # data partitioning: halve
                 HEAD_DIM_Q,
                 q.element_size(),
             )
@@ -1649,16 +1685,14 @@ class _attention_opt(torch.autograd.Function):
                 BATCH * H * N_CTX,
                 HEAD_DIM_Q,
                 META["BLOCK_M"]
-                // (2 if META['ENABLE_WS'] else 1),  # data partitioning: halve
+                // (2 if META["ENABLE_WS"] else 1),  # data partitioning: halve
                 HEAD_DIM_Q,
                 o.element_size(),
             )
             return (
                 # grid partitioning: num_consumer_groups * BLOCK_M
                 # data partitioning: BLOCK_M
-                triton.cdiv(
-                    q.shape[2], META["BLOCK_M"]
-                ),  # num_consumer_groups
+                triton.cdiv(q.shape[2], META["BLOCK_M"]),  # num_consumer_groups
                 q.shape[0] * q.shape[1],
                 1,
             )
