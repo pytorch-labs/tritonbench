@@ -90,7 +90,7 @@ def _run_operator_in_task(op: str, args: List[str]):
             return
         skip = ",".join(skip_tests[op])
         args.extend(["--skip", skip])
-    task = OpTask(operator)
+    task = OpTask(op)
     task.make_operator_instance(args=args)
     task.run()
     task.check_output()
