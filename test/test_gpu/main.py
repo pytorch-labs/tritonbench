@@ -55,9 +55,10 @@ def check_ci_output(op):
 
 
 def _run_one_operator(
-    tb_args: argparse.Namespace,
-    extra_args: Optional[List[str]] = None,
+    args: List[str]
 ):
+    parser = get_parser(args)
+    tb_args, extra_args = parser.parse_known_args(args)
     if tb_args.op in skip_tests:
         # If the op itself is in the skip list, skip all tests
         if not skip_tests[tb_args.op]:
@@ -80,6 +81,24 @@ def _run_one_operator(
             f"Operator {op.name} does not support backward, skipping backward test."
         )
 
+def _run_operator_in_task(op: str, args: List[str]):
+    from tritonbench.operators.op_task import OpTask
+    if op in skip_tests:
+        # If the op itself is in the skip list, skip all tests
+        if not skip_tests[op]:
+            return
+        skip = ",".join(skip_tests[op])
+        args.extend(["--skip", skip])
+    task = OpTask(operator)
+    op = task.make_operator_instance(args=args)
+    op.run()
+    op.check_output()
+    del op
+    # Test backward (if applicable)
+    args.extend(["--bwd"])
+    op = task.make_operator_instance(args=args)
+    op.run()
+    op.check_output()
 
 def make_test(operator):
     def test_case(self):
@@ -93,13 +112,10 @@ def make_test(operator):
             "1",
             "--test-only",
         ]
-        parser = get_parser(args)
-        tb_args, extra_args = parser.parse_known_args(args)
-        _run_one_operator(
-            tb_args,
-            extra_args,
-        )
-
+        if IS_FBCODE:
+            _run_one_operator(args)
+        else:
+            _run_operator_in_task(op=operator, args=args)
     return test_case
 
 

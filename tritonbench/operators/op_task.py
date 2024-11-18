@@ -53,7 +53,6 @@ class OpDetails:
 
     name: str
     exists: bool
-    metadata: Dict[str, Any]
 
 
 class OpTask(base_task.TaskBase):
@@ -95,7 +94,7 @@ class OpTask(base_task.TaskBase):
 
     @base_task.run_in_worker(scoped=True)
     @staticmethod
-    def _maybe_import_operator(package: str, op_name: str) -> Dict[str, Any]:
+    def _maybe_import_operator(package: str, op_name: str, args: List[str]) -> Dict[str, Any]:
         import importlib
         import os
         import traceback
@@ -111,7 +110,6 @@ class OpTask(base_task.TaskBase):
         return {
             "name": op_name,
             "exists": Operator is not None,
-            "metadata": {},
         }
 
     # =========================================================================
@@ -121,14 +119,15 @@ class OpTask(base_task.TaskBase):
     @base_task.run_in_worker(scoped=True)
     @staticmethod
     def make_operator_instance(
-        mode: str,
-        device: str,
-        extra_args: Optional[List[str]] = None,
+        args: List[str],
     ) -> None:
+        from tritonbench.utils.parser import get_parser
+        parser = get_parser()
+        tb_args, extra_args = parser.parse_known_args(args)
         Operator = globals()["Operator"]
+        parser = get_parser()
         op = Operator(
-            mode=mode,
-            device=device,
+            tb_args=tb_args,
             extra_args=extra_args,
         )
 
@@ -136,8 +135,7 @@ class OpTask(base_task.TaskBase):
 
         gc.collect()
 
-        if device == "cuda":
-            torch.cuda.empty_cache()
+        if op.device == "cuda":
             maybe_sync = torch.cuda.synchronize
         else:
             maybe_sync = lambda: None
@@ -180,6 +178,24 @@ class OpTask(base_task.TaskBase):
                 return getattr(op, attr)
         else:
             return None
+
+    # =========================================================================
+    # == Check output is expected in the child process ========================
+    # =========================================================================
+    @base_task.run_in_worker(scoped=True)
+    @staticmethod
+    def check_output():
+        op = globals()["op"]
+        from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS
+        output = op.output
+        output_impls = output.result[0][1].keys()
+        ci_enabled_impls = [
+            x for x in REGISTERED_BENCHMARKS[output.op_name].keys() if x not in op._skip
+        ]
+        # Make sure that all the ci_enabled impls are in the output
+        assert set(output_impls) == set(
+            ci_enabled_impls
+        ), f"output impls: {output_impls} != ci_enabled impls: {ci_enabled_impls}"
 
     def del_op_instance(self):
         self.worker.run(
