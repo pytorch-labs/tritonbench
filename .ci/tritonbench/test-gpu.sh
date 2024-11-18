@@ -11,4 +11,4 @@ fi
 # install deps
 pip install psutil tabulate
 
-python -m unittest test.test_gpu.main
+python -m unittest test.test_gpu.main -v
