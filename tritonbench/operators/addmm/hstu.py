@@ -9,6 +9,7 @@ from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 with add_path(str(SUBMODULE_PATH.joinpath("generative-recommenders"))):
     from generative_recommenders.ops.triton.triton_addmm import _addmm_fwd
 
+
 class _AddMmFunction(torch.autograd.Function):
     @staticmethod
     # pyre-ignore[14]

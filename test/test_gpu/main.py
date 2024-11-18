@@ -37,8 +37,6 @@ SKIP_OPS = {
 
 TEST_OPERATORS = set(list_operators_by_collection(op_collection="default")) - SKIP_OPS
 
-print(f"Testing operators: {TEST_OPERATORS}")
-
 
 def check_ci_output(op):
     from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS

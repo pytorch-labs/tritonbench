@@ -521,11 +521,13 @@ class PostInitProcessor(type):
         obj.__post__init__()
         return obj
 
+
 def _translate_mode(tb_args):
     def _has_and_true(attr):
         if hasattr(tb_args, attr) and getattr(tb_args, attr):
             return True
         return False
+
     if _has_and_true("fwd"):
         tb_args.mode = "fwd"
     if _has_and_true("bwd"):
@@ -534,6 +536,7 @@ def _translate_mode(tb_args):
         tb_args.mode = "fwd_bwd"
     if _has_and_true("fwd_no_grad"):
         tb_args.mode = "fwd_no_grad"
+
 
 class BenchmarkOperator(metaclass=PostInitProcessor):
     mode: Mode = Mode.FWD
