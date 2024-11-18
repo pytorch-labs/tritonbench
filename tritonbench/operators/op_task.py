@@ -94,7 +94,7 @@ class OpTask(base_task.TaskBase):
 
     @base_task.run_in_worker(scoped=True)
     @staticmethod
-    def _maybe_import_operator(package: str, op_name: str, args: List[str]) -> Dict[str, Any]:
+    def _maybe_import_operator(package: str, op_name: str) -> Dict[str, Any]:
         import importlib
         import os
         import traceback
@@ -184,7 +184,7 @@ class OpTask(base_task.TaskBase):
     # =========================================================================
     @base_task.run_in_worker(scoped=True)
     @staticmethod
-    def check_output():
+    def check_output() -> None:
         op = globals()["op"]
         from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS
         output = op.output

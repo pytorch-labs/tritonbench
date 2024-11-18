@@ -90,15 +90,15 @@ def _run_operator_in_task(op: str, args: List[str]):
         skip = ",".join(skip_tests[op])
         args.extend(["--skip", skip])
     task = OpTask(operator)
-    op = task.make_operator_instance(args=args)
-    op.run()
-    op.check_output()
-    del op
+    task.make_operator_instance(args=args)
+    task.run()
+    task.check_output()
+    task.del_op_instance()
     # Test backward (if applicable)
     args.extend(["--bwd"])
-    op = task.make_operator_instance(args=args)
-    op.run()
-    op.check_output()
+    task.make_operator_instance(args=args)
+    task.run()
+    task.check_output()
 
 def make_test(operator):
     def test_case(self):
