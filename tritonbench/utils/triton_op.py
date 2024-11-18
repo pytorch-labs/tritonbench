@@ -523,7 +523,7 @@ class PostInitProcessor(type):
 
 def _translate_mode(tb_args):
     def _has_and_true(attr):
-        if hasattr(tb_args, attr) and attr:
+        if hasattr(tb_args, attr) and getattr(tb_args, attr):
             return True
         return False
     if _has_and_true("fwd"):
