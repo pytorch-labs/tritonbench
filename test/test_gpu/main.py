@@ -96,10 +96,15 @@ def _run_operator_in_task(op: str, args: List[str]):
     task.check_output()
     task.del_op_instance()
     # Test backward (if applicable)
-    args.extend(["--bwd"])
-    task.make_operator_instance(args=args)
-    task.run()
-    task.check_output()
+    try:
+        args.extend(["--bwd"])
+        task.make_operator_instance(args=args)
+        task.run()
+        task.check_output()
+    except NotImplementedError:
+        logger.info(
+            f"Operator {op.name} does not support backward, skipping backward test."
+        )
 
 
 def make_test(operator):
