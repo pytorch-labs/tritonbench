@@ -39,6 +39,7 @@ TEST_OPERATORS = set(list_operators_by_collection(op_collection="default")) - SK
 
 print(f"Testing operators: {TEST_OPERATORS}")
 
+
 def check_ci_output(op):
     from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS
 
@@ -54,9 +55,7 @@ def check_ci_output(op):
     ), f"output impls: {output_impls} != ci_enabled impls: {ci_enabled_impls}"
 
 
-def _run_one_operator(
-    args: List[str]
-):
+def _run_one_operator(args: List[str]):
     parser = get_parser(args)
     tb_args, extra_args = parser.parse_known_args(args)
     if tb_args.op in skip_tests:
@@ -81,8 +80,10 @@ def _run_one_operator(
             f"Operator {op.name} does not support backward, skipping backward test."
         )
 
+
 def _run_operator_in_task(op: str, args: List[str]):
     from tritonbench.operators.op_task import OpTask
+
     if op in skip_tests:
         # If the op itself is in the skip list, skip all tests
         if not skip_tests[op]:
@@ -100,6 +101,7 @@ def _run_operator_in_task(op: str, args: List[str]):
     task.run()
     task.check_output()
 
+
 def make_test(operator):
     def test_case(self):
         # Add `--test-only` to disable Triton autotune in tests
@@ -116,6 +118,7 @@ def make_test(operator):
             _run_one_operator(args)
         else:
             _run_operator_in_task(op=operator, args=args)
+
     return test_case
 
 

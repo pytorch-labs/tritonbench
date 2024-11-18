@@ -122,6 +122,7 @@ class OpTask(base_task.TaskBase):
         args: List[str],
     ) -> None:
         from tritonbench.utils.parser import get_parser
+
         parser = get_parser()
         tb_args, extra_args = parser.parse_known_args(args)
         Operator = globals()["Operator"]
@@ -187,6 +188,7 @@ class OpTask(base_task.TaskBase):
     def check_output() -> None:
         op = globals()["op"]
         from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS
+
         output = op.output
         output_impls = output.result[0][1].keys()
         ci_enabled_impls = [
