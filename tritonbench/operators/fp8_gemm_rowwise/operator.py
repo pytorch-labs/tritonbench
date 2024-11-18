@@ -43,13 +43,13 @@ try:
         matmul_fp8_row as triton_fp8_row,
     )
 
-    assert hasattr(
-        triton.runtime.driver.active.utils, "fill_1d_tma_descriptor"
-    ), "TMA is required by the Triton kernel."
+    if not torch.version.hip:
+        assert hasattr(
+            triton.runtime.driver.active.utils, "fill_1d_tma_descriptor"
+        ), "TMA is required by the Triton kernel."
     HAS_TRITON = True
 except (ImportError, AssertionError):
     HAS_TRITON = False
-
 
 try:
     cutlass_or_ck_fp8_row = torch.ops.fbgemm.f8f8bf16_rowwise
