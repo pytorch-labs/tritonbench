@@ -169,7 +169,6 @@ class RaggedHSTUAttn(torch.nn.Module):
                 kwargs["time_delta"],  # time_delta
                 kwargs["max_pos_ind"],  # max_pos_ind
                 kwargs["num_targets"],
-                None,  # attn_scale
                 kwargs["ATTN_BIAS_TYPE"],  # relative_bias_type
                 kwargs["MAX_ATTN_LEN"],  # max_attn_len
                 kwargs["contextual_seq_len"],  # contextual_seq_len
