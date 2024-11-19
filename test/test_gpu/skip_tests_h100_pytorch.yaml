@@ -1,15 +1,19 @@
-# Tests we skip in OSS CI
-# This file is regarding to the Triton version bundled with pytorch
-# Use <op-name:> to skip an entire operator
-# Use <op-name:\n  - impl-name> to skip an impl
+# Tests we skip in triton-pytorch + OSS CI
+# triton-pytorch is the triton version bundled with pytorch nightly
+# We need to skip kernels that only work on triton-main
+# Usage:
+#  op-name: to skip an entire operator
+#  op-name:\n\t- impl-name to skip an impl
 bf16xint16_gemm:
   # LLVM ERROR: mma16816 data type not supported
   - bf16xint16
 flash_attention:
+  # FIXME: enable colfax_cutlass and tk
   - xformers
   - xformers_splitk
   - colfax_cutlass
   - tk
+  # triton_tutorial_* kernels require triton-main
   - triton_tutorial_flash_v2
   - triton_tutorial_flash_v2_opt
   - triton_tutorial_flash_v2_tma
@@ -17,16 +21,17 @@ flash_attention:
   - triton_tutorial_flash_v2_tma_ws
 fp8_attention:
   - colfax_fmha
-  # triton_flash_v2 now requires the main branch of Triton
-  # pytorch version does not work
+  # triton_flash_v2 requires triton-main
   - triton_flash_v2
-# All requires fb-import kernels
+# fp8_fused_quant_gemm_rowwise requires fb-only kernels
 fp8_fused_quant_gemm_rowwise:
 fp8_gemm:
+  # triton_*_persistent requires triton-main
   - triton_persistent_fp8_gemm
   - triton_tma_persistent_fp8_gemm
 fp8_gemm_rowwise:
 gemm:
+  # triton_*_persistent_* requires triton-main
   - triton_persistent_matmul
   - triton_tma_persistent_matmul
   - triton_tma_persistent_cached_matmul
@@ -34,10 +39,6 @@ gemm:
   - colfax_cutlass_matmul
   # FIXME: PT2 CUTLASS backend failed
   - pt2_cutlass_matmul
-jagged_layer_norm:
-jagged_mean:
-jagged_softmax:
-jagged_sum:
 ragged_attention:
   - hstu_triton_ragged_attention_persistent
 test_op:
