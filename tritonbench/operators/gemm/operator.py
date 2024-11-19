@@ -24,11 +24,16 @@ from tritonbench.utils.triton_op import (
 
 from .kernels import matmul as kernels
 from .partition_k import matmul_partition_k
-from .persistent_matmul import (
-    matmul_persistent,
-    matmul_tma_persistent,
-    matmul_tma_persistent_cached,
-)
+try:
+    from .persistent_matmul import (
+        matmul_persistent,
+        matmul_tma_persistent,
+        matmul_tma_persistent_cached,
+    )
+    HAS_PRESISTENT = True
+except ModuleNotFoundError:
+    HAS_PRESISTENT = False
+
 from .triton_matmul import (
     matmul as triton_tutorial_matmul,
     matmul_kernel as triton_tutorial_matmul_kernel,
@@ -158,14 +163,14 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_partition_k(a, bt)
 
-    @register_benchmark()
+    @register_benchmark(enabled=HAS_PRESISTENT)
     def triton_persistent_matmul(self, a, b, bias) -> Callable:
         if not bias == None:
             return lambda: matmul_persistent(a, b) + bias
         else:
             return lambda: matmul_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE)
+    @register_benchmark(enabled=not IS_FBCODE and HAS_PRESISTENT)
     def triton_tma_persistent_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if not bias == None:
@@ -173,7 +178,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_tma_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE)
+    @register_benchmark(enabled=not IS_FBCODE and HAS_PRESISTENT)
     def triton_tma_persistent_cached_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if not bias == None:

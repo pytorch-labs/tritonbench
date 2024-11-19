@@ -25,6 +25,10 @@ fp8_gemm:
   - triton_persistent_fp8_gemm
   - triton_tma_persistent_fp8_gemm
 fp8_gemm_rowwise:
+gemm:
+  - triton_persistent_matmul
+  - triton_tma_persistent_matmul
+  - triton_tma_persistent_cached_matmul
 jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
