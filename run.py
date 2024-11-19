@@ -55,12 +55,6 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
         Opbench = load_opbench_by_name_from_loader(args)
     else:
         Opbench = load_opbench_by_name(args.op)
-    if args.fwd_bwd:
-        args.mode = "fwd_bwd"
-    if args.bwd:
-        args.mode = "bwd"
-    if args.fwd_no_grad:
-        args.mode = "fwd_no_grad"
     opbench = Opbench(
         tb_args=args,
         extra_args=extra_args,

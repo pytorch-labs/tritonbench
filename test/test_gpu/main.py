@@ -53,10 +53,9 @@ def check_ci_output(op):
     ), f"output impls: {output_impls} != ci_enabled impls: {ci_enabled_impls}"
 
 
-def _run_one_operator(
-    tb_args: argparse.Namespace,
-    extra_args: Optional[List[str]] = None,
-):
+def _run_one_operator(args: List[str]):
+    parser = get_parser(args)
+    tb_args, extra_args = parser.parse_known_args(args)
     if tb_args.op in skip_tests:
         # If the op itself is in the skip list, skip all tests
         if not skip_tests[tb_args.op]:
@@ -80,6 +79,31 @@ def _run_one_operator(
         )
 
 
+def _run_operator_in_task(op: str, args: List[str]):
+    from tritonbench.operators.op_task import OpTask
+
+    if op in skip_tests:
+        # If the op itself is in the skip list, skip all tests
+        if not skip_tests[op]:
+            return
+        skip = ",".join(skip_tests[op])
+        args.extend(["--skip", skip])
+    task = OpTask(op)
+    task.make_operator_instance(args=args)
+    task.run()
+    task.check_output()
+    task.del_op_instance()
+    # Test backward (if applicable)
+    try:
+        args.extend(["--bwd"])
+        task.make_operator_instance(args=args)
+        task.run()
+        task.check_output()
+    except NotImplementedError:
+        # Operator does not support backward, skip the test
+        pass
+
+
 def make_test(operator):
     def test_case(self):
         # Add `--test-only` to disable Triton autotune in tests
@@ -92,12 +116,10 @@ def make_test(operator):
             "1",
             "--test-only",
         ]
-        parser = get_parser(args)
-        tb_args, extra_args = parser.parse_known_args(args)
-        _run_one_operator(
-            tb_args,
-            extra_args,
-        )
+        if IS_FBCODE:
+            _run_one_operator(args)
+        else:
+            _run_operator_in_task(op=operator, args=args)
 
     return test_case
 

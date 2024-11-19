@@ -17,6 +17,9 @@ flash_attention:
 #   - flex_attention
 fp8_attention:
   - colfax_fmha
+  # triton_flash_v2 now requires the main branch of Triton
+  # pytorch version does not work
+  - triton_flash_v2
 fp8_fused_quant_gemm_rowwise:
 fp8_gemm:
   - triton_persistent_fp8_gemm
@@ -29,9 +32,6 @@ jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
 jagged_sum:
-layer_norm:
-low_mem_dropout:
-rms_norm:
-rope:
-template_attention:
+ragged_attention:
+  - hstu_triton_ragged_attention_persistent
 test_op:

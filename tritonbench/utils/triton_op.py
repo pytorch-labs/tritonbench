@@ -522,6 +522,22 @@ class PostInitProcessor(type):
         return obj
 
 
+def _translate_mode(tb_args):
+    def _has_and_true(attr):
+        if hasattr(tb_args, attr) and getattr(tb_args, attr):
+            return True
+        return False
+
+    if _has_and_true("fwd"):
+        tb_args.mode = "fwd"
+    if _has_and_true("bwd"):
+        tb_args.mode = "bwd"
+    if _has_and_true("fwd_bwd"):
+        tb_args.mode = "fwd_bwd"
+    if _has_and_true("fwd_no_grad"):
+        tb_args.mode = "fwd_no_grad"
+
+
 class BenchmarkOperator(metaclass=PostInitProcessor):
     mode: Mode = Mode.FWD
     test: str = "eval"
@@ -555,7 +571,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self.use_cuda_graphs = (
             self.tb_args.cudagraph if self.tb_args.cudagraph else self.use_cuda_graphs
         )
-        # we accept both "fwd" and "eval"
+        _translate_mode(self.tb_args)
         if self.tb_args.mode == "fwd":
             self.mode = Mode.FWD
         elif self.tb_args.mode == "fwd_bwd":
@@ -565,7 +581,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         else:
             assert (
                 self.tb_args.mode == "bwd"
-            ), f"We only accept 3 test modes: fwd(eval), fwd_bwd(train), or bwd."
+            ), "We only accept test modes: fwd, bwd, fwd_bwd, or fwd_no_grad."
             self.mode = Mode.BWD
         self.device = tb_args.device
         self.required_metrics = (

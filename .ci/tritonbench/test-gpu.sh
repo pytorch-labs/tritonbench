@@ -8,7 +8,8 @@ fi
 
 . "${SETUP_SCRIPT}"
 
-# install deps
-pip install psutil tabulate
+# FIXME: patch hstu
+sudo apt-get install  -y patch
+python install.py --hstu
 
-python -m unittest test.test_gpu.main
+python -m unittest test.test_gpu.main -v

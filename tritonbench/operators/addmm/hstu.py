@@ -6,11 +6,8 @@ import torch
 import triton
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
-with add_path(str(SUBMODULE_PATH)):
-    triton_addmm = importlib.import_module(
-        "generative-recommenders.ops.triton.triton_addmm"
-    )
-    _addmm_fwd = triton_addmm._addmm_fwd
+with add_path(str(SUBMODULE_PATH.joinpath("generative-recommenders"))):
+    from generative_recommenders.ops.triton.triton_addmm import _addmm_fwd
 
 
 class _AddMmFunction(torch.autograd.Function):
