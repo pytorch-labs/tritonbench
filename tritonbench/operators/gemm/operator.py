@@ -24,12 +24,14 @@ from tritonbench.utils.triton_op import (
 
 from .kernels import matmul as kernels
 from .partition_k import matmul_partition_k
+
 try:
     from .persistent_matmul import (
         matmul_persistent,
         matmul_tma_persistent,
         matmul_tma_persistent_cached,
     )
+
     HAS_PRESISTENT = True
 except ModuleNotFoundError:
     HAS_PRESISTENT = False
