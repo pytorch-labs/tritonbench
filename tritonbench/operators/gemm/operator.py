@@ -194,6 +194,25 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: torch.matmul(a, b)
 
+    @register_benchmark()
+    def aten_tunableop_matmul(self, a, b, bias) -> Callable:
+        is_enabled = torch.cuda.tunable.is_enabled()
+
+        def op():
+            torch.cuda.tunable.enable(True)
+            output = (
+                torch.matmul(a, b) + bias if bias is not None else torch.matmul(a, b)
+            )
+            torch.cuda.tunable.enable(is_enabled)
+            return output
+
+        torch.cuda.tunable.enable(True)
+
+        # trigger tuning
+        op()
+
+        return op
+
     @register_benchmark(enabled=HAS_HAMMER)
     def hstu_triton_matmul(self, a, b, bias) -> Callable:
         if not bias == None:
