@@ -39,6 +39,11 @@ gemm:
   - colfax_cutlass_matmul
   # FIXME: PT2 CUTLASS backend failed
   - pt2_cutlass_matmul
+# jagged tests are slow, so disable them in OSS
+jagged_layer_norm:
+jagged_mean:
+jagged_softmax:
+jagged_sum:
 ragged_attention:
   - hstu_triton_ragged_attention_persistent
 test_op:
