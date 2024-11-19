@@ -30,7 +30,8 @@ def set_env():
     current_cutlass_dir = torch._inductor.config.cuda.cutlass_dir
     if not os.path.exists(current_cutlass_dir):
         tb_cutlass_dir = REPO_PATH.joinpath("submodules", "cutlass")
-        torch._inductor.config.cuda.cutlass_dir = str(tb_cutlass_dir)
+        if tb_cutlass_dir.is_dir():
+            torch._inductor.config.cuda.cutlass_dir = str(tb_cutlass_dir)
 
 
 def set_random_seed():
