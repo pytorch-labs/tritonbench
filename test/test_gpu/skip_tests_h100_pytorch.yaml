@@ -17,6 +17,9 @@ flash_attention:
 #   - flex_attention
 fp8_attention:
   - colfax_fmha
+  # triton_flash_v2 now requires the main branch of Triton
+  # pytorch version does not work
+  - triton_flash_v2
 fp8_fused_quant_gemm_rowwise:
 fp8_gemm:
   - triton_persistent_fp8_gemm
