@@ -1517,3 +1517,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     ir_dir / f"{fn._name}_{kernel.name}_{input_id}.sass", "w"
                 ) as f:
                     f.write(sass)
+
+    @property
+    def has_bwd(self) -> bool:
+        return self.get_bwd_fn.__code__ is BenchmarkOperator.get_bwd_fn.__code__
