@@ -19,3 +19,6 @@
 [submodule "submodules/xformers"]
 	path = submodules/xformers
 	url = https://github.com/facebookresearch/xformers.git
+[submodule "submodules/cutlass"]
+	path = submodules/cutlass
+	url = https://github.com/NVIDIA/cutlass.git
