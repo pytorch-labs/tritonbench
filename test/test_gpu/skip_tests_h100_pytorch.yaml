@@ -29,9 +29,6 @@ jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
 jagged_sum:
-layer_norm:
-low_mem_dropout:
-rms_norm:
-rope:
-template_attention:
+ragged_attention:
+  - hstu_triton_ragged_attention_persistent
 test_op:
