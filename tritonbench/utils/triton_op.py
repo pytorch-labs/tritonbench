@@ -27,6 +27,7 @@ from tritonbench.utils.env_utils import (
     apply_precision,
     fresh_triton_cache,
     set_random_seed,
+    set_env,
 )
 from tritonbench.utils.input import input_cast
 
@@ -561,6 +562,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
+        set_env()
         set_random_seed()
         self.name = _find_op_name_from_module_path(self.__class__.__module__)
         self._raw_extra_args = copy.deepcopy(extra_args)

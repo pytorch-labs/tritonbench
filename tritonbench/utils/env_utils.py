@@ -4,6 +4,7 @@ import shutil
 from contextlib import contextmanager, ExitStack
 
 from typing import Optional
+from tritonbench.utils.path_utils import REPO_PATH
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +21,16 @@ AVAILABLE_PRECISIONS = [
     "amp_bf16",
     "fp8",
 ]
+
+
+def set_env():
+    import torch
+    IS_FBCODE = not hasattr(torch.version, "git_version")
+    # set cutlass dir
+    # by default we use the cutlass version built with fbgemm
+    if not "TORCHINDUCTOR_CUTLASS_DIR" in os.environ and not IS_FBCODE:
+        cutlass_dir = REPO_PATH.joinpath("submodules", "FBGEMM", "external", "cutlass")
+        os.environ["TORCHINDUCTOR_CUTLASS_DIR"] = str(cutlass_dir.absolute())
 
 
 def set_random_seed():
