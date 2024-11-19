@@ -43,7 +43,7 @@ from tritonbench.utils.path_utils import add_ld_library_path, add_path, SUBMODUL
 from tritonbench.utils.triton_op import IS_FBCODE
 
 try:
-    with add_path(SUBMODULE_PATH.joinpath("kernels")):
+    with add_path(str(SUBMODULE_PATH.joinpath("kernels"))):
         from kernels.flash_attention import attention as triton_op_FA2
     HAS_KERNELS = True
 except BaseException:
