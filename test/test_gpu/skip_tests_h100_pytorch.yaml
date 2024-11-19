@@ -31,6 +31,8 @@ gemm:
   - triton_tma_persistent_cached_matmul
   - hstu_triton_matmul
   - colfax_cutlass_matmul
+  # FIXME: PT2 CUTLASS backend failed
+  - pt2_cutlass_matmul
 jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
