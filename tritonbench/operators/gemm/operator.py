@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 from typing import Any, Callable, Generator, List, Optional, Tuple
+
 import torch
 import torch._inductor.config as inductor_config
 import triton
@@ -39,7 +40,10 @@ from .triton_matmul import (
 )
 
 if IS_FBCODE:
-    from hammer.ops.triton.triton_matmul import triton_matmul as hstu_triton_matmul_kernel
+    from hammer.ops.triton.triton_matmul import (
+        triton_matmul as hstu_triton_matmul_kernel,
+    )
+
     HAS_HAMMER = True
 else:
     HAS_HAMMER = False
