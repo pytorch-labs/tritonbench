@@ -1,10 +1,7 @@
 import argparse
 import csv
 import os
-import statistics
 from typing import Any, Callable, Generator, List, Optional, Tuple
-
-import numpy
 import torch
 import torch._inductor.config as inductor_config
 import triton
@@ -41,9 +38,8 @@ from .triton_matmul import (
     matmul_kernel as triton_tutorial_matmul_kernel,
 )
 
-if inductor_config.is_fbcode():
-    from hammer.ops.triton.triton_matmul import triton_matmul as hstu_triton_matmul
-
+if IS_FBCODE:
+    from hammer.ops.triton.triton_matmul import triton_matmul as hstu_triton_matmul_kernel
     HAS_HAMMER = True
 else:
     HAS_HAMMER = False
@@ -204,9 +200,9 @@ class Operator(BenchmarkOperator):
     @register_benchmark(enabled=HAS_HAMMER)
     def hstu_triton_matmul(self, a, b, bias) -> Callable:
         if not bias == None:
-            return lambda: hstu_triton_matmul(a, b) + bias
+            return lambda: hstu_triton_matmul_kernel(a, b) + bias
         else:
-            return lambda: hstu_triton_matmul(a, b)
+            return lambda: hstu_triton_matmul_kernel(a, b)
 
     @register_benchmark(enabled=bool(colfax_gemm))
     def colfax_cutlass_matmul(self, a, b, bias) -> Callable:

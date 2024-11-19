@@ -29,6 +29,7 @@ gemm:
   - triton_persistent_matmul
   - triton_tma_persistent_matmul
   - triton_tma_persistent_cached_matmul
+  - hstu_triton_matmul
 jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
