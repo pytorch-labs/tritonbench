@@ -88,9 +88,9 @@ def _run_operator_in_task(op: str, args: List[str]):
     task.make_operator_instance(args=args)
     task.run()
     task.check_output()
-    task.del_op_instance()
     # Test backward (if applicable)
     if task.get_attribute("has_bwd"):
+        task.del_op_instance()
         args.extend(["--bwd"])
         task.make_operator_instance(args=args)
         task.run()
