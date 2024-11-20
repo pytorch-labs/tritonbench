@@ -1518,6 +1518,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 ) as f:
                     f.write(sass)
 
-    @property
-    def has_bwd(self) -> bool:
-        return self.get_bwd_fn.__code__ is BenchmarkOperator.get_bwd_fn.__code__
+    @classmethod
+    def has_bwd(cls) -> bool:
+        return cls.get_bwd_fn is not BenchmarkOperator.get_bwd_fn
