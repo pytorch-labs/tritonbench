@@ -130,6 +130,7 @@ if __name__ == "__main__":
     if args.colfax or args.all:
         logger.info("[tritonbench] installing colfax cutlass-kernels...")
         from tools.cutlass_kernels.install import install_colfax_cutlass
+
         install_colfax_cutlass()
     if args.jax or args.all:
         logger.info("[tritonbench] installing jax...")
@@ -137,6 +138,7 @@ if __name__ == "__main__":
     if args.tk or args.all:
         logger.info("[tritonbench] installing thunderkittens...")
         from tools.tk.install import install_tk
+
         install_tk()
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")

@@ -92,7 +92,8 @@ try:
     import xformers.ops.fmha as xformers_fmha  # @manual=//fair/xformers:xformers
 
     from .test_fmha_utils import permute_qkv
-    HAS_XFORMERS =True
+
+    HAS_XFORMERS = True
 except (ImportError, IOError, AttributeError):
     HAS_XFORMERS = False
 
