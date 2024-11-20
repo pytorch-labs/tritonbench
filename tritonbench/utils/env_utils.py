@@ -4,6 +4,7 @@ import shutil
 from contextlib import contextmanager, ExitStack
 
 from typing import Optional
+
 from tritonbench.utils.path_utils import REPO_PATH
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ def set_env():
     # set cutlass dir
     # by default we use the cutlass version built with fbgemm
     import torch
+
     current_cutlass_dir = torch._inductor.config.cuda.cutlass_dir
     if not os.path.exists(current_cutlass_dir):
         tb_cutlass_dir = REPO_PATH.joinpath("submodules", "cutlass")

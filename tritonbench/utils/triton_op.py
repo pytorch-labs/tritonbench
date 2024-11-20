@@ -26,8 +26,8 @@ from tritonbench.components.ncu import analyzer as ncu_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
     fresh_triton_cache,
-    set_random_seed,
     set_env,
+    set_random_seed,
 )
 from tritonbench.utils.input import input_cast
 
