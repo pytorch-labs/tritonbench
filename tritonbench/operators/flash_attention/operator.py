@@ -144,9 +144,6 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
     parser.add_argument("--causal", action="store_true", help="enable causal")
-    parser.add_argument(
-        "--xformers-splitk", action="store_true", help="benchmark xformers-split impl"
-    )
     return parser.parse_args(args)
 
 
@@ -167,7 +164,6 @@ class Operator(BenchmarkOperator):
         self.N_CTX = None
         self.causal = args.causal
         self.sm_scale = 1.3
-        self.xformers_splitk = args.xformers_splitk
 
     @register_benchmark()
     def aten(
