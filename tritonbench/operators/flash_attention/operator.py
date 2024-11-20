@@ -377,10 +377,10 @@ class Operator(BenchmarkOperator):
     @register_benchmark(enabled=bool(tk_fwd is not None))
     def tk(self, q, k, v):
         o = torch.zeros_like(v)
-        l = torch.zeros_like(o).to(torch.float32)
+        l_tensor = torch.zeros_like(o).to(torch.float32)
 
         def tk_dispatcher():
-            tk_fwd.attention_forward(q, k, v, o, l, causal=self.causal)
+            tk_fwd.attention_forward(q, k, v, o, l_tensor, causal=self.causal)
             return o
 
         return tk_dispatcher
