@@ -68,7 +68,7 @@ def _run_one_operator(args: List[str]):
     check_ci_output(op)
     del op
     # Test backward (if applicable)
-    if op.has_bwd:
+    if op.has_bwd():
         tb_args.mode = "bwd"
         op = Operator(tb_args=tb_args, extra_args=extra_args)
         op.run()
@@ -89,7 +89,7 @@ def _run_operator_in_task(op: str, args: List[str]):
     task.run()
     task.check_output()
     # Test backward (if applicable)
-    if task.get_attribute("has_bwd"):
+    if task.get_attribute("has_bwd", method=True):
         task.del_op_instance()
         args.extend(["--bwd"])
         task.make_operator_instance(args=args)

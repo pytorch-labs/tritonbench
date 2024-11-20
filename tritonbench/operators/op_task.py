@@ -165,7 +165,10 @@ class OpTask(base_task.TaskBase):
     @base_task.run_in_worker(scoped=True)
     @staticmethod
     def get_attribute(
-        attr: str, field: Optional[str] = None, classattr: bool = False
+        attr: str,
+        field: Optional[str] = None,
+        classattr: bool = False,
+        method: bool = False,
     ) -> Any:
         if classattr:
             op = globals()["Operator"]
@@ -173,10 +176,10 @@ class OpTask(base_task.TaskBase):
             op = globals()["op"]
         if hasattr(op, attr):
             if field:
-                op_attr = getattr(op, attr)
-                return getattr(op_attr, field)
+                op_attr = getattr(getattr(op, attr), field)
             else:
-                return getattr(op, attr)
+                op_attr = getattr(op, attr)
+            return op_attr() if method else op_attr
         else:
             return None
 
