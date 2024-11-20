@@ -8,11 +8,6 @@ bf16xint16_gemm:
   # LLVM ERROR: mma16816 data type not supported
   - bf16xint16
 flash_attention:
-  # FIXME: enable colfax_cutlass and tk
-  - xformers
-  - xformers_splitk
-  - colfax_cutlass
-  - tk
   # triton_tutorial_* kernels require triton-main
   - triton_tutorial_flash_v2
   - triton_tutorial_flash_v2_opt
