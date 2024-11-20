@@ -122,7 +122,6 @@ try:
         tk_fwd = torch.ops.tk
 except (ImportError, IOError, AttributeError):
     tk_fwd = None
-    tk_fwd_causal = None
 
 from typing import Any, Generator, List
 
@@ -381,12 +380,10 @@ class Operator(BenchmarkOperator):
     @register_benchmark(enabled=bool(tk_fwd is not None))
     def tk(self, q, k, v):
         o = torch.zeros_like(v)
+        l = torch.zeros_like(o).to(torch.float32)
 
         def tk_dispatcher():
-            if self.causal:
-                tk_fwd_causal.attention_forward_causal(q, k, v, o)
-            else:
-                tk_fwd.attention_forward(q, k, v, o)
+            tk_fwd.attention_forward(q, k, v, o, l, causal=self.causal)
             return o
 
         return tk_dispatcher
