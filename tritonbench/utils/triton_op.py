@@ -621,7 +621,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     def _get_bm_func(self, bm_func_name: str):
         fwd_fn_lambda = getattr(self, bm_func_name, None)
-        assert fwd_fn_lambda, (
+        assert callable(fwd_fn_lambda), (
             f"Could not find benchmark {bm_func_name} registered in {self.name}. "
             f"Available benchmarks: {REGISTERED_BENCHMARKS[self.name].keys()}. "
         )
