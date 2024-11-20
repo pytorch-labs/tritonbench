@@ -26,6 +26,7 @@ from tritonbench.components.ncu import analyzer as ncu_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
     fresh_triton_cache,
+    set_env,
     set_random_seed,
 )
 from tritonbench.utils.input import input_cast
@@ -561,6 +562,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
+        set_env()
         set_random_seed()
         self.name = _find_op_name_from_module_path(self.__class__.__module__)
         self._raw_extra_args = copy.deepcopy(extra_args)
@@ -619,7 +621,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     def _get_bm_func(self, bm_func_name: str):
         fwd_fn_lambda = getattr(self, bm_func_name, None)
-        assert fwd_fn_lambda, (
+        assert callable(fwd_fn_lambda), (
             f"Could not find benchmark {bm_func_name} registered in {self.name}. "
             f"Available benchmarks: {REGISTERED_BENCHMARKS[self.name].keys()}. "
         )

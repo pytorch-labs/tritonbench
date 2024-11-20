@@ -85,7 +85,6 @@ except (ImportError, IOError, AttributeError):
         )
     except (ImportError, IOError, AttributeError):
         HAS_FLASH_V3 = False
-        pass
 
 # [Optional] xformers backend
 try:
@@ -93,8 +92,10 @@ try:
     import xformers.ops.fmha as xformers_fmha  # @manual=//fair/xformers:xformers
 
     from .test_fmha_utils import permute_qkv
+
+    HAS_XFORMERS = True
 except (ImportError, IOError, AttributeError):
-    pass
+    HAS_XFORMERS = False
 
 # [Optional] colfax cutlass backend
 try:
@@ -122,7 +123,6 @@ try:
         tk_fwd = torch.ops.tk
 except (ImportError, IOError, AttributeError):
     tk_fwd = None
-    tk_fwd_causal = None
 
 from typing import Any, Generator, List
 
@@ -145,9 +145,6 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
     parser.add_argument("--causal", action="store_true", help="enable causal")
-    parser.add_argument(
-        "--xformers-splitk", action="store_true", help="benchmark xformers-split impl"
-    )
     return parser.parse_args(args)
 
 
@@ -168,7 +165,6 @@ class Operator(BenchmarkOperator):
         self.N_CTX = None
         self.causal = args.causal
         self.sm_scale = 1.3
-        self.xformers_splitk = args.xformers_splitk
 
     @register_benchmark()
     def aten(
@@ -335,7 +331,7 @@ class Operator(BenchmarkOperator):
         )
         return fhma_input
 
-    @register_benchmark(enabled=False)
+    @register_benchmark(enabled=HAS_XFORMERS)
     def xformers(
         self,
         q: torch.Tensor,
@@ -346,7 +342,7 @@ class Operator(BenchmarkOperator):
         xformers_cutlass_fhma = xformers.ops.fmha.cutlass.FwOp
         return lambda: xformers_cutlass_fhma().apply(fhma_input, needs_gradient=False)
 
-    @register_benchmark(enabled=False)
+    @register_benchmark(enabled=HAS_XFORMERS)
     def xformers_splitk(
         self,
         q: torch.Tensor,
@@ -364,7 +360,7 @@ class Operator(BenchmarkOperator):
             torch.transpose(v, 1, 2),
         )
 
-    @register_benchmark(enabled=False)
+    @register_benchmark(enabled=bool(colfax_cutlass_fmha is not None))
     def colfax_cutlass(self, q, k, v):
         default_scale = 1.0 / math.sqrt(float(self.D_HEAD))
         colfax_q, colfax_k, colfax_v = self.colfax_cutlass_preprocess(q, k, v)
@@ -378,15 +374,13 @@ class Operator(BenchmarkOperator):
             default_scale,
         )
 
-    @register_benchmark(enabled=False)
+    @register_benchmark(enabled=bool(tk_fwd is not None))
     def tk(self, q, k, v):
         o = torch.zeros_like(v)
+        l_tensor = torch.zeros_like(o).to(torch.float32)
 
         def tk_dispatcher():
-            if self.causal:
-                tk_fwd_causal.attention_forward_causal(q, k, v, o)
-            else:
-                tk_fwd.attention_forward(q, k, v, o)
+            tk_fwd.attention_forward(q, k, v, o, l_tensor, causal=self.causal)
             return o
 
         return tk_dispatcher

@@ -5,6 +5,8 @@ from contextlib import contextmanager, ExitStack
 
 from typing import Optional
 
+from tritonbench.utils.path_utils import REPO_PATH
+
 log = logging.getLogger(__name__)
 
 MAIN_RANDOM_SEED = 1337
@@ -20,6 +22,18 @@ AVAILABLE_PRECISIONS = [
     "amp_bf16",
     "fp8",
 ]
+
+
+def set_env():
+    # set cutlass dir
+    # by default we use the cutlass version built with pytorch
+    import torch
+
+    current_cutlass_dir = torch._inductor.config.cuda.cutlass_dir
+    if not os.path.exists(current_cutlass_dir):
+        tb_cutlass_dir = REPO_PATH.joinpath("submodules", "cutlass")
+        if tb_cutlass_dir.is_dir():
+            torch._inductor.config.cuda.cutlass_dir = str(tb_cutlass_dir)
 
 
 def set_random_seed():

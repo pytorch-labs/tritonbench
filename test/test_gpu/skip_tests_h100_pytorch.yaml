@@ -8,10 +8,7 @@ bf16xint16_gemm:
   # LLVM ERROR: mma16816 data type not supported
   - bf16xint16
 flash_attention:
-  # FIXME: enable colfax_cutlass and tk
-  - xformers
-  - xformers_splitk
-  - colfax_cutlass
+  # thunderkittens cannot handle the default input shapes
   - tk
   # triton_tutorial_* kernels require triton-main
   - triton_tutorial_flash_v2
@@ -37,8 +34,6 @@ gemm:
   - triton_tma_persistent_cached_matmul
   - hstu_triton_matmul
   - colfax_cutlass_matmul
-  # FIXME: PT2 CUTLASS backend failed
-  - pt2_cutlass_matmul
 # jagged tests are slow, so disable them in OSS
 jagged_layer_norm:
 jagged_mean:
@@ -47,3 +42,5 @@ jagged_sum:
 ragged_attention:
   - hstu_triton_ragged_attention_persistent
 test_op:
+fwd_only_ops:
+  - flash_attention

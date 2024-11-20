@@ -8,8 +8,7 @@ CUDA_HOME = (
     "/usr/local/cuda" if "CUDA_HOME" not in os.environ else os.environ["CUDA_HOME"]
 )
 REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent
-FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
-FBGEMM_CUTLASS_PATH = FBGEMM_PATH.parent.joinpath("external", "cutlass")
+TORCH_CUTLASS_PATH = REPO_PATH.joinpath("submodules", "cutlass")
 COLFAX_CUTLASS_PATH = REPO_PATH.joinpath("submodules", "cutlass-kernels")
 COLFAX_CUTLASS_TRITONBENCH_PATH = REPO_PATH.joinpath("tools", "cutlass_kernels")
 
@@ -41,9 +40,9 @@ COMPILER_FLAGS = [
     f"-I{str(COLFAX_CUTLASS_PATH.joinpath('lib').resolve())}",
     f"-I{str(COLFAX_CUTLASS_PATH.joinpath('include').resolve())}",
     f"-I{str(COLFAX_CUTLASS_PATH.joinpath('src', 'fmha').resolve())}",
-    f"-I{str(FBGEMM_CUTLASS_PATH.joinpath('include').resolve())}",
-    f"-I{str(FBGEMM_CUTLASS_PATH.joinpath('examples', 'commmon').resolve())}",
-    f"-I{str(FBGEMM_CUTLASS_PATH.joinpath('tools', 'util', 'include').resolve())}",
+    f"-I{str(TORCH_CUTLASS_PATH.joinpath('include').resolve())}",
+    f"-I{str(TORCH_CUTLASS_PATH.joinpath('examples', 'commmon').resolve())}",
+    f"-I{str(TORCH_CUTLASS_PATH.joinpath('tools', 'util', 'include').resolve())}",
     f"-I{CUDA_HOME}/include",
     f"-I{str(TORCH_BASE_PATH.joinpath('include').resolve())}",
     f"-I{str(COLFAX_CUTLASS_TRITONBENCH_PATH.joinpath('include').resolve())}",
