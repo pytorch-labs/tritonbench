@@ -30,12 +30,10 @@ with open(SKIP_FILE, "r") as f:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Ops that we can skip the unit tests
-SKIP_OPS = {
-    "test_op",
-}
+# Ops that we run forward only
+FWD_ONLY_OPS = skip_tests.get("fwd_only_ops", [])
 
-TEST_OPERATORS = set(list_operators_by_collection(op_collection="default")) - SKIP_OPS
+TEST_OPERATORS = set(list_operators_by_collection(op_collection="default"))
 
 
 def check_ci_output(op):
@@ -67,6 +65,8 @@ def _run_one_operator(args: List[str]):
     op.run()
     check_ci_output(op)
     # Test backward (if applicable)
+    if tb_args.op in FWD_ONLY_OPS:
+        return
     if op.has_bwd():
         del op
         tb_args.mode = "bwd"
@@ -89,6 +89,8 @@ def _run_operator_in_task(op: str, args: List[str]):
     task.run()
     task.check_output()
     # Test backward (if applicable)
+    if op in FWD_ONLY_OPS:
+        return
     if task.get_attribute("has_bwd", method=True):
         task.del_op_instance()
         args.extend(["--bwd"])
