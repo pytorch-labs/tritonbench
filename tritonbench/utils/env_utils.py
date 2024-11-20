@@ -26,7 +26,7 @@ AVAILABLE_PRECISIONS = [
 
 def set_env():
     # set cutlass dir
-    # by default we use the cutlass version built with fbgemm
+    # by default we use the cutlass version built with pytorch
     import torch
 
     current_cutlass_dir = torch._inductor.config.cuda.cutlass_dir
