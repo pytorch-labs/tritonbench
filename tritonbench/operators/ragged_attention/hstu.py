@@ -46,6 +46,8 @@ class RaggedHSTUAttn(torch.nn.Module):
         num_heads,
         max_seq_len,
         num_buckets,
+        sparsity,
+        target_size,
         requires_grad,
         persistent_kernel: bool = False,
     ) -> None:
@@ -54,6 +56,8 @@ class RaggedHSTUAttn(torch.nn.Module):
         self.num_heads = num_heads
         self.max_seq_len = max_seq_len
         self.num_buckets = num_buckets
+        self.sparsity = sparsity
+        self.target_size = target_size
         self.all_ts_weights = torch.nn.Parameter(
             torch.randn(
                 (self.num_buckets + 1,),
@@ -73,7 +77,7 @@ class RaggedHSTUAttn(torch.nn.Module):
         self.persistent_kernel = persistent_kernel
 
     def forward(
-        self, qkv: torch.Tensor, seq_offsets: torch.Tensor, timestamps: torch.Tensor
+        self, qkv: torch.Tensor, seq_offsets: torch.Tensor, timestamps: torch.Tensor, num_targets: torch.Tensor
     ) -> torch.Tensor:
         NUM_BUCKETS = self.num_buckets
         torch._check(timestamps.size(0) + 1 == seq_offsets.size(0))
@@ -99,7 +103,7 @@ class RaggedHSTUAttn(torch.nn.Module):
             "PW": self.all_pos_weights,
             "Bias": None,
             "seq2_offsets": None,
-            "num_targets": None,
+            "num_targets": num_targets,
             "Scale": None,
             "Out": out,
             "stride_qm": q.stride(0),
@@ -177,19 +181,63 @@ class RaggedHSTUAttn(torch.nn.Module):
         return out
 
 
+def generate_sparse_seq_len(
+    size: int,
+    max_seq_len: int,
+    sparsity: float,
+    device: torch.device,
+) -> torch.Tensor:
+    if sparsity == 0.0:
+        return torch.zeros(size=(size,), device=device, dtype=torch.int)
+    elif sparsity == 1.0:
+        return torch.ones(size=(size,), device=device, dtype=torch.int) * max_seq_len
+    elif sparsity >= 0.5:
+        min_seq_len: int = int((2 * sparsity - 1.0) * max_seq_len)
+        return torch.randint(
+            low=min_seq_len,
+            high=max_seq_len,
+            size=(size,),
+            device=device,
+            dtype=torch.int,
+        )
+    else:
+        min_seq_len: int = 0
+        max_seq_len: int = int(2 * sparsity * max_seq_len)
+        return torch.randint(
+            low=min_seq_len,
+            high=max_seq_len,
+            size=(size,),
+            device=device,
+            dtype=torch.int,
+        )
+
+
 def get_test_inputs(
-    batch_size, num_heads, max_seq_len, requires_grad
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    batch_size, num_heads, max_seq_len, sparsity, target_size, requires_grad
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     timestamp_deltas: torch.Tensor = torch.randint(
         86400,
         size=(batch_size, max_seq_len + 1),
     ).cuda()
     timestamps = timestamp_deltas.cumsum(dim=1)
 
-    lengths = torch.randint(
-        max_seq_len + 1,
-        size=(batch_size,),
-    ).cuda()
+    lengths = generate_sparse_seq_len(
+        size=batch_size,
+        max_seq_len=max_seq_len,
+        sparsity=sparsity,
+        device=torch.device("cuda"),
+    )
+    # assume has_delta_q is False
+    num_targets = None
+    if target_size != 0:
+        num_targets = torch.randint(
+            1,
+            target_size + 1,
+            (batch_size,),
+            device=lengths.device,
+            dtype=lengths.dtype,
+        )
+        num_targets = torch.where(num_targets > lengths, lengths, num_targets)
     seq_offsets = torch.zeros(
         (batch_size + 1,),
         dtype=torch.int64,
@@ -208,4 +256,4 @@ def get_test_inputs(
         .requires_grad_(requires_grad)
         .cuda()
     )
-    return qkv, seq_offsets, timestamps
+    return qkv, seq_offsets, timestamps, num_targets

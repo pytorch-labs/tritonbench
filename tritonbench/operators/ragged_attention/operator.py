@@ -22,6 +22,8 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--heads", type=int, default=4, help="Number of heads")
     parser.add_argument("--max-seq-len-log2", type=int, default=9)
     parser.add_argument("--num-buckets", type=int, default=2048)
+    parser.add_argument("--sparsity", type=float, default=0.8)
+    parser.add_argument("--target-size", type=int, default=20)
     return parser.parse_args(args)
 
 
@@ -37,42 +39,48 @@ class Operator(BenchmarkOperator):
         self.num_heads = args.heads
         self.max_seq_len = 2**args.max_seq_len_log2
         self.num_buckets = args.num_buckets
+        self.sparsity = args.sparsity
+        self.target_size = args.target_size
         # set a default number of inputs
         self._num_inputs = 10 if self._num_inputs is None else self._num_inputs
         self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
 
     @register_benchmark()
-    def hstu_triton_ragged_attention(self, qkv, seq_offsets, timestamps):
+    def hstu_triton_ragged_attention(self, qkv, seq_offsets, timestamps, num_targets):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
             self.max_seq_len,
             self.num_buckets,
+            self.sparsity,
+            self.target_size,
             self.requires_grad,
             persistent_kernel=False,
         )
-        return lambda: attn(qkv, seq_offsets, timestamps)
+        return lambda: attn(qkv, seq_offsets, timestamps, num_targets)
 
     # TODO: enable persistent kernels when the OSS backward is ready
     @register_benchmark(enabled=False)
-    def hstu_triton_ragged_attention_persistent(self, qkv, seq_offsets, timestamps):
+    def hstu_triton_ragged_attention_persistent(self, qkv, seq_offsets, timestamps, num_targets):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
             self.max_seq_len,
             self.num_buckets,
+            self.sparsity,
+            self.target_size,
             self.requires_grad,
             persistent_kernel=True,
         )
-        return lambda: attn(qkv, seq_offsets, timestamps)
+        return lambda: attn(qkv, seq_offsets, timestamps, num_targets)
 
     def get_x_val(self, example_inputs):
-        return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets)
+        return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets, self.sparsity, self.target_size)
 
     def get_input_iter(self):
         for _input_id in range(self._num_inputs):
             inputs = get_test_inputs(
-                self.batch_size, self.num_heads, self.max_seq_len, self.requires_grad
+                self.batch_size, self.num_heads, self.max_seq_len, self.sparsity, self.target_size, self.requires_grad
             )
             yield inputs
 
@@ -94,7 +102,7 @@ class Operator(BenchmarkOperator):
         f1 = 0.0
         f2 = 0.0
         jagged = True
-        qkv, seq_offsets, timestamps = example_inputs
+        qkv, seq_offsets, timestamps, num_targets = example_inputs
         q = qkv[:, :, :128]
         v = qkv[:, :, 256:384]
         _, nheads, attn_dim = q.shape
