@@ -40,6 +40,12 @@ from .triton_matmul import (
 )
 
 if IS_FBCODE:
+    import hammer.oss.generative_recommenders.ops.triton.triton_addmm as hstu_triton_addmm
+
+    # without this set we can only pick a single config for AMD, Nvidia has 8
+    # with this set AMD will pick from 256 different configs (not the actual full
+    # tuning space, so some perf may be left on the table)
+    hstu_triton_addmm.ENABLE_FULL_TURNING_SPACE = True
     from hammer.ops.triton.triton_matmul import (
         triton_matmul as hstu_triton_matmul_kernel,
     )
