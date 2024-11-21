@@ -170,7 +170,7 @@ class RaggedHSTUAttn(torch.nn.Module):
                 kwargs["num_targets"],
                 kwargs["ATTN_BIAS_TYPE"],  # relative_bias_type
                 kwargs["MAX_ATTN_LEN"],  # max_attn_len
-                kwargs["contextual_seq_len"],  # contextual_seq_len
+                kwargs["CONTEXTUAL_SEQ_LEN"],  # contextual_seq_len
                 kwargs["sort_by_length_indices"],  # sort_by_length
             )
 

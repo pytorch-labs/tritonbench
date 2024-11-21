@@ -1,11 +1,6 @@
 name: TritonBench PR Test
 on:
   pull_request:
-    paths:
-      - .ci/*
-      - test/test_gpu/*
-      - tritonbench/*
-      - .github/workflows/pr.yaml
   push:
     branches:
       - main
