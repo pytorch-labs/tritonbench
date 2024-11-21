@@ -8,11 +8,4 @@ fi
 
 . "${SETUP_SCRIPT}"
 
-# FIXME: patch and install hstu
-sudo apt-get install  -y patch
-python install.py --hstu
-
-# FIXME: install colfax
-python install.py --colfax
-
 python -m unittest test.test_gpu.main -v
