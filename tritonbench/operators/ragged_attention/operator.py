@@ -22,7 +22,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--heads", type=int, default=4, help="Number of heads")
     parser.add_argument("--max-seq-len-log2", type=int, default=9)
     parser.add_argument("--num-buckets", type=int, default=2048)
-    parser.add_argument("--sparsity", type=float, default=0.8)
+    parser.add_argument("--seq-sparsity", type=float, default=0.8)
     parser.add_argument("--target-size", type=int, default=20)
     parser.add_argument("--sort-by-length", type=bool, default=False)
     return parser.parse_args(args)
@@ -40,7 +40,7 @@ class Operator(BenchmarkOperator):
         self.num_heads = args.heads
         self.max_seq_len = 2**args.max_seq_len_log2
         self.num_buckets = args.num_buckets
-        self.sparsity = args.sparsity
+        self.sparsity = args.seq_sparsity
         self.target_size = args.target_size
         self.sort_by_length = args.sort_by_length
         # set a default number of inputs
