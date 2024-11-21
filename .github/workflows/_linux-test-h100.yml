@@ -15,7 +15,7 @@ jobs:
     environment: docker-s3-upload
     env:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
-      CONDA_ENV: ${{ envs.conda_env }}
+      CONDA_ENV: ${{ inputs.conda_env }}
     steps:
       - name: Checkout Tritonbench
         uses: actions/checkout@v3

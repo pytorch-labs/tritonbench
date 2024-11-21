@@ -8,11 +8,11 @@ on:
 jobs:
   h100-pytorch-test:
     uses: ./.github/workflows/_linux-test-h100.yml
-    inputs:
+    with:
       conda_env: "pytorch"
   h100-triton-main-test:
     uses: ./.github/workflows/_linux-test-h100.yml
-    inputs:
+    with:
       conda_env: "triton-main"
 
 concurrency:
