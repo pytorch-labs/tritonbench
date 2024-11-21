@@ -728,7 +728,6 @@ def _attn_fwd_compute_ws(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
 ):
-    tl.static_assert(BLOCK_N <= HEAD_DIM)
     start_m = tl.program_id(0)
     off_hz = tl.program_id(1)
     off_z = off_hz // H
@@ -913,6 +912,7 @@ def _attn_fwd_ws(
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
 ):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
     _attn_fwd_compute_ws(
         Q,
         K,
@@ -1232,6 +1232,7 @@ def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
 ):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
     _attn_fwd_compute_ws(
         Q,
         K,
