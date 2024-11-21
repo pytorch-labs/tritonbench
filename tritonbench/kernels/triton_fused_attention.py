@@ -454,10 +454,10 @@ configsOrig = [
             num_warps=w,
         )
     )
-    for BM in [128]  # 64, 128]
-    for BN in [128]  # 64, 128]
-    for s in [3]  # , 4, 7]
-    for w in [8]  # 4, 8]
+    for BM in [64, 128]
+    for BN in [64, 128]
+    for s in [3, 4, 7]
+    for w in [4, 8]
 ]
 # TMA, WS, and CompPipe
 configsTmaWS = [
@@ -548,7 +548,6 @@ def _attn_fwd_compute(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
 ):
-    tl.static_assert(BLOCK_N <= HEAD_DIM)
     start_m = tl.program_id(0)
     off_hz = tl.program_id(1)
     off_z = off_hz // H
@@ -993,6 +992,7 @@ def _attn_fwd(
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
 ):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
     _attn_fwd_compute(
         Q,
         K,
@@ -1072,6 +1072,7 @@ def _attn_fwd_opt(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
 ):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
     _attn_fwd_compute(
         Q,
         K,
@@ -1151,6 +1152,7 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
 ):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
     _attn_fwd_compute(
         Q,
         K,
