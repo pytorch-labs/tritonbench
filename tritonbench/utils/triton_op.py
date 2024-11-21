@@ -62,7 +62,7 @@ ENABLED_BENCHMARKS: Dict[str, List[str]] = {}
 REGISTERED_METRICS: Dict[str, List[str]] = {}
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
-BASELINE_SKIP_METRICS = {"speedup", "accuracy", "mem_footprint"}
+BASELINE_SKIP_METRICS = {"speedup", "accuracy", "mem_footprint_compression_ratio"}
 X_ONLY_METRICS = set(["hw_roofline"])
 PRECISION_DTYPE_MAPPING = {
     "fp32": torch.float32,
@@ -226,7 +226,7 @@ class BenchmarkOperatorMetrics:
     # extra metrics
     extra_metrics: Optional[Dict[str, float]] = None
     # mem footprint
-    mem_footprint: Optional[float] = None
+    mem_footprint_compression_ratio: Optional[float] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
@@ -951,9 +951,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         if not self.tb_args.bypass_fail:
                             raise e
                         metrics.latency = None
-            if {"gpu_peak_mem", "gpu_mem_footprint", "cpu_peak_mem"} & set(
-                self.required_metrics
-            ):
+            if {
+                "gpu_peak_mem",
+                "gpu_mem_footprint_compression_ratio",
+                "cpu_peak_mem",
+            } & set(self.required_metrics):
                 metrics.cpu_peak_mem, metrics.gpu_peak_mem = self.get_peak_mem(
                     fn,
                     grad_to_none=self.get_grad_to_none(self.example_inputs),
@@ -961,7 +963,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     use_cuda_graphs=self.use_cuda_graphs,
                 )
             if (
-                "mem_footprint" in self.required_metrics
+                "mem_footprint_compression_ratio" in self.required_metrics
                 and "gpu_peak_mem" in self.required_metrics
                 and self.baseline_metrics
             ):
@@ -969,11 +971,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     self.baseline_metrics.gpu_peak_mem is not None
                     and metrics.gpu_peak_mem is not None
                 ):
-                    metrics.mem_footprint = (
+                    metrics.mem_footprint_compression_ratio = (
                         self.baseline_metrics.gpu_peak_mem / metrics.gpu_peak_mem
                     )
                 else:
-                    metrics.mem_footprint = None
+                    metrics.mem_footprint_compression_ratio = None
             if "walltime" in self.required_metrics:
                 metrics.walltime = do_bench_walltime(
                     fn,
@@ -1178,7 +1180,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             grad_to_none (Optional[List[torch.Tensor]], optional): List of tensors whose gradients
                 should be set to None between iterations. Defaults to None.
             required_metrics (Optional[List[str]], optional): List of metrics to measure.
-                Supported values: ["gpu_peak_mem", "mem_footprint", "cpu_peak_mem"].
+                Supported values: ["gpu_peak_mem", "mem_footprint_compression_ratio", "cpu_peak_mem"].
                 Defaults to None.
             use_cuda_graphs (bool, optional): Whether to use CUDA graphs for measurement.
                 Defaults to False.
@@ -1204,7 +1206,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 fn, n_repeat=2, grad_to_none=grad_to_none, device_type=device_type
             )
         if device_type == "cuda" and (
-            {"gpu_peak_mem", "mem_footprint"} & set(required_metrics)
+            {"gpu_peak_mem", "mem_footprint_compression_ratio"} & set(required_metrics)
         ):
             gpu_peak_mem = torch.cuda.max_memory_allocated() / 10**9
         if "cpu_peak_mem" in required_metrics:
