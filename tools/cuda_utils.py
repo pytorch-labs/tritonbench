@@ -129,6 +129,12 @@ def install_torch_deps(cuda_version: str):
     ]
     cmd = ["conda", "install", "-y"] + torch_deps
     subprocess.check_call(cmd)
+    # conda forge deps
+    # ubuntu 22.04 comes with libstdcxx6 12.3.0
+    # we need to install the same library version in conda
+    conda_deps = ["libstdcxx-ng=12.3.0"]
+    cmd = ["conda", "install", "-y", "-c", "conda-forge"] + conda_deps
+    subprocess.check_call(cmd)
 
 
 def install_torch_build_deps(cuda_version: str):
