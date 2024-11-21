@@ -1,0 +1,31 @@
+name: linux-test-h100
+on:
+  workflow_call:
+    inputs:
+      conda_env:
+        required: True
+        description: |
+          Conda environment to activate when testing Triton
+
+jobs:
+  linux-test-h100:
+    if: github.repository_owner == 'pytorch'
+    runs-on: [gcp-h100-runner]
+    timeout-minutes: 240
+    environment: docker-s3-upload
+    env:
+      SETUP_SCRIPT: "/workspace/setup_instance.sh"
+      CONDA_ENV: ${{ envs.conda_env }}
+    steps:
+      - name: Checkout Tritonbench
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Tune Nvidia GPU
+        run: |
+          sudo nvidia-smi -pm 1
+          sudo ldconfig
+          nvidia-smi
+      - name: Test Tritonbench operators on H100 GPU
+        run: |
+          bash ./.ci/tritonbench/test-gpu.sh
