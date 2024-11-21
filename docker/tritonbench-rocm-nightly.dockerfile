@@ -1,7 +1,7 @@
 # Build ROCM base docker file
 # We are not building AMD CI in a short term, but this could be useful
 # for sharing benchmark results with AMD.
-ARG BASE_IMAGE=rocm/rocm-terminal:6.2
+ARG BASE_IMAGE=rocm/pytorch:latest
 
 FROM ${BASE_IMAGE}
 
@@ -11,6 +11,15 @@ ENV SETUP_SCRIPT=/workspace/setup_instance.sh
 ARG TRITONBENCH_BRANCH=${TRITONBENCH_BRANCH:-main}
 ARG FORCE_DATE=${FORCE_DATE}
 
+RUN mkdir -p /workspace; touch "${SETUP_SCRIPT}"
+
+RUN echo "\
+. /opt/conda/etc/profile.d/conda.sh\n\
+conda activate base\n\
+export CONDA_HOME=\${HOME}/miniconda3\n" > "${SETUP_SCRIPT}"
+
+RUN echo ". /workspace/setup_instance.sh\n" >> ${HOME}/.bashrc
+
 # Checkout TritonBench and submodules
 RUN git clone --recurse-submodules -b "${TRITONBENCH_BRANCH}" --single-branch \
     https://github.com/pytorch-labs/tritonbench /workspace/tritonbench
@@ -19,13 +28,9 @@ RUN git clone --recurse-submodules -b "${TRITONBENCH_BRANCH}" --single-branch \
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
     python tools/python_utils.py --create-conda-env ${CONDA_ENV} && \
-    echo "if [ -z \${CONDA_ENV} ]; then export CONDA_ENV=${CONDA_ENV}; fi" >> /workspace/setup_instance.sh && \
-    echo "conda activate \${CONDA_ENV}" >> /workspace/setup_instance.sh
+    echo "if [ -z \${CONDA_ENV} ]; then export CONDA_ENV=${CONDA_ENV}; fi" >> "${SETUP_SCRIPT}" && \
+    echo "conda activate \${CONDA_ENV}" >> "${SETUP_SCRIPT}"
 
-# Setup rocm
-RUN cd /workspace/tritonbench && \
-    . ${SETUP_SCRIPT} && \
-    sudo python tools/rocm_utils.py --setup-softlink
 
 # Install PyTorch nightly and verify the date is correct
 RUN cd /workspace/tritonbench && \
