@@ -77,14 +77,6 @@ def install_liger():
     subprocess.check_call(cmd)
 
 
-def install_xformers():
-    os_env = os.environ.copy()
-    os_env["TORCH_CUDA_ARCH_LIST"] = "8.0;9.0;9.0a"
-    XFORMERS_PATH = REPO_PATH.joinpath("submodules", "xformers")
-    cmd = ["pip", "install", "-e", XFORMERS_PATH]
-    subprocess.check_call(cmd, env=os_env)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--fbgemm", action="store_true", help="Install FBGEMM GPU")
@@ -145,6 +137,7 @@ if __name__ == "__main__":
         install_liger()
     if args.xformers or args.all:
         logger.info("[tritonbench] installing xformers...")
+        from tools.xformers.install import install_xformers
         install_xformers()
     if args.hstu or args.all:
         logger.info("[tritonbench] installing hstu...")
