@@ -1,8 +1,8 @@
+import csv
 import os
 import shutil
 import sys
 from typing import Dict, List
-import csv
 
 # The nsys metrics to the reports. The value is the list of reports of nsys.
 nsys_metrics_to_reports = {
