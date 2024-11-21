@@ -4,6 +4,7 @@ on:
     inputs:
       conda_env:
         required: True
+        type: string
         description: |
           Conda environment to activate when testing Triton
 
