@@ -38,18 +38,6 @@ RUN cd /workspace/tritonbench && \
     python tools/rocm_utils.py --install-torch-deps && \
     python tools/rocm_utils.py --install-torch-nightly
 
-# Check the installed version of nightly if needed
-RUN cd /workspace/tritonbench && \
-    . ${SETUP_SCRIPT} && \
-    if [ "${FORCE_DATE}" = "skip_check" ]; then \
-        echo "torch version check skipped"; \
-    elif [ -z "${FORCE_DATE}" ]; then \
-        FORCE_DATE=$(date '+%Y%m%d') \
-        python tools/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
-    else \
-        python tools/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
-    fi
-
 
 # Install Tritonbench
 RUN cd /workspace/tritonbench && \

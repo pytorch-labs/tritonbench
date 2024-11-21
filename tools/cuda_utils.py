@@ -87,7 +87,7 @@ def setup_cuda_softlink(cuda_version: str):
 
 
 def install_pytorch_nightly(cuda_version: str, env, dryrun=False):
-    from .torch.utils import TORCH_NIGHTLY_PACKAGES
+    from .torch_utils import TORCH_NIGHTLY_PACKAGES
     uninstall_torch_cmd = ["pip", "uninstall", "-y"]
     uninstall_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
     if dryrun:
@@ -167,12 +167,12 @@ if __name__ == "__main__":
     if args.install_torch_deps:
         install_torch_deps(cuda_version=args.cudaver)
     if args.install_torch_build_deps:
-        from .torch.utils import install_torch_build_deps
+        from .torch_utils import install_torch_build_deps
         install_torch_deps(cuda_version=args.cudaver)
         install_torch_build_deps()
     if args.install_torch_nightly:
         install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
     if args.check_torch_nightly_version:
-        from .torch.utils import check_torch_nightly_version
+        from .torch_utils import check_torch_nightly_version
         assert not args.install_torch_nightly, "Error: Can't run install torch nightly and check version in the same command."
         check_torch_nightly_version(args.force_date)
