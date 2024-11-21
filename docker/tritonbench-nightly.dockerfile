@@ -9,6 +9,9 @@ ENV SETUP_SCRIPT=/workspace/setup_instance.sh
 ARG TRITONBENCH_BRANCH=${TRITONBENCH_BRANCH:-main}
 ARG FORCE_DATE=${FORCE_DATE}
 
+# Install deps
+RUN sudo apt install -y patch
+
 # Checkout TritonBench and submodules
 RUN git clone --recurse-submodules -b "${TRITONBENCH_BRANCH}" --single-branch \
     https://github.com/pytorch-labs/tritonbench /workspace/tritonbench
