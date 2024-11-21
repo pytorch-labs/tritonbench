@@ -48,6 +48,7 @@ class RaggedHSTUAttn(torch.nn.Module):
         num_buckets,
         sparsity,
         target_size,
+        sort_by_length,
         requires_grad,
         persistent_kernel: bool = False,
     ) -> None:
@@ -58,6 +59,7 @@ class RaggedHSTUAttn(torch.nn.Module):
         self.num_buckets = num_buckets
         self.sparsity = sparsity
         self.target_size = target_size
+        self.sort_by_length = sort_by_length
         self.all_ts_weights = torch.nn.Parameter(
             torch.randn(
                 (self.num_buckets + 1,),
@@ -175,7 +177,7 @@ class RaggedHSTUAttn(torch.nn.Module):
                 kwargs["ATTN_BIAS_TYPE"],  # relative_bias_type
                 kwargs["MAX_ATTN_LEN"],  # max_attn_len
                 kwargs["CONTEXTUAL_SEQ_LEN"],  # contextual_seq_len
-                kwargs["sort_by_length_indices"],  # sort_by_length
+                self.sort_by_length,
             )
 
         return out
@@ -213,7 +215,7 @@ def generate_sparse_seq_len(
 
 
 def get_test_inputs(
-    batch_size, num_heads, max_seq_len, sparsity, target_size, requires_grad
+    batch_size, num_heads, max_seq_len, sparsity, target_size, sort_by_length, requires_grad
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     timestamp_deltas: torch.Tensor = torch.randint(
         86400,

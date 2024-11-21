@@ -24,6 +24,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--num-buckets", type=int, default=2048)
     parser.add_argument("--sparsity", type=float, default=0.8)
     parser.add_argument("--target-size", type=int, default=20)
+    parser.add_argument("--sort-by-length", type=bool, default=False)
     return parser.parse_args(args)
 
 
@@ -41,6 +42,7 @@ class Operator(BenchmarkOperator):
         self.num_buckets = args.num_buckets
         self.sparsity = args.sparsity
         self.target_size = args.target_size
+        self.sort_by_length = args.sort_by_length
         # set a default number of inputs
         self._num_inputs = 10 if self._num_inputs is None else self._num_inputs
         self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
@@ -54,6 +56,7 @@ class Operator(BenchmarkOperator):
             self.num_buckets,
             self.sparsity,
             self.target_size,
+            self.sort_by_length,
             self.requires_grad,
             persistent_kernel=False,
         )
@@ -69,18 +72,19 @@ class Operator(BenchmarkOperator):
             self.num_buckets,
             self.sparsity,
             self.target_size,
+            self.sort_by_length,
             self.requires_grad,
             persistent_kernel=True,
         )
         return lambda: attn(qkv, seq_offsets, timestamps, num_targets)
 
     def get_x_val(self, example_inputs):
-        return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets, self.sparsity, self.target_size)
+        return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets, self.sparsity, self.target_size, self.sort_by_length)
 
     def get_input_iter(self):
         for _input_id in range(self._num_inputs):
             inputs = get_test_inputs(
-                self.batch_size, self.num_heads, self.max_seq_len, self.sparsity, self.target_size, self.requires_grad
+                self.batch_size, self.num_heads, self.max_seq_len, self.sparsity, self.target_size, self.sort_by_length, self.requires_grad
             )
             yield inputs
 
