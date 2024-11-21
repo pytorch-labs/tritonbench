@@ -36,12 +36,14 @@ $ python run.py --op gemm
 
 We depend on the following projects as a source of customized Triton or CUTLASS kernels:
 
-* (Required) [FBGEMM](https://github.com/pytorch/FBGEMM)
-* (Required) [kernels](https://github.com/triton-lang/kernels)
-* (Required) [generative-recommenders](https://github.com/facebookresearch/generative-recommenders)
-* (Optional) [ThunderKittens](https://github.com/HazyResearch/ThunderKittens)
-* (Optional) [cutlass-kernels](https://github.com/ColfaxResearch/cutlass-kernels)
-* (Optional) [flash-attention](https://github.com/Dao-AILab/flash-attention)
+* (CUDA, HIP) [kernels](https://github.com/triton-lang/kernels)
+* (CUDA, HIP) [generative-recommenders](https://github.com/facebookresearch/generative-recommenders)
+* (CUDA, HIP) [Liger-Kernel](https://github.com/linkedin/Liger-Kernel)
+* (CUDA) [xformers](https://github.com/facebookresearch/xformers)
+* (CUDA) [flash-attention](https://github.com/Dao-AILab/flash-attention)
+* (CUDA) [FBGEMM](https://github.com/pytorch/FBGEMM)
+* (CUDA) [ThunderKittens](https://github.com/HazyResearch/ThunderKittens)
+* (CUDA) [cutlass-kernels](https://github.com/ColfaxResearch/cutlass-kernels)
 
 
 ## License
