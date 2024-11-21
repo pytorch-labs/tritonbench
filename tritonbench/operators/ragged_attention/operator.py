@@ -64,7 +64,9 @@ class Operator(BenchmarkOperator):
 
     # TODO: enable persistent kernels when the OSS backward is ready
     @register_benchmark(enabled=False)
-    def hstu_triton_ragged_attention_persistent(self, qkv, seq_offsets, timestamps, num_targets):
+    def hstu_triton_ragged_attention_persistent(
+        self, qkv, seq_offsets, timestamps, num_targets
+    ):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
@@ -79,12 +81,26 @@ class Operator(BenchmarkOperator):
         return lambda: attn(qkv, seq_offsets, timestamps, num_targets)
 
     def get_x_val(self, example_inputs):
-        return (self.batch_size, self.num_heads, self.max_seq_len, self.num_buckets, self.sparsity, self.target_size, self.sort_by_length)
+        return (
+            self.batch_size,
+            self.num_heads,
+            self.max_seq_len,
+            self.num_buckets,
+            self.sparsity,
+            self.target_size,
+            self.sort_by_length,
+        )
 
     def get_input_iter(self):
         for _input_id in range(self._num_inputs):
             inputs = get_test_inputs(
-                self.batch_size, self.num_heads, self.max_seq_len, self.sparsity, self.target_size, self.sort_by_length, self.requires_grad
+                self.batch_size,
+                self.num_heads,
+                self.max_seq_len,
+                self.sparsity,
+                self.target_size,
+                self.sort_by_length,
+                self.requires_grad,
             )
             yield inputs
 

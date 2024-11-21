@@ -79,7 +79,11 @@ class RaggedHSTUAttn(torch.nn.Module):
         self.persistent_kernel = persistent_kernel
 
     def forward(
-        self, qkv: torch.Tensor, seq_offsets: torch.Tensor, timestamps: torch.Tensor, num_targets: torch.Tensor
+        self,
+        qkv: torch.Tensor,
+        seq_offsets: torch.Tensor,
+        timestamps: torch.Tensor,
+        num_targets: torch.Tensor,
     ) -> torch.Tensor:
         NUM_BUCKETS = self.num_buckets
         torch._check(timestamps.size(0) + 1 == seq_offsets.size(0))
@@ -215,7 +219,13 @@ def generate_sparse_seq_len(
 
 
 def get_test_inputs(
-    batch_size, num_heads, max_seq_len, sparsity, target_size, sort_by_length, requires_grad
+    batch_size,
+    num_heads,
+    max_seq_len,
+    sparsity,
+    target_size,
+    sort_by_length,
+    requires_grad,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     timestamp_deltas: torch.Tensor = torch.randint(
         86400,
