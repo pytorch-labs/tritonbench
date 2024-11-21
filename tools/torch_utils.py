@@ -16,6 +16,11 @@ PIN_CMAKE_VERSION = "3.22.*"
 BUILD_REQUIREMENTS_FILE = REPO_ROOT.joinpath("utils", "build_requirements.txt")
 
 
+def is_hip() -> bool:
+    import torch
+    version = torch.__version__
+    return "rocm" in version
+
 def install_torch_build_deps():
     # Pin cmake version to stable
     # See: https://github.com/pytorch/builder/pull/1269

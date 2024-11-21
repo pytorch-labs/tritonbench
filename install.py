@@ -8,6 +8,7 @@ from pathlib import Path
 from tools.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from tools.git_utils import checkout_submodules
 from tools.python_utils import pip_install_requirements
+from tools.torch_utils import is_hip
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,6 +78,13 @@ def install_liger():
     subprocess.check_call(cmd)
 
 
+def setup_hip(args: argparse.Namespace):
+    # We have to disable all third-parties that donot support hip/rocm
+    args.all = False
+    args.liger = True
+    args.hstu = True
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--fbgemm", action="store_true", help="Install FBGEMM GPU")
@@ -104,6 +112,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--test", action="store_true", help="Run tests")
     args = parser.parse_args()
+
+    if args.all and is_hip():
+        setup_hip(args)
 
     # install framework dependencies
     pip_install_requirements("requirements.txt")
