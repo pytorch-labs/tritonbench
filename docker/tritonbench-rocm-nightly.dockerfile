@@ -16,7 +16,7 @@ RUN mkdir -p /workspace; touch "${SETUP_SCRIPT}"
 RUN echo "\
 . /opt/conda/etc/profile.d/conda.sh\n\
 conda activate base\n\
-export CONDA_HOME=\${HOME}/miniconda3\n" > "${SETUP_SCRIPT}"
+export CONDA_HOME=/opt/conda\n" > "${SETUP_SCRIPT}"
 
 RUN echo ". /workspace/setup_instance.sh\n" >> ${HOME}/.bashrc
 
