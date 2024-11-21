@@ -34,6 +34,7 @@ def install_torch_deps():
 
 def install_pytorch_nightly(rocm_version: str, env, dryrun=False):
     from .torch_utils import TORCH_NIGHTLY_PACKAGES
+
     uninstall_torch_cmd = ["pip", "uninstall", "-y"]
     uninstall_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
     if dryrun:

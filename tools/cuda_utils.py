@@ -37,9 +37,9 @@ def prepare_cuda_env(cuda_version: str, dryrun=False):
     env["CUDA_HOME"] = cuda_path_str
     env["PATH"] = f"{cuda_path_str}/bin:{env['PATH']}"
     env["CMAKE_CUDA_COMPILER"] = str(cuda_path.joinpath("bin", "nvcc").resolve())
-    env["LD_LIBRARY_PATH"] = (
-        f"{cuda_path_str}/lib64:{cuda_path_str}/extras/CUPTI/lib64:{env['LD_LIBRARY_PATH']}"
-    )
+    env[
+        "LD_LIBRARY_PATH"
+    ] = f"{cuda_path_str}/lib64:{cuda_path_str}/extras/CUPTI/lib64:{env['LD_LIBRARY_PATH']}"
     if dryrun:
         print(f"CUDA_HOME is set to {env['CUDA_HOME']}")
     # step 2: test call to nvcc to confirm the version is correct
@@ -88,6 +88,7 @@ def setup_cuda_softlink(cuda_version: str):
 
 def install_pytorch_nightly(cuda_version: str, env, dryrun=False):
     from .torch_utils import TORCH_NIGHTLY_PACKAGES
+
     uninstall_torch_cmd = ["pip", "uninstall", "-y"]
     uninstall_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
     if dryrun:
@@ -168,11 +169,15 @@ if __name__ == "__main__":
         install_torch_deps(cuda_version=args.cudaver)
     if args.install_torch_build_deps:
         from .torch_utils import install_torch_build_deps
+
         install_torch_deps(cuda_version=args.cudaver)
         install_torch_build_deps()
     if args.install_torch_nightly:
         install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
     if args.check_torch_nightly_version:
         from .torch_utils import check_torch_nightly_version
-        assert not args.install_torch_nightly, "Error: Can't run install torch nightly and check version in the same command."
+
+        assert (
+            not args.install_torch_nightly
+        ), "Error: Can't run install torch nightly and check version in the same command."
         check_torch_nightly_version(args.force_date)

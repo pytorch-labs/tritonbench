@@ -2,9 +2,9 @@
 CUDA/ROCM independent pytorch installation helpers.
 """
 
-import subprocess
 import importlib
 import re
+import subprocess
 from pathlib import Path
 
 from typing import Optional
@@ -18,8 +18,10 @@ BUILD_REQUIREMENTS_FILE = REPO_ROOT.joinpath("utils", "build_requirements.txt")
 
 def is_hip() -> bool:
     import torch
+
     version = torch.__version__
     return "rocm" in version
+
 
 def install_torch_build_deps():
     # Pin cmake version to stable
@@ -51,6 +53,7 @@ def install_torch_build_deps():
     conda_deps = ["libstdcxx-ng=12.3.0"]
     cmd = ["conda", "install", "-y", "-c", "conda-forge"] + conda_deps
     subprocess.check_call(cmd)
+
 
 def get_torch_nightly_version(pkg_name: str):
     pkg = importlib.import_module(pkg_name)
