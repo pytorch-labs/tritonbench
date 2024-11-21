@@ -44,7 +44,7 @@ RUN cd /workspace/tritonbench && \
 
 # Tritonbench library build and test require libcuda.so.1
 # which is from NVIDIA driver
-RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf
+RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf patch
 
 # Install Tritonbench
 RUN cd /workspace/tritonbench && \
