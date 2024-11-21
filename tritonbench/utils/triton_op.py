@@ -22,7 +22,7 @@ import psutil
 import tabulate
 import torch
 import triton
-from tritonbench.components.ncu import analyzer as ncu_analyzer
+from tritonbench.components.ncu import analyzer as ncu_analyzer, nsys_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
     fresh_triton_cache,
@@ -1044,8 +1044,19 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.ncu_rep_ir = self.ncu_trace(
                     input_id, fn_name, replay=True, profile_ir=True
                 )
-            if "nsys_rep" in self.required_metrics:
-                metrics.nsys_rep = self.nsys_rep(input_id, fn_name)
+            nsys_metrics = []
+            for metric_name in nsys_analyzer.nsys_metrics:
+                if metric_name in self.required_metrics:
+                    nsys_metrics.append(metric_name)
+            
+            if "nsys_rep" in self.required_metrics or nsys_metrics:
+                nsys_rep_path = self.nsys_rep(input_id, fn_name)
+                metrics.nsys_rep = nsys_rep_path
+                if nsys_metrics:
+                    nsys_analyzer_results = nsys_analyzer.read_nsys_report(
+                        nsys_rep_path, nsys_metrics
+                    )
+
             if "kineto_trace" in self.required_metrics:
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
             if "best_config" in self.required_metrics:
