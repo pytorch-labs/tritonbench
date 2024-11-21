@@ -35,8 +35,8 @@ RUN cd /workspace/tritonbench && \
 # Install PyTorch nightly and verify the date is correct
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
-    python tools/rocm_utils.py --install-torch-deps && \
-    python tools/rocm_utils.py --install-torch-nightly
+    python -m tools.rocm_utils --install-torch-deps && \
+    python -m tools.rocm_utils --install-torch-nightly
 
 
 # Install Tritonbench

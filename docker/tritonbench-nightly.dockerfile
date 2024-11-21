@@ -22,13 +22,13 @@ RUN cd /workspace/tritonbench && \
 
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
-    sudo python tools/cuda_utils.py --setup-cuda-softlink
+    sudo python -m tools.cuda_utils --setup-cuda-softlink
 
 # Install PyTorch nightly and verify the date is correct
 RUN cd /workspace/tritonbench && \
     . ${SETUP_SCRIPT} && \
-    python tools/cuda_utils.py --install-torch-deps && \
-    python tools/cuda_utils.py --install-torch-nightly
+    python -m tools.cuda_utils --install-torch-deps && \
+    python -m tools.cuda_utils --install-torch-nightly
 
 # Check the installed version of nightly if needed
 RUN cd /workspace/tritonbench && \
@@ -37,9 +37,9 @@ RUN cd /workspace/tritonbench && \
         echo "torch version check skipped"; \
     elif [ -z "${FORCE_DATE}" ]; then \
         FORCE_DATE=$(date '+%Y%m%d') \
-        python tools/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
+        python -m tools.cuda_utils --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     else \
-        python tools/cuda_utils.py --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
+        python -m tools.cuda_utils --check-torch-nightly-version --force-date "${FORCE_DATE}"; \
     fi
 
 # Tritonbench library build and test require libcuda.so.1
