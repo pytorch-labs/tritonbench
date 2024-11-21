@@ -369,7 +369,10 @@ class BenchmarkOperatorResult:
                 )
                 if value is None:
                     continue
-                agg_data[agg_metric_name] = agg_data.get(agg_metric_name, []) + [value]
+                if isinstance(value, (int, float)):
+                    agg_data[agg_metric_name] = agg_data.get(agg_metric_name, []) + [
+                        value
+                    ]
         final_agg_data = {k: sum(v) / len(v) for k, v in agg_data.items()}
         userbenchmark_metrics_dict.update(final_agg_data)
 
@@ -987,7 +990,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if "speedup" in self.required_metrics:
                 metrics.speedup = (
                     self.baseline_metrics.latency / metrics.latency
-                    if self.baseline_metrics and self.baseline_metrics.latency
+                    if (self.baseline_metrics and self.baseline_metrics.latency)
+                    and metrics.latency
                     else None
                 )
                 metrics.error_msg = (
@@ -1003,7 +1007,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if "hw_roofline" in self.required_metrics:
                 metrics.hw_roofline = self.hw_roofline()
-            if "tflops" in self.required_metrics:
+            if "tflops" in self.required_metrics and metrics.latency:
+                # cannot compute tflops without latency so adding latency to the check here
                 metrics.tflops = self.tflops(fn_name, self.example_inputs, metrics)
             if "compile_time" in self.required_metrics:
                 metrics.compile_time = self.compile_time(input_id, fn_name, metrics)
