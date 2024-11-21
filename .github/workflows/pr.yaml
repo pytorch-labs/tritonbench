@@ -7,28 +7,13 @@ on:
 
 jobs:
   h100-pytorch-test:
-    # Don't run on forked repos
-    if: github.repository_owner == 'pytorch-labs'
-    runs-on: [gcp-h100-runner]
-    timeout-minutes: 240
-    environment: docker-s3-upload
-    env:
-      CONDA_ENV: "pytorch"
-      SETUP_SCRIPT: "/workspace/setup_instance.sh"
-    steps:
-      - name: Checkout Tritonbench
-        uses: actions/checkout@v3
-        with:
-          # no need to checkout submodules recursively
-          submodules: true
-      - name: Tune Nvidia GPU
-        run: |
-          sudo nvidia-smi -pm 1
-          sudo ldconfig
-          nvidia-smi
-      - name: Test Tritonbench operators on H100 GPU
-        run: |
-          bash ./.ci/tritonbench/test-gpu.sh
+    uses: ./.github/workflows/_linux-test-h100.yml
+    with:
+      conda_env: "pytorch"
+  h100-triton-main-test:
+    uses: ./.github/workflows/_linux-test-h100.yml
+    with:
+      conda_env: "triton-main"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}

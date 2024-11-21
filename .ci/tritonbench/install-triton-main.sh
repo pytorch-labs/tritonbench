@@ -28,5 +28,17 @@ conda activate "${CONDA_ENV}"
 cd /workspace
 git clone https://github.com/triton-lang/triton.git
 cd /workspace/triton
+# delete the original triton directory
+TRITON_PKG_DIR=$(python -c "import triton; import os; print(os.path.dirname(triton.__file__))")
+# make sure all pytorch triton has been uninstalled
+pip uninstall -y triton
+pip uninstall -y triton
+pip uninstall -y triton
+rm -rf "${TRITON_PKG_DIR}"
+
+# install main triton
 pip install ninja cmake wheel pybind11; # build-time dependencies
 pip install -e python
+
+# test main branch installation with importing experimental descriptor
+python -c "import triton.tools.experimental_descriptor"
