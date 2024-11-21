@@ -14,7 +14,7 @@ NV_A100 = {
 }
 
 # NVIDIA H100 GPU Datasheet:
-# https://nvdam.widen.net/content/vuzumiozpb/original/h100-datasheet-2287922.pdf
+# https://www.nvidia.com/en-gb/data-center/h100
 NV_H100 = {
     "fp32": 51,
     "tf32": 756,
