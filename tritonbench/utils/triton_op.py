@@ -306,9 +306,25 @@ class BenchmarkOperatorResult:
                     )
                     metric_val = _metrics_dict.get(metric, None)
                     if isinstance(metric_val, list):
-                        row.append(numpy.median(metric_val))
+                        # Check if all elements are numbers before calculating median
+                        if all(isinstance(x, Number) for x in metric_val):
+                            row.append(numpy.median(metric_val))
+                        else:
+                            # For non-numeric lists, convert to string representation
+                            metric_val_str = str(metric_val)
+                            if ";" in metric_val_str:
+                                logger.warning(
+                                    f"Metric value '{metric_val_str}' contains semicolon which may cause CSV parsing issues"
+                                )
+                            row.append(metric_val_str)
                     elif isinstance(metric_val, bool):
                         row.append(1.0 if metric_val else 0.0)
+                    elif isinstance(metric_val, str):
+                        if ";" in metric_val:
+                            logger.warning(
+                                f"Metric value '{metric_val}' contains semicolon which may cause CSV parsing issues"
+                            )
+                        row.append(metric_val)
                     else:
                         row.append(metric_val)
             table.append(row)
