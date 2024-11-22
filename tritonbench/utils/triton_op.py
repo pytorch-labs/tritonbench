@@ -49,6 +49,10 @@ class BenchmarkOperatorBackend:
     baseline: bool = False
     # enabled
     enabled: bool = True
+    # fwd_only
+    # if an operator supports backward, but one of the kernels do not
+    # set fwd_only = True
+    fwd_only: bool = False
     # need to be tested in ci
     # ci = False implies enabled = False
     ci: bool = True
@@ -422,6 +426,7 @@ def register_x_val(label: str = "x_val"):
 def register_benchmark(
     baseline: bool = False,
     enabled: bool = True,
+    fwd_only: bool = False,
     label: Optional[str] = None,
 ):
     def decorator(function):
@@ -431,6 +436,7 @@ def register_benchmark(
             label=label if label else function.__name__,
             baseline=baseline,
             enabled=enabled,
+            fwd_only=fwd_only,
         )
         if not operator_name in REGISTERED_BENCHMARKS:
             REGISTERED_BENCHMARKS[operator_name] = OrderedDict()
@@ -639,14 +645,19 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             bm_func_name,
         )
 
+        backend = REGISTERED_BENCHMARKS[self.name][bm_func_name]
         if self.mode == Mode.FWD:
             setattr(fwd_fn, "_name", bm_func_name)
             return fwd_fn
         elif self.mode == Mode.BWD:
+            if backend.fwd_only:
+                raise NotImplementedError(f"Backward pass is not implemented for {bm_func_name}")
             bwd_fn = self.get_bwd_fn(fwd_fn)
             setattr(bwd_fn, "_name", bm_func_name)
             return bwd_fn
         elif self.mode == Mode.FWD_BWD:
+            if backend.fwd_only:
+                raise NotImplementedError(f"Backward pass is not implemented for {bm_func_name}")
             bwd_fn = self.get_bwd_fn(fwd_fn)
             fwd_bwd_fn = lambda: (fwd_fn(), bwd_fn())
             setattr(fwd_bwd_fn, "_name", bm_func_name)

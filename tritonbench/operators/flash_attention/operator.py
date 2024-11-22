@@ -345,7 +345,7 @@ class Operator(BenchmarkOperator):
             fhma_input, needs_gradient=need_gradient
         )
 
-    @register_benchmark(enabled=HAS_XFORMERS)
+    @register_benchmark(enabled=HAS_XFORMERS, fwd_only=True)
     def xformers_splitk(
         self,
         q: torch.Tensor,
