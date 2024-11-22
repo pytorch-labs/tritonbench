@@ -341,7 +341,9 @@ class Operator(BenchmarkOperator):
         need_gradient = not (self.mode == BenchmarkMode.FWD_NO_GRAD)
         fhma_input = self.xformers_preprocess(q, k, v)
         xformers_cutlass_fhma = xformers.ops.fmha.cutlass.FwOp
-        return lambda: xformers_cutlass_fhma().apply(fhma_input, needs_gradient=need_gradient)
+        return lambda: xformers_cutlass_fhma().apply(
+            fhma_input, needs_gradient=need_gradient
+        )
 
     @register_benchmark(enabled=HAS_XFORMERS)
     def xformers_splitk(
@@ -353,7 +355,9 @@ class Operator(BenchmarkOperator):
         need_gradient = not (self.mode == BenchmarkMode.FWD_NO_GRAD)
         fhma_input = self.xformers_preprocess(q, k, v)
         xformers_splitk_fhma = xformers_fmha.triton_splitk.FwOp
-        return lambda: xformers_splitk_fhma().apply(fhma_input, needs_gradient=need_gradient)
+        return lambda: xformers_splitk_fhma().apply(
+            fhma_input, needs_gradient=need_gradient
+        )
 
     def colfax_cutlass_preprocess(self, q, k, v):
         return (
