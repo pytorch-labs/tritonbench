@@ -26,6 +26,7 @@ fp8_gemm:
   # triton_*_persistent requires triton-main
   - triton_persistent_fp8_gemm
   - triton_tma_persistent_fp8_gemm
+# fbgemm fp8 gemm requires triton-main (desc_helper.fill_2d_tma_descriptor)
 fp8_gemm_rowwise:
 gemm:
   # triton_*_persistent_* requires triton-main
