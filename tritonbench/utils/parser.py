@@ -188,33 +188,3 @@ def get_parser(args=None):
             "Neither operator nor operator collection is specified. Running all operators in the default collection."
         )
     return parser
-
-
-def _find_param_loc(params, key: str) -> int:
-    try:
-        return params.index(key)
-    except ValueError:
-        return -1
-
-
-def _remove_params(params, loc):
-    if loc == -1:
-        return params
-    if loc == len(params) - 1:
-        return params[:loc]
-    if params[loc + 1].startswith("--"):
-        return params[:loc] + params[loc + 1 :]
-    if loc == len(params) - 2:
-        return params[:loc]
-    return params[:loc] + params[loc + 2 :]
-
-
-def add_cmd_parameter(args: List[str], name: str, value: str) -> List[str]:
-    args.append(name)
-    args.append(value)
-    return args
-
-
-def remove_cmd_parameter(args: List[str], name: str) -> List[str]:
-    loc = _find_param_loc(args, name)
-    return _remove_params(args, loc)

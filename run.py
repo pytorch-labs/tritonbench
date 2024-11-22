@@ -17,7 +17,8 @@ from tritonbench.operator_loader import load_opbench_by_name_from_loader
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.gpu_utils import gpu_lockdown
-from tritonbench.utils.parser import add_cmd_parameter, get_parser, remove_cmd_parameter
+from tritonbench.utils.parser import get_parser
+from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 

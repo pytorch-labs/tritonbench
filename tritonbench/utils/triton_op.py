@@ -30,6 +30,7 @@ from tritonbench.utils.env_utils import (
     set_random_seed,
 )
 from tritonbench.utils.input import input_cast
+from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
 
 try:
     from tqdm import tqdm
@@ -153,19 +154,6 @@ def llama_shapes():
         (6656, 16384),
     ]
     return [(bs, n, k, None) for bs, (k, n) in product(BS, KN)]
-
-
-def _find_param_loc(l, key: str) -> int:
-    try:
-        return l.index(key)
-    except ValueError:
-        return -1
-
-
-def _remove_params(l, loc):
-    if loc == -1:
-        return l
-    return l[:loc] + l[loc + 2 :]
 
 
 def _split_params_by_comma(params: Optional[str]) -> List[str]:
@@ -1228,10 +1216,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
         op_task_args = [] if IS_FBCODE else [sys.executable]
         op_task_args.extend(copy.deepcopy(sys.argv))
+        op_task_args = remove_cmd_parameter(op_task_args, "--op")
+        op_task_args = add_cmd_parameter(op_task_args, "--op", self.name)
         for override_option in ["--only", "--input-id", "--num-inputs", "--metrics"]:
-            op_task_args = _remove_params(
-                op_task_args, _find_param_loc(op_task_args, override_option)
-            )
+            op_task_args = remove_cmd_parameter(op_task_args, override_option)
         op_task_args.extend(
             [
                 "--only",
@@ -1291,9 +1279,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         op_task_args = [] if IS_FBCODE else [sys.executable]
         op_task_args.extend(copy.deepcopy(sys.argv))
         for override_option in ["--only", "--input-id", "--num-inputs", "--metrics"]:
-            op_task_args = _remove_params(
-                op_task_args, _find_param_loc(op_task_args, override_option)
-            )
+            op_task_args = remove_cmd_parameter(op_task_args, override_option)
         op_task_args.extend(
             [
                 "--only",
@@ -1405,9 +1391,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
         op_task_args = copy.deepcopy(self._raw_extra_args)
         for override_option in ["--only", "--input-id", "--num-inputs", "--metrics"]:
-            op_task_args = _remove_params(
-                op_task_args, _find_param_loc(op_task_args, override_option)
-            )
+            op_task_args = remove_cmd_parameter(op_task_args, override_option)
         op_task_args.extend(
             [
                 "--only",
