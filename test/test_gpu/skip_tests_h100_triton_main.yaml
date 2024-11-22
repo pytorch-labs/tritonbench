@@ -16,8 +16,9 @@ fp8_attention:
 # fb-only kernels
 fp8_fused_quant_gemm_rowwise:
 fp8_gemm:
-  # FIXME: triton_*_persistent kernels are broken
+  # FIXME: out of shared memory
   - triton_persistent_fp8_gemm
+  # FIXME: out of shared memory
   - triton_tma_persistent_fp8_gemm
 gemm:
   # FIXME: out of shared memory
