@@ -29,7 +29,6 @@ from tritonbench.utils.env_utils import (
     set_env,
     set_random_seed,
 )
-from tritonbench.utils.path_utils import remove_cmd_parameter, add_cmd_parameter
 from tritonbench.utils.input import input_cast
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
 
