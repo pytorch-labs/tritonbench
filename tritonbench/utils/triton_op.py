@@ -63,7 +63,6 @@ DEFAULT_WARMUP = 25
 DEFAULT_RUN_ITERS = 100
 DEFAULT_QUANTILES = [0.5, 0.1, 0.9]
 REGISTERED_BENCHMARKS: Dict[str, OrderedDict[str, BenchmarkOperatorBackend]] = {}
-ENABLED_BENCHMARKS: Dict[str, List[str]] = {}
 REGISTERED_METRICS: Dict[str, List[str]] = {}
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
@@ -409,6 +408,13 @@ class BenchmarkOperatorResult:
         table = tabulate.tabulate(table, headers=headers, stralign="right")
         return table
 
+def find_enabled_benchmarks(mode, benchmark_backends):
+    run_bwd = lambda m: m == Mode.BWD or m == Mode.FWD_BWD
+    benchmarks = [  bm for bm in benchmark_backends.keys() \
+        if benchmark_backends[bm].enabled and (not run_bwd(mode) or not benchmark_backends[bm].fwd_only)
+    ]
+    return benchmarks
+
 
 def register_x_val(label: str = "x_val"):
     def decorator(function):
@@ -443,11 +449,6 @@ def register_benchmark(
         REGISTERED_BENCHMARKS[operator_name][function.__name__] = backend_config
         if backend_config.baseline:
             BASELINE_BENCHMARKS[operator_name] = function.__name__
-        if backend_config.enabled:
-            if not operator_name in ENABLED_BENCHMARKS:
-                ENABLED_BENCHMARKS[operator_name] = []
-            ENABLED_BENCHMARKS[operator_name].append(function.__name__)
-
         def _inner(self, *args, **kwargs):
             return function(self, *args, **kwargs)
 
@@ -474,8 +475,8 @@ def register_benchmark_mannually(
         enabled (bool, optional): If True, this benchmark function is enabled. Defaults to True.
         label (Optional[str], optional): An optional label for the benchmark function. Defaults to None.
 
-    This function updates the global dictionaries REGISTERED_BENCHMARKS, BASELINE_BENCHMARKS,
-    and ENABLED_BENCHMARKS to include the new benchmark function. If the operator or function
+    This function updates the global dictionaries REGISTERED_BENCHMARKS and BASELINE_BENCHMARKS,
+    to include the new benchmark function. If the operator or function
     is already registered, it updates the existing entries.
 
     We need this manually register function because decorator doesn't work for
@@ -491,10 +492,6 @@ def register_benchmark_mannually(
     )
     if baseline:
         BASELINE_BENCHMARKS[operator_name] = func_name
-    if enabled:
-        if not operator_name in ENABLED_BENCHMARKS:
-            ENABLED_BENCHMARKS[operator_name] = []
-        ENABLED_BENCHMARKS[operator_name].append(func_name)
 
 
 def register_metric(
@@ -650,14 +647,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             setattr(fwd_fn, "_name", bm_func_name)
             return fwd_fn
         elif self.mode == Mode.BWD:
-            if backend.fwd_only:
-                raise NotImplementedError(f"Backward pass is not implemented for {bm_func_name}")
+            assert not backend.fwd_only, f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             setattr(bwd_fn, "_name", bm_func_name)
             return bwd_fn
         elif self.mode == Mode.FWD_BWD:
-            if backend.fwd_only:
-                raise NotImplementedError(f"Backward pass is not implemented for {bm_func_name}")
+            assert not backend.fwd_only, f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             fwd_bwd_fn = lambda: (fwd_fn(), bwd_fn())
             setattr(fwd_bwd_fn, "_name", bm_func_name)
@@ -714,11 +709,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         if bm not in self._skip
                     ]
                 else:
-                    benchmarks = (
-                        [bm for bm in ENABLED_BENCHMARKS[self.name]]
-                        if self.name in ENABLED_BENCHMARKS
-                        else []
-                    )
+                    benchmarks = find_enabled_benchmarks(self.mode, REGISTERED_BENCHMARKS[self.name])
                 # Run the baseline first, if baseline exists
                 baseline_name = (
                     BASELINE_BENCHMARKS[self.name]
