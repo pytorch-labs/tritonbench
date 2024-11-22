@@ -408,11 +408,17 @@ class BenchmarkOperatorResult:
         table = tabulate.tabulate(table, headers=headers, stralign="right")
         return table
 
-def find_enabled_benchmarks(mode, benchmark_backends):
-    run_bwd = lambda m: m == Mode.BWD or m == Mode.FWD_BWD
-    benchmarks = [  bm for bm in benchmark_backends.keys() \
-        if benchmark_backends[bm].enabled and (not run_bwd(mode) or not benchmark_backends[bm].fwd_only)
-    ]
+def find_enabled_benchmarks(mode, benchmark_backends, skip_benchmarks):
+    """Condition: enabled, not skipped and """
+    run_bwd = lambda m, backend: not (m == Mode.BWD or m == Mode.FWD_BWD) or backend.fwd_only
+    if skip_benchmarks:
+        benchmarks = [  bm for bm in benchmark_backends.keys() \
+            if not bm in skip_benchmarks and run_bwd(mode, benchmark_backends[bm])
+        ]
+    else:
+        benchmarks = [  bm for bm in benchmark_backends.keys() \
+            if benchmark_backends[bm].enabled and run_bwd(mode, benchmark_backends[bm])
+        ]
     return benchmarks
 
 
@@ -702,14 +708,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
-                elif self._skip:
-                    benchmarks = [
-                        bm
-                        for bm in REGISTERED_BENCHMARKS[self.name].keys()
-                        if bm not in self._skip
-                    ]
                 else:
-                    benchmarks = find_enabled_benchmarks(self.mode, REGISTERED_BENCHMARKS[self.name])
+                    benchmarks = find_enabled_benchmarks(self.mode, REGISTERED_BENCHMARKS[self.name], self._skip)
+
                 # Run the baseline first, if baseline exists
                 baseline_name = (
                     BASELINE_BENCHMARKS[self.name]
