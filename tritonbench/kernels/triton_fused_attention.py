@@ -360,11 +360,11 @@ configsOpt = [
             num_warps=w,
         )
     )
-    for BM in [128]
-    for BN in [128]
+    for BM in [64, 128]
+    for BN in [64, 128]
     for sched in schedList
     for enable_tma in [False]
-    for w in [8]
+    for w in [4, 8]
 ]
 # no WS, with TMA and CompPipe
 configsTma = [
@@ -393,11 +393,11 @@ configsTma = [
             num_warps=w,
         )
     )
-    for BM in [128]
-    for BN in [128]
+    for BM in [64, 128]
+    for BN in [64, 128]
     for sched in schedList
     for enable_tma in [True]
-    for w in [8]
+    for w in [4, 8]
 ]
 # no TMA, with WS and CompPipe
 configsWS = [
