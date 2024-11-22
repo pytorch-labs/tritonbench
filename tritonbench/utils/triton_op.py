@@ -410,14 +410,14 @@ class BenchmarkOperatorResult:
 
 def find_enabled_benchmarks(mode, benchmark_backends, skip_benchmarks):
     """Condition: enabled, not skipped and """
-    run_bwd = lambda m, backend: not (m == Mode.BWD or m == Mode.FWD_BWD) or backend.fwd_only
+    runnable = lambda m, backend: (not (m == Mode.BWD or m == Mode.FWD_BWD)) or (not backend.fwd_only)
     if skip_benchmarks:
         benchmarks = [  bm for bm in benchmark_backends.keys() \
-            if not bm in skip_benchmarks and run_bwd(mode, benchmark_backends[bm])
+            if not bm in skip_benchmarks and runnable(mode, benchmark_backends[bm])
         ]
     else:
         benchmarks = [  bm for bm in benchmark_backends.keys() \
-            if benchmark_backends[bm].enabled and run_bwd(mode, benchmark_backends[bm])
+            if benchmark_backends[bm].enabled and runnable(mode, benchmark_backends[bm])
         ]
     return benchmarks
 
