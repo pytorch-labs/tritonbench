@@ -27,13 +27,13 @@ AVAILABLE_PRECISIONS = [
 def set_env():
     # set cutlass dir
     # by default we use the cutlass version built with pytorch
-    import torch
+    import torch._inductor.config as inductor_config
 
-    current_cutlass_dir = torch._inductor.config.cuda.cutlass_dir
+    current_cutlass_dir = inductor_config.cuda.cutlass_dir
     if not os.path.exists(current_cutlass_dir):
         tb_cutlass_dir = REPO_PATH.joinpath("submodules", "cutlass")
         if tb_cutlass_dir.is_dir():
-            torch._inductor.config.cuda.cutlass_dir = str(tb_cutlass_dir)
+            inductor_config.cuda.cutlass_dir = str(tb_cutlass_dir)
 
 
 def set_random_seed():

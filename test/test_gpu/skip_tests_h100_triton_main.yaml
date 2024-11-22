@@ -1,0 +1,44 @@
+# Tests we skip in triton-pytorch + OSS CI
+# triton-pytorch is the triton version bundled with pytorch nightly
+# We need to skip kernels that only work on triton-main
+# Usage:
+#  op-name: to skip an entire operator
+#  op-name:\n\t- impl-name to skip an impl
+flash_attention:
+  # thunderkittens cannot handle the default input shapes
+  - tk
+  # FIXME: triton_tutorial_* kernels are broken
+  - triton_tutorial_flash_v2
+  - triton_tutorial_flash_v2_opt
+  - triton_tutorial_flash_v2_tma
+  - triton_tutorial_flash_v2_ws
+  - triton_tutorial_flash_v2_tma_ws
+fp8_attention:
+  # fb-only kernel
+  - colfax_fmha
+  # FIXME: triton_flash_v2 kernel is broken
+  - triton_flash_v2
+# fb-only kernels
+fp8_fused_quant_gemm_rowwise:
+fp8_gemm:
+  # FIXME: triton_*_persistent kernels are broken
+  - triton_persistent_fp8_gemm
+  - triton_tma_persistent_fp8_gemm
+gemm:
+  # out of shared memory
+  - triton_tma_persistent_matmul
+  # out of shared memory
+  - triton_tma_persistent_cached_matmul
+  # internal only kernels
+  - hstu_triton_matmul
+  - colfax_cutlass_matmul
+# jagged tests are slow, so disable them in OSS
+jagged_layer_norm:
+jagged_mean:
+jagged_softmax:
+jagged_sum:
+# FIXME: ragged attention will Abort (Core Dump) on Triton Main
+ragged_attention:
+test_op:
+fwd_only_ops:
+  - flash_attention

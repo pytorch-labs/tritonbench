@@ -92,7 +92,7 @@ def test_tk_attn_h100_fwd(tk_lib):
 
 def install_tk():
     # compile thunderkitten kernels
-    output_dir = TRITONBENCH_TK_PATH.joinpath(".data")
+    output_dir = REPO_PATH.joinpath(".data", "tk")
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = ["nvcc"]
     cmd.extend(COMPILER_FLAGS)
