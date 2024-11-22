@@ -82,7 +82,7 @@ def test_colfax_cutlass(colfax_cutlass_lib: str):
 
 def install_colfax_cutlass():
     # compile colfax_cutlass kernels
-    output_dir = COLFAX_CUTLASS_TRITONBENCH_PATH.joinpath(".data")
+    output_dir = REPO_PATH.joinpath(".data", "cutlass_kernels")
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = ["nvcc"]
     cmd.extend(COMPILER_FLAGS)

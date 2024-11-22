@@ -12,8 +12,8 @@ import statistics
 from typing import Any, List, Optional
 
 import torch
+import triton
 import triton.language as tl
-import triton.ops
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
