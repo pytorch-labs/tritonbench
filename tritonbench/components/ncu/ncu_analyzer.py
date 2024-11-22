@@ -152,7 +152,7 @@ def get_arithmetic_intensity(kernel):
 def read_ncu_report(report_path: str, required_metrics: List[str]):
     assert os.path.exists(
         report_path
-    ), f"The NCU report at {report_path} does not exist. Ensure you add --metrics ncu_rep to your benchmark run."
+    ), f"The NCU report at {report_path} does not exist."
     import_ncu_python_path()
     import ncu_report
 

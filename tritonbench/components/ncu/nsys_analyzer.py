@@ -20,8 +20,6 @@ nsys_metrics_to_reports = {
     # the number of kernels
     "nsys_num_of_kernels": ["nvtx_kern_sum"],
 }
-# The public nsys metrics to tritonbench
-nsys_bench_metrics = list(nsys_metrics_to_reports.keys())
 
 
 def read_nsys_report(
@@ -29,7 +27,7 @@ def read_nsys_report(
 ) -> Dict[str, List[float]]:
     assert os.path.exists(
         report_path
-    ), f"The nsys report at {report_path} does not exist. Ensure you add --metrics nsys_rep to your benchmark run."
+    ), f"The nsys report at {report_path} does not exist."
     reports_required = []
     for metric in required_metrics:
         if metric in nsys_metrics_to_reports:
@@ -38,12 +36,10 @@ def read_nsys_report(
     assert reports_required, "No nsys reports required"
     cmd = f"nsys stats --report {','.join(reports_required)} --force-export=true --format csv --output . --force-overwrite=true {report_path}"
     try:
-        subprocess.check_call(
-            cmd.split(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-        )
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:
         print(f"Failed to run nsys command: {cmd}\nError: {e}")
-        raise
+        raise e
     # Get the base path and filename without extension
     base_path = os.path.dirname(report_path)
     base_name = os.path.splitext(os.path.basename(report_path))[0]
@@ -74,6 +70,8 @@ def read_nsys_report(
     if "nvtx_sum" in csv_contents:
         # It is supposed to be only one row. The nvtx range is `:tritonbench_range`
         assert len(csv_contents["nvtx_sum"]) == 1
+        # @TODO: nsys has a bug that the unit of nvtx range duration is ms sometimes.
+        # waiting for nvidia replys.
         nvtx_range_duration = (
             float(csv_contents["nvtx_sum"][0]["Total Time (ns)"]) / 1_000_000
         )
@@ -87,7 +85,12 @@ def read_nsys_report(
         "nsys_launch_overhead": nvtx_range_duration - sum_kernel_duration,
         "nsys_num_of_kernels": len(kernel_names),
     }
-
+    # Verify that metrics_map keys match nsys_metrics_to_reports keys
+    assert set(metrics_map.keys()) == set(nsys_metrics_to_reports.keys()), (
+        f"Mismatch between metrics_map keys and nsys_metrics_to_reports keys.\n"
+        f"metrics_map keys: {set(metrics_map.keys())}\n"
+        f"nsys_metrics_to_reports keys: {set(nsys_metrics_to_reports.keys())}"
+    )
     # Add only requested metrics to results
     results.update(
         {

@@ -1081,7 +1081,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     input_id, fn_name, replay=True, profile_ir=True
                 )
             nsys_metrics = []
-            for metric_name in nsys_analyzer.nsys_bench_metrics:
+            for metric_name in nsys_analyzer.nsys_metrics_to_reports.keys():
                 if metric_name in self.required_metrics:
                     nsys_metrics.append(metric_name)
 
