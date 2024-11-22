@@ -408,15 +408,22 @@ class BenchmarkOperatorResult:
         table = tabulate.tabulate(table, headers=headers, stralign="right")
         return table
 
+
 def find_enabled_benchmarks(mode, benchmark_backends, skip_benchmarks):
-    """Condition: enabled, not skipped and """
-    runnable = lambda m, backend: (not (m == Mode.BWD or m == Mode.FWD_BWD)) or (not backend.fwd_only)
+    """Condition: enabled, not skipped and"""
+    runnable = lambda m, backend: (not (m == Mode.BWD or m == Mode.FWD_BWD)) or (
+        not backend.fwd_only
+    )
     if skip_benchmarks:
-        benchmarks = [ bm for bm in benchmark_backends.keys() \
+        benchmarks = [
+            bm
+            for bm in benchmark_backends.keys()
             if not bm in skip_benchmarks and runnable(mode, benchmark_backends[bm])
         ]
     else:
-        benchmarks = [ bm for bm in benchmark_backends.keys() \
+        benchmarks = [
+            bm
+            for bm in benchmark_backends.keys()
             if benchmark_backends[bm].enabled and runnable(mode, benchmark_backends[bm])
         ]
     return benchmarks
@@ -455,6 +462,7 @@ def register_benchmark(
         REGISTERED_BENCHMARKS[operator_name][function.__name__] = backend_config
         if backend_config.baseline:
             BASELINE_BENCHMARKS[operator_name] = function.__name__
+
         def _inner(self, *args, **kwargs):
             return function(self, *args, **kwargs)
 
@@ -653,12 +661,16 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             setattr(fwd_fn, "_name", bm_func_name)
             return fwd_fn
         elif self.mode == Mode.BWD:
-            assert not backend.fwd_only, f"Backend {bm_func_name} does not support backward pass."
+            assert (
+                not backend.fwd_only
+            ), f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             setattr(bwd_fn, "_name", bm_func_name)
             return bwd_fn
         elif self.mode == Mode.FWD_BWD:
-            assert not backend.fwd_only, f"Backend {bm_func_name} does not support backward pass."
+            assert (
+                not backend.fwd_only
+            ), f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             fwd_bwd_fn = lambda: (fwd_fn(), bwd_fn())
             setattr(fwd_bwd_fn, "_name", bm_func_name)
@@ -709,7 +721,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 if self._only:
                     benchmarks = self._only
                 else:
-                    benchmarks = find_enabled_benchmarks(self.mode, REGISTERED_BENCHMARKS[self.name], self._skip)
+                    benchmarks = find_enabled_benchmarks(
+                        self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
+                    )
 
                 # Run the baseline first, if baseline exists
                 baseline_name = (

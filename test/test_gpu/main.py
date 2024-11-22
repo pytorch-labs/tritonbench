@@ -43,11 +43,16 @@ TEST_OPERATORS = set(list_operators_by_collection(op_collection="default"))
 
 
 def check_ci_output(op):
-    from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS, find_enabled_benchmarks
+    from tritonbench.utils.triton_op import (
+        find_enabled_benchmarks,
+        REGISTERED_BENCHMARKS,
+    )
 
     output = op.output
     output_impls = output.result[0][1].keys()
-    ci_enabled_impls = find_enabled_benchmarks(op.mode, REGISTERED_BENCHMARKS[op.name], op._skip)
+    ci_enabled_impls = find_enabled_benchmarks(
+        op.mode, REGISTERED_BENCHMARKS[op.name], op._skip
+    )
     # Make sure that all the ci_enabled impls are in the output
     logger.info(f"output impls: {output_impls}, ci_enabled impls: {ci_enabled_impls}")
     assert set(output_impls) == set(
