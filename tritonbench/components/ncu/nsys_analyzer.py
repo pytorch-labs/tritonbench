@@ -7,17 +7,17 @@ from typing import Dict, List
 # The nsys metrics to the reports. The value is the list of reports of nsys.
 nsys_metrics_to_reports = {
     # the sum of kernel execution time
-    "nsys_gpu_kernel_sum": ["cuda_gpu_kern_sum", "nvtx_sum"],
+    "nsys_gpu_kernel_sum": ["nvtx_kern_sum", "nvtx_sum"],
     # the overhead of kernel launch
-    "nsys_launch_overhead": ["cuda_gpu_kern_sum", "nvtx_sum"],
+    "nsys_launch_overhead": ["nvtx_kern_sum", "nvtx_sum"],
     # the names of kernels
-    "nsys_kernel_names": ["cuda_gpu_kern_sum"],
+    "nsys_kernel_names": ["nvtx_kern_sum"],
     # the durations of kernels
-    "nsys_kernel_durations": ["cuda_gpu_kern_sum"],
+    "nsys_kernel_durations": ["nvtx_kern_sum"],
     # the duration of nvtx range
     "nsys_nvtx_range_duration": ["nvtx_sum"],
     # the number of kernels
-    "nsys_num_of_kernels": ["cuda_gpu_kern_sum"],
+    "nsys_num_of_kernels": ["nvtx_kern_sum"],
 }
 # The public nsys metrics to tritonbench
 nsys_bench_metrics = list(nsys_metrics_to_reports.keys())
@@ -59,12 +59,12 @@ def read_nsys_report(
     kernel_names = []
     sum_kernel_duration = 0
     nvtx_range_duration = 0
-    if "cuda_gpu_kern_sum" in csv_contents:
+    if "nvtx_kern_sum" in csv_contents:
         # gpu kernel execution time summary
-        for row in csv_contents["cuda_gpu_kern_sum"]:
+        for row in csv_contents["nvtx_kern_sum"]:
             # use ms as the unit
             kernel_duration.append(float(row["Total Time (ns)"]) / 1_000_000)
-            kernel_names.append(row["Name"])
+            kernel_names.append(row["Kernel Name"])
         sum_kernel_duration = sum(kernel_duration)
     if "nvtx_sum" in csv_contents:
         # It is supposed to be only one row. The nvtx range is `:tritonbench_range`
