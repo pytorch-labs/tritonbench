@@ -59,7 +59,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def inductor_geglu(self, input) -> Callable:
-        compiled = torch.compile(self.baseline_model, dynamic=False)
+        compiled = torch.compile(self.baseline_model)
         return lambda: compiled(input)
 
     @register_x_val(label="(B, T, H)")
