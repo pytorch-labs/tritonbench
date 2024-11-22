@@ -5,7 +5,6 @@ from typing import Any, Generator, List, Optional
 
 import torch
 from torch._dynamo.backends.cudagraphs import cudagraphs_inner
-from torch._inductor.compile_fx import compile_fx
 from torch._inductor.utils import gen_gm_and_inputs
 from torch._ops import OpOverload
 from torch.utils._pytree import tree_map_only
@@ -102,6 +101,9 @@ def create_operator_class(op_eval: OpOverload):
                     "aten::convolution_backward",
                 )
                 if self.device == "cuda":
+                    from torch._inductor.compile_fx import compile_fx
+
+                    
                     cudagraph_eager = cudagraphs_inner(
                         gm, gm_args, copy_outputs=False, copy_inputs=False
                     )
