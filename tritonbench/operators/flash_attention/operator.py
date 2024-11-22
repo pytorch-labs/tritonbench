@@ -448,6 +448,9 @@ class Operator(BenchmarkOperator):
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         o = fwd_fn()
+        # xformers_splitk does not have backward
+        if fwd_fn._name == "xformers_splitk":
+            raise NotImplementedError("xformers split-k does not support backward")
         o_tensor = input_filter(
             lambda x: isinstance(x, torch.Tensor),
             o,
