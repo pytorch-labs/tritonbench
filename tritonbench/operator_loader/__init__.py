@@ -103,6 +103,8 @@ def create_operator_class(op_eval: OpOverload):
                     "aten::convolution_backward",
                 )
                 if self.device == "cuda":
+                    from torch._inductor.compile_fx import compile_fx
+
                     cudagraph_eager = cudagraphs_inner(
                         gm, gm_args, copy_outputs=False, copy_inputs=False
                     )
