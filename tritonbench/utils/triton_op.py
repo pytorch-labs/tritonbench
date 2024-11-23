@@ -216,6 +216,8 @@ class BenchmarkOperatorMetrics:
     extra_metrics: Optional[Dict[str, float]] = None
     # mem footprint
     mem_footprint_compression_ratio: Optional[float] = None
+    # gbps
+    gbps: Optional[float] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
@@ -545,6 +547,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     extra_args: List[str] = []
     example_inputs: Any = None
     use_cuda_graphs: bool = False
+    is_compute_bound = True
 
     """
     A base class for adding operators to torch benchmark.
@@ -998,6 +1001,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if "tflops" in self.required_metrics and metrics.latency:
                 # cannot compute tflops without latency so adding latency to the check here
                 metrics.tflops = self.tflops(fn_name, self.example_inputs, metrics)
+            if "gbps" in self.required_metrics:
+                metrics.gbps = self.gbps(fn, self.example_inputs, metrics)
             if "compile_time" in self.required_metrics:
                 metrics.compile_time = self.compile_time(input_id, fn_name, metrics)
             if "ncu_trace" in self.required_metrics:
@@ -1418,14 +1423,19 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         """Hardware roofline in tflops."""
         from tritonbench.utils.gpu_utils import HW_ROOFLINE_SPECS
 
+        rooflines = HW_ROOFLINE_SPECS[self.is_compute_bound]
+
         device_name = torch.cuda.get_device_name()
         assert (
-            device_name in HW_ROOFLINE_SPECS
+            device_name in rooflines
         ), f"{device_name} is not supported in HW roofline specs."
-        assert (
-            self.tb_args.precision in HW_ROOFLINE_SPECS[device_name]
-        ), f"{self.tb_args.precision} is not supported by {device_name}."
-        return HW_ROOFLINE_SPECS[device_name][self.tb_args.precision]
+        rooflines = rooflines[device_name]
+        if self.is_compute_bound:
+            assert (
+                self.tb_args.precision in rooflines
+            ), f"{self.tb_args.precision} is not supported by {device_name}."
+            return rooflines[self.tb_args.precision]
+        return rooflines
 
     def _compile_time_in_task(
         self,

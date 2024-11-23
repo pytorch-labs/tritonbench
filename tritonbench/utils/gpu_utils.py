@@ -24,10 +24,19 @@ NV_H100 = {
 }
 
 
-HW_ROOFLINE_SPECS: Dict[str, Dict[str, float]] = {
-    "NVIDIA A100-SXM4-40GB": NV_A100,
-    "NVIDIA A100-PG509-200": NV_A100,
-    "NVIDIA H100": NV_H100,
+HW_ROOFLINE_SPECS: Dict[
+    bool, Dict[str, Dict[str, float]]
+] = {  # true is compute bound false would be memory bound
+    True: {
+        "NVIDIA A100-SXM4-40GB": NV_A100,
+        "NVIDIA A100-PG509-200": NV_A100,
+        "NVIDIA H100": NV_H100,
+    },
+    False: {
+        # https://www.nvidia.com/en-gb/data-center/h100
+        # values in gbps
+        "NVIDIA H100": 2000,
+    },
 }
 
 CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
