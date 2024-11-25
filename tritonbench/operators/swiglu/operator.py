@@ -60,7 +60,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def inductor_swiglu(self, input) -> Callable:
-        compiled = torch.compile(self.baseline_op, dynamic=False)
+        compiled = torch.compile(self.baseline_op)
         return lambda: compiled(input)
 
     @register_x_val(label="(B, T, H)")

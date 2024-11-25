@@ -65,7 +65,11 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def inductor_rms(self, H, input) -> Callable:
-        compiled = torch.compile(self.llama_rms_op, dynamic=False)
+        if self.llama_rms_op is None:
+            self.llama_rms_op = LlamaRMSNorm(hidden_size=H, eps=self.eps).to(
+                self.device
+            )
+        compiled = torch.compile(self.llama_rms_op)
         return lambda: compiled(input)
 
     @register_x_val(label="(M, H)")
