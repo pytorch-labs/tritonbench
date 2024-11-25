@@ -43,5 +43,3 @@ jagged_sum:
 ragged_attention:
   - hstu_triton_ragged_attention_persistent
 test_op:
-fwd_only_ops:
-  - flash_attention

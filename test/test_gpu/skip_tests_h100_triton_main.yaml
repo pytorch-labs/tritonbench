@@ -36,5 +36,3 @@ jagged_sum:
 # FIXME: ragged attention will Abort (Core Dump) on Triton Main
 ragged_attention:
 test_op:
-fwd_only_ops:
-  - flash_attention

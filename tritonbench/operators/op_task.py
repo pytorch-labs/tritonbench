@@ -190,13 +190,16 @@ class OpTask(base_task.TaskBase):
     @staticmethod
     def check_output() -> None:
         op = globals()["op"]
-        from tritonbench.utils.triton_op import REGISTERED_BENCHMARKS
+        from tritonbench.utils.triton_op import (
+            find_enabled_benchmarks,
+            REGISTERED_BENCHMARKS,
+        )
 
         output = op.output
         output_impls = output.result[0][1].keys()
-        ci_enabled_impls = [
-            x for x in REGISTERED_BENCHMARKS[output.op_name].keys() if x not in op._skip
-        ]
+        ci_enabled_impls = find_enabled_benchmarks(
+            op.mode, REGISTERED_BENCHMARKS[output.op_name], op._skip
+        )
         # Make sure that all the ci_enabled impls are in the output
         assert set(output_impls) == set(
             ci_enabled_impls

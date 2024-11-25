@@ -338,20 +338,26 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
+        need_gradient = not (self.mode == BenchmarkMode.FWD_NO_GRAD)
         fhma_input = self.xformers_preprocess(q, k, v)
         xformers_cutlass_fhma = xformers.ops.fmha.cutlass.FwOp
-        return lambda: xformers_cutlass_fhma().apply(fhma_input, needs_gradient=False)
+        return lambda: xformers_cutlass_fhma().apply(
+            fhma_input, needs_gradient=need_gradient
+        )
 
-    @register_benchmark(enabled=HAS_XFORMERS)
+    @register_benchmark(enabled=HAS_XFORMERS, fwd_only=True)
     def xformers_splitk(
         self,
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
     ):
+        need_gradient = not (self.mode == BenchmarkMode.FWD_NO_GRAD)
         fhma_input = self.xformers_preprocess(q, k, v)
         xformers_splitk_fhma = xformers_fmha.triton_splitk.FwOp
-        return lambda: xformers_splitk_fhma().apply(fhma_input, needs_gradient=False)
+        return lambda: xformers_splitk_fhma().apply(
+            fhma_input, needs_gradient=need_gradient
+        )
 
     def colfax_cutlass_preprocess(self, q, k, v):
         return (

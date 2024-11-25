@@ -1954,7 +1954,7 @@ class _attention_opt(torch.autograd.Function):
             num_stages=NUM_STAGES,  #
         )
 
-        return dq, dk, dv, None, None
+        return dq, dk, dv, None, None, None
 
 
 attention_opt = _attention_opt.apply

@@ -50,6 +50,10 @@ class BenchmarkOperatorBackend:
     baseline: bool = False
     # enabled
     enabled: bool = True
+    # fwd_only
+    # if an operator supports backward, but one of the kernels do not
+    # set fwd_only = True
+    fwd_only: bool = False
     # need to be tested in ci
     # ci = False implies enabled = False
     ci: bool = True
@@ -60,7 +64,6 @@ DEFAULT_WARMUP = 25
 DEFAULT_RUN_ITERS = 100
 DEFAULT_QUANTILES = [0.5, 0.1, 0.9]
 REGISTERED_BENCHMARKS: Dict[str, OrderedDict[str, BenchmarkOperatorBackend]] = {}
-ENABLED_BENCHMARKS: Dict[str, List[str]] = {}
 REGISTERED_METRICS: Dict[str, List[str]] = {}
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
@@ -396,6 +399,27 @@ class BenchmarkOperatorResult:
         return table
 
 
+def find_enabled_benchmarks(mode, benchmark_backends, skip_benchmarks):
+    """Condition: enabled, not skipped and"""
+
+    def runnable(m, backend):
+        return (not (m == Mode.BWD or m == Mode.FWD_BWD)) or not backend.fwd_only
+
+    if skip_benchmarks:
+        benchmarks = [
+            bm
+            for bm in benchmark_backends.keys()
+            if bm not in skip_benchmarks and runnable(mode, benchmark_backends[bm])
+        ]
+    else:
+        benchmarks = [
+            bm
+            for bm in benchmark_backends.keys()
+            if benchmark_backends[bm].enabled and runnable(mode, benchmark_backends[bm])
+        ]
+    return benchmarks
+
+
 def register_x_val(label: str = "x_val"):
     def decorator(function):
         operator_name = _find_op_name_from_module_path(function.__module__)
@@ -412,6 +436,7 @@ def register_x_val(label: str = "x_val"):
 def register_benchmark(
     baseline: bool = False,
     enabled: bool = True,
+    fwd_only: bool = False,
     label: Optional[str] = None,
 ):
     def decorator(function):
@@ -421,16 +446,13 @@ def register_benchmark(
             label=label if label else function.__name__,
             baseline=baseline,
             enabled=enabled,
+            fwd_only=fwd_only,
         )
         if not operator_name in REGISTERED_BENCHMARKS:
             REGISTERED_BENCHMARKS[operator_name] = OrderedDict()
         REGISTERED_BENCHMARKS[operator_name][function.__name__] = backend_config
         if backend_config.baseline:
             BASELINE_BENCHMARKS[operator_name] = function.__name__
-        if backend_config.enabled:
-            if not operator_name in ENABLED_BENCHMARKS:
-                ENABLED_BENCHMARKS[operator_name] = []
-            ENABLED_BENCHMARKS[operator_name].append(function.__name__)
 
         def _inner(self, *args, **kwargs):
             return function(self, *args, **kwargs)
@@ -458,8 +480,8 @@ def register_benchmark_mannually(
         enabled (bool, optional): If True, this benchmark function is enabled. Defaults to True.
         label (Optional[str], optional): An optional label for the benchmark function. Defaults to None.
 
-    This function updates the global dictionaries REGISTERED_BENCHMARKS, BASELINE_BENCHMARKS,
-    and ENABLED_BENCHMARKS to include the new benchmark function. If the operator or function
+    This function updates the global dictionaries REGISTERED_BENCHMARKS and BASELINE_BENCHMARKS,
+    to include the new benchmark function. If the operator or function
     is already registered, it updates the existing entries.
 
     We need this manually register function because decorator doesn't work for
@@ -475,10 +497,6 @@ def register_benchmark_mannually(
     )
     if baseline:
         BASELINE_BENCHMARKS[operator_name] = func_name
-    if enabled:
-        if not operator_name in ENABLED_BENCHMARKS:
-            ENABLED_BENCHMARKS[operator_name] = []
-        ENABLED_BENCHMARKS[operator_name].append(func_name)
 
 
 def register_metric(
@@ -630,14 +648,21 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             bm_func_name,
         )
 
+        backend = REGISTERED_BENCHMARKS[self.name][bm_func_name]
         if self.mode == Mode.FWD:
             setattr(fwd_fn, "_name", bm_func_name)
             return fwd_fn
         elif self.mode == Mode.BWD:
+            assert (
+                not backend.fwd_only
+            ), f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             setattr(bwd_fn, "_name", bm_func_name)
             return bwd_fn
         elif self.mode == Mode.FWD_BWD:
+            assert (
+                not backend.fwd_only
+            ), f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             fwd_bwd_fn = lambda: (fwd_fn(), bwd_fn())
             setattr(fwd_bwd_fn, "_name", bm_func_name)
@@ -687,18 +712,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
-                elif self._skip:
-                    benchmarks = [
-                        bm
-                        for bm in REGISTERED_BENCHMARKS[self.name].keys()
-                        if bm not in self._skip
-                    ]
                 else:
-                    benchmarks = (
-                        [bm for bm in ENABLED_BENCHMARKS[self.name]]
-                        if self.name in ENABLED_BENCHMARKS
-                        else []
+                    benchmarks = find_enabled_benchmarks(
+                        self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
                     )
+
                 # Run the baseline first, if baseline exists
                 baseline_name = (
                     BASELINE_BENCHMARKS[self.name]
