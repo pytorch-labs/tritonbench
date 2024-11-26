@@ -1,1 +1,1 @@
-from .op import load_opbench_by_name, list_operators
+from .op import list_operators, load_opbench_by_name

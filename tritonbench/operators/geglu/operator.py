@@ -5,6 +5,7 @@ import torch
 
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaMLP
+
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     register_benchmark,
