@@ -26,10 +26,24 @@ By default, it will install the latest PyTorch nightly release and use the Trito
 
 ## Basic Usage
 
-To benchmark an operator, use the following command:
+To benchmark an operator, run the following command:
 
 ```
 $ python run.py --op gemm
+```
+
+## Install as a library
+
+To install as a library:
+
+```
+$ pip install -e .
+# in your own benchmark script
+import tritonbench
+from tritonbench.utils import parser
+op_args = parser.parse_args()
+addmm_bench = tritonbench.load_opbench_by_name("addmm")(op_args)
+addmm_bench.run()
 ```
 
 ## Submodules
