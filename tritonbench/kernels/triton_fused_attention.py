@@ -155,7 +155,7 @@ def _attn_fwd_inner(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(lo, hi, BLOCK_N, loop_schedule=LOOP_SCHEDULE):
+    for start_n in tl.range(lo, hi, BLOCK_N): #, loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
@@ -259,7 +259,7 @@ def _attn_fwd_inner_ws(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(lo, hi, BLOCK_N, loop_schedule=LOOP_SCHEDULE):
+    for start_n in tl.range(lo, hi, BLOCK_N): #, loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         with tl.async_task([0]):
