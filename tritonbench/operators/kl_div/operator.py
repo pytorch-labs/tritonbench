@@ -47,7 +47,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def inductor_kl_div(self, input, target) -> Callable:
-        compiled = torch.compile(self.baseline_op, dynamic=False)
+        compiled = torch.compile(self.baseline_op)
         return lambda: compiled(input, target)
 
     @register_x_val(label="(B, T, V)")

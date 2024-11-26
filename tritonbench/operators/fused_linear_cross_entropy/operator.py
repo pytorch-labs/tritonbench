@@ -104,7 +104,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def inductor_fused_linear_cross_entropy(self, input, target) -> Callable:
-        compiled = torch.compile(self.baseline_model, dynamic=False)
+        compiled = torch.compile(self.baseline_model)
         return lambda: compiled(input, target)
 
     @register_x_val(label="(B*T, H)")

@@ -115,7 +115,7 @@ def fp8_block_quantize(
 
 class Operator(BenchmarkOperator):
     DEFAULT_METRICS = ["tflops", "speedup", "accuracy"]
-    DEFAULT_PRECISION = "fp32"
+    DEFAULT_PRECISION = "fp8"
 
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
