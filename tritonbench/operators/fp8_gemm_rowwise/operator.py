@@ -109,7 +109,7 @@ def fp8_row_quantize(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
 class Operator(BenchmarkOperator):
     DEFAULT_METRICS = ["tflops", "speedup", "accuracy"]
-    DEFAULT_PRECISION = "fp32"
+    DEFAULT_PRECISION = "fp8"
 
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
@@ -118,7 +118,7 @@ class Operator(BenchmarkOperator):
         self.use_cuda_graphs = True
         addmm_args = parse_args(self.extra_args)
         if hasattr(tb_args, "production_shapes") and tb_args.production_shapes:
-            self.shapes = get_production_shapes(self.name, "fp8_gemm")
+            self.shapes = get_production_shapes(self.name, "fp32_gemm")
         elif addmm_args.m and addmm_args.n and addmm_args.k:
             self.shapes = [(addmm_args.m, addmm_args.n, addmm_args.k)]
         elif addmm_args.llama:
