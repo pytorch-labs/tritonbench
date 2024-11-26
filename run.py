@@ -6,9 +6,7 @@ Note: make sure to `python install.py` first or otherwise make sure the benchmar
 """
 
 import argparse
-import copy
 import os
-import subprocess
 import sys
 import tempfile
 from typing import List
@@ -19,7 +17,7 @@ from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.gpu_utils import gpu_lockdown
 from tritonbench.utils.parser import get_parser
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
-
+from tritonbench.utils.runner import run_in_task
 from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 
 try:
@@ -31,24 +29,6 @@ except ImportError:
     usage_report_logger = lambda *args, **kwargs: None
 
 TRITON_BENCH_CSV_DUMP_PATH = tempfile.gettempdir() + "/tritonbench/"
-
-
-def _run_in_task(op: str) -> None:
-    op_task_cmd = [] if IS_FBCODE else [sys.executable]
-    copy_sys_argv = copy.deepcopy(sys.argv)
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
-    add_cmd_parameter(copy_sys_argv, "--op", op)
-    op_task_cmd.extend(copy_sys_argv)
-    try:
-        print("[tritonbench] running command: " + " ".join(op_task_cmd))
-        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr)
-    except subprocess.CalledProcessError:
-        # By default, we will continue on the failed operators
-        pass
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt received, exiting...")
-        sys.exit(1)
 
 
 def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorResult:
@@ -107,11 +87,6 @@ def run(args: List[str] = []):
     usage_report_logger(benchmark_name="tritonbench")
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
-    if args.ci:
-        from .ci import run_ci  # @manual
-
-        run_ci()
-        return
 
     if args.op:
         ops = args.op.split(",")
@@ -122,7 +97,7 @@ def run(args: List[str] = []):
         for op in ops:
             args.op = op
             if args.isolate:
-                _run_in_task(op)
+                run_in_task(op)
             else:
                 _run(args, extra_args)
 

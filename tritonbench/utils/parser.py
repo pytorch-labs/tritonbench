@@ -1,6 +1,5 @@
 import argparse
-
-from typing import List
+from typing import List, Optional
 
 from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
 from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP, IS_FBCODE
@@ -78,11 +77,6 @@ def get_parser(args=None):
         "--plot",
         action="store_true",
         help="Plot the result.",
-    )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="Run in the CI mode.",
     )
     parser.add_argument(
         "--metrics",
@@ -165,6 +159,11 @@ def get_parser(args=None):
         action="store_true",
         help="bypass and continue on operator failure.",
     )
+    parser.add_argument(
+        "--child",
+        action="store_true",
+        help="Flag option that it is running in the child process.",
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
@@ -181,10 +180,38 @@ def get_parser(args=None):
         )
 
     args, extra_args = parser.parse_known_args(args)
-    if args.op and args.ci:
-        parser.error("cannot specify operator when in CI mode")
     if not args.op and not args.op_collection:
         print(
             "Neither operator nor operator collection is specified. Running all operators in the default collection."
         )
     return parser
+
+def _find_param_loc(params, key: str) -> int:
+    try:
+        return params.index(key)
+    except ValueError:
+        return -1
+
+
+def _remove_params(params, loc):
+    if loc == -1:
+        return params
+    if loc == len(params) - 1:
+        return params[:loc]
+    if params[loc + 1].startswith("--"):
+        return params[:loc] + params[loc + 1 :]
+    if loc == len(params) - 2:
+        return params[:loc]
+    return params[:loc] + params[loc + 2 :]
+
+
+def add_cmd_parameter(args: List[str], name: str, value: Optional[str]=None) -> List[str]:
+    args.append(name)
+    if value:
+        args.append(value)
+    return args
+
+
+def remove_cmd_parameter(args: List[str], name: str) -> List[str]:
+    loc = _find_param_loc(args, name)
+    return _remove_params(args, loc)
