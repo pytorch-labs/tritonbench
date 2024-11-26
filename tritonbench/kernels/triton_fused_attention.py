@@ -155,7 +155,7 @@ def _attn_fwd_inner(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(lo, hi, BLOCK_N): #, loop_schedule=LOOP_SCHEDULE):
+    for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
@@ -259,7 +259,7 @@ def _attn_fwd_inner_ws(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(lo, hi, BLOCK_N): #, loop_schedule=LOOP_SCHEDULE):
+    for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         with tl.async_task([0]):
@@ -425,7 +425,9 @@ configsWS = [
     for w in [4]
     for buf in [2]
     for grp in [2]
-    for dec, inc in [(24, 240)] #(24, 240), (40, 232)]  # 32,240 hangs, 24, 240 works 40, 232 works
+    for dec, inc in [
+        (24, 240)
+    ]  # (24, 240), (40, 232)]  # 32,240 hangs, 24, 240 works 40, 232 works
 ]
 # BLOCK_M: 128, BLOCK_N: 128, ENABLE_TMA: False, LOOP_SCHEDULE: default, num_warps: 8, num_ctas: 1, num_stages: 3
 configsOrig = [
@@ -550,8 +552,8 @@ def _attn_fwd_compute(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
 ):
-    start_m = pid #tl.program_id(0)
-    #off_hz = tl.program_id(1)
+    start_m = pid  # tl.program_id(0)
+    # off_hz = tl.program_id(1)
     off_z = off_hz // H
     off_h = off_hz % H
     qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
@@ -732,8 +734,8 @@ def _attn_fwd_compute_ws(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
 ):
-    start_m = pid #tl.program_id(0)
-    #off_hz = tl.program_id(1)
+    start_m = pid  # tl.program_id(0)
+    # off_hz = tl.program_id(1)
     off_z = off_hz // H
     off_h = off_hz % H
     qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
@@ -1348,11 +1350,11 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     tiles_per_sm = total_tiles // num_progs
     if prog_id < total_tiles % num_progs:
         tiles_per_sm += 1
-	
+
     tile_idx = prog_id
     for _ in range(0, tiles_per_sm):
         pid = tile_idx // (Z * H)
-        off_hz = tile_idx % (Z * H) #tl.program_id(1)
+        off_hz = tile_idx % (Z * H)  # tl.program_id(1)
         _attn_fwd_compute_ws(
             Q,
             K,
@@ -1823,10 +1825,16 @@ class _attention_opt(torch.autograd.Function):
 
         NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
         print("NUM_SMS: ", NUM_SMS)
+
         def grid_tma_persistent(META):
             if META["ENABLE_TMA"] == False:
                 return (
-                    min(NUM_SMS, triton.cdiv(q.shape[2], META["BLOCK_M"]) * q.shape[0] * q.shape[1]),
+                    min(
+                        NUM_SMS,
+                        triton.cdiv(q.shape[2], META["BLOCK_M"])
+                        * q.shape[0]
+                        * q.shape[1],
+                    ),
                     1,
                     1,
                 )
@@ -1881,7 +1889,10 @@ class _attention_opt(torch.autograd.Function):
                 o.element_size(),
             )
             return (
-                min(NUM_SMS, triton.cdiv(q.shape[2], META["BLOCK_M"]) * q.shape[0] * q.shape[1]),
+                min(
+                    NUM_SMS,
+                    triton.cdiv(q.shape[2], META["BLOCK_M"]) * q.shape[0] * q.shape[1],
+                ),
                 1,
                 1,
             )
