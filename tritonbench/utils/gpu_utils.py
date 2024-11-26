@@ -14,13 +14,14 @@ NV_A100 = {
 }
 
 # NVIDIA H100 GPU Datasheet:
-# https://www.nvidia.com/en-gb/data-center/h100
+# "https://resources.nvidia.com/en-us-tensor-core/nvidia-tensor-core-gpu-datasheet
 NV_H100 = {
-    "fp32": 51,
-    "tf32": 756,
-    "bf16": 1513,
-    "fp16": 1513,
-    "fp8": 3026,
+    "fp32": 989 // 2,
+    "tf32": 989 // 2,
+    "bf16": 1979 // 2,
+    "fp16": 1979 // 2,
+    "fp8": 3958 // 2,
+    "int8": 3958 // 2,
 }
 
 
