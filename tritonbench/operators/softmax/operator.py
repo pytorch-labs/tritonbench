@@ -107,7 +107,9 @@ class Operator(BenchmarkOperator):
         M = 4096
         shapes = [(M, 128 * i) for i in range(2, 100)]
         if IS_FBCODE and self.tb_args.production_shapes:
-            shapes = get_production_shapes(self.name, "softmax")
+            shapes = get_production_shapes(
+                self.name, "softmax", self.tb_args.shuffle_shapes
+            )
         for M, N in shapes:
             yield (torch.randn([M, N], dtype=self.dtype, device=self.device),)
 

@@ -144,7 +144,9 @@ class Operator(BenchmarkOperator):
         gemm_args = parse_args(self.extra_args)
         self.layout = gemm_args.layout
         if IS_FBCODE and tb_args.production_shapes:
-            self.shapes = get_production_shapes(self.name, f"{tb_args.precision}_gemm")
+            self.shapes = get_production_shapes(
+                self.name, f"{tb_args.precision}_gemm", self.tb_args.shuffle_shapes
+            )
         elif gemm_args.input:
             self.shapes = read_shapes_from_csv(gemm_args.input)
         elif gemm_args.splitk:
