@@ -475,7 +475,7 @@ class Operator(BenchmarkOperator):
         H = self.H
 
         def get_ctx_vals():
-            for i in range(self.SEQ_LEN, 11):
+            for i in range(self.SEQ_LEN, self.SEQ_LEN+1):
                 N_CTX = 2**i
                 # BATCH = 16384 // N_CTX
                 # H = 2048 // D_HEAD
