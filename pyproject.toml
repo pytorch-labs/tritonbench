@@ -1,3 +1,18 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tritonbench"
+version = "0.0.1"
+dependencies = [
+    "torch",
+    "triton",
+]
+
+[tool.setuptools.packages.find]
+include = ["tritonbench*"]
+
 [tool.ufmt]
 formatter = "ruff-api"
 excludes = ["submodules/"]
