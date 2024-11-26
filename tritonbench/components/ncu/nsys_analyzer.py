@@ -36,7 +36,9 @@ def read_nsys_report(
     assert reports_required, "No nsys reports required"
     cmd = f"nsys stats --report {','.join(reports_required)} --force-export=true --format csv --output . --force-overwrite=true {report_path}"
     try:
-        subprocess.check_call(cmd.split(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        subprocess.check_call(
+            cmd.split(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+        )
     except subprocess.CalledProcessError as e:
         print(f"Failed to run nsys command: {cmd}\nError: {e}")
         raise e
