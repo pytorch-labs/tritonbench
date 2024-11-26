@@ -67,7 +67,7 @@ def load_opbench_by_name(op_name: str):
         if not _is_internal_operator(op_name)
         else f"{INTERNAL_OPBENCH_DIR}.{op_name}"
     )
-    module = importlib.import_module(f".{op_pkg}", package=__name__)
+    module = importlib.import_module(f"..{op_pkg}", package=__name__)
 
     Operator = getattr(module, "Operator", None)
     if Operator is None:

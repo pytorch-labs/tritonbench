@@ -49,7 +49,7 @@ def list_operators_by_collection(op_collection: str = "default") -> List[str]:
 
     def _list_all_operators(collection_name: str):
         try:
-            module_name = f".{collection_name}"
+            module_name = f"..{collection_name}"
             module = importlib.import_module(module_name, package=__name__)
             if hasattr(module, "get_operators"):
                 return module.get_operators()
