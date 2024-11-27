@@ -80,7 +80,9 @@ def read_nsys_report(
 
     # Define mapping of metrics to their values. The keys must be in nsys_bench_metrics.
     metrics_map = {
-        "nsys_kernel_durations": kernel_duration,
+        # Because tritonbench takes the median of numerical values, we need to convert
+        # the list of floats to a list of strings.
+        "nsys_kernel_durations": [str(duration) for duration in kernel_duration],
         "nsys_kernel_names": kernel_names,
         "nsys_gpu_kernel_sum": sum_kernel_duration,
         "nsys_nvtx_range_duration": nvtx_range_duration,

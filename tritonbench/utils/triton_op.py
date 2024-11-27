@@ -67,7 +67,12 @@ REGISTERED_BENCHMARKS: Dict[str, OrderedDict[str, BenchmarkOperatorBackend]] = {
 REGISTERED_METRICS: Dict[str, List[str]] = {}
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
-BASELINE_SKIP_METRICS = {"speedup", "accuracy", "mem_footprint_compression_ratio"}
+BASELINE_SKIP_METRICS = {
+    "speedup",
+    "accuracy",
+    "mem_footprint_compression_ratio",
+    "nsys_gpu_speedup",
+}
 X_ONLY_METRICS = set(["hw_roofline"])
 PRECISION_DTYPE_MAPPING = {
     "fp32": torch.float32,
@@ -1094,7 +1099,17 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     )
                     for metric_name, metric_value in nsys_analyzer_results.items():
                         metrics.extra_metrics[metric_name] = metric_value
-
+            if "nsys_gpu_speedup" in self.required_metrics:
+                metrics.nsys_gpu_speedup = (
+                    self.baseline_metrics.nsys_gpu_kernel_sum
+                    / metrics.nsys_gpu_kernel_sum
+                    if (
+                        self.baseline_metrics
+                        and self.baseline_metrics.nsys_gpu_kernel_sum
+                    )
+                    and metrics.nsys_gpu_kernel_sum
+                    else None
+                )
             if "kineto_trace" in self.required_metrics:
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
             if "best_config" in self.required_metrics:
