@@ -507,7 +507,7 @@ class Operator(BenchmarkOperator):
             shapes = chain(
                 shapes,
                 productionDataLoader.get_shapes_from_frozen_durin(
-                    self.name, "attention"
+                    self.name, "attention", shuffle_shapes=self.tb_args.shuffle_shapes
                 ),
             )
         return shapes

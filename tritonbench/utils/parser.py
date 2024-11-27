@@ -165,6 +165,11 @@ def get_parser(args=None):
         action="store_true",
         help="bypass and continue on operator failure.",
     )
+    parser.add_argument(
+        "--shuffle-shapes",
+        action="store_true",
+        help="when true randomly shuffles the inputs before running benchmarks where possible.",
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")

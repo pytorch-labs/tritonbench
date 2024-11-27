@@ -7,6 +7,7 @@ from typing import Callable, Generator, List, Optional, Tuple
 
 import torch
 import triton
+
 from tritonbench.utils.jagged_utils import (
     ABSOLUTE_TOLERANCE,
     EPSILON,
