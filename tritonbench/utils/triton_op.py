@@ -1100,14 +1100,17 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     for metric_name, metric_value in nsys_analyzer_results.items():
                         metrics.extra_metrics[metric_name] = metric_value
             if "nsys_gpu_speedup" in self.required_metrics:
+                baseline_nsys_gpu_kernel_sum = (
+                    self.baseline_metrics.extra_metrics.get("nsys_gpu_kernel_sum", None)
+                    if self.baseline_metrics
+                    else None
+                )
+                current_nsys_gpu_kernel_sum = metrics.extra_metrics.get(
+                    "nsys_gpu_kernel_sum", None
+                )
                 metrics.nsys_gpu_speedup = (
-                    self.baseline_metrics.nsys_gpu_kernel_sum
-                    / metrics.nsys_gpu_kernel_sum
-                    if (
-                        self.baseline_metrics
-                        and self.baseline_metrics.nsys_gpu_kernel_sum
-                    )
-                    and metrics.nsys_gpu_kernel_sum
+                    baseline_nsys_gpu_kernel_sum / current_nsys_gpu_kernel_sum
+                    if baseline_nsys_gpu_kernel_sum and current_nsys_gpu_kernel_sum
                     else None
                 )
             if "kineto_trace" in self.required_metrics:
