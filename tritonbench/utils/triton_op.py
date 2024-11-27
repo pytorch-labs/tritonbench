@@ -226,6 +226,8 @@ class BenchmarkOperatorMetrics:
     mem_footprint_compression_ratio: Optional[float] = None
     # gbps
     gbps: Optional[float] = None
+    # speedup for the summary of kernel GPU time only
+    nsys_gpu_speedup: Optional[float] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
