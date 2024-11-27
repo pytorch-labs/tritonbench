@@ -536,7 +536,7 @@ configsTmaWSPersistent = [
     )
     for BM in [128]
     for BN in [128]
-    for mult in [1] #, 2, 4, 8, 16]
+    for mult in [1]
     for sched in schedList
     for enable_tma in tmaList
     for enable_ws in [True]
