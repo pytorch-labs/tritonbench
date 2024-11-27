@@ -1,8 +1,6 @@
 import csv
 import os
-import shutil
 import subprocess
-import sys
 from typing import Dict, List
 
 # The nsys metrics to the reports. The value is the list of reports of nsys.
