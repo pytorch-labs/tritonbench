@@ -13,4 +13,4 @@ __pycache__/
 .DS_Store
 .ipynb_checkpoints/
 .idea
-torchbench.egg-info/
+*.egg-info/

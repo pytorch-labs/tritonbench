@@ -22,6 +22,7 @@ import psutil
 import tabulate
 import torch
 import triton
+
 from tritonbench.components.ncu import analyzer as ncu_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,

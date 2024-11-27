@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
+
 from tritonbench.components.tasks import base as base_task
 from tritonbench.components.workers import subprocess_worker
 

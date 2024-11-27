@@ -3,6 +3,7 @@ import argparse
 from typing import Any, Callable, List, Optional
 
 import torch
+
 from tritonbench.utils.input import input_filter
 
 from tritonbench.utils.triton_op import (

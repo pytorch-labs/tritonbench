@@ -6,6 +6,7 @@ import fbgemm_gpu.experimental.gen_ai  # noqa: F401
 
 import torch
 import triton
+
 from tritonbench.utils.data_utils import get_production_shapes
 
 from tritonbench.utils.triton_op import (
