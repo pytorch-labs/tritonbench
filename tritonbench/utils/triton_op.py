@@ -23,7 +23,7 @@ import tabulate
 import torch
 import triton
 
-from tritonbench.components.ncu import analyzer as ncu_analyzer
+from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
     fresh_triton_cache,
@@ -68,7 +68,12 @@ REGISTERED_BENCHMARKS: Dict[str, OrderedDict[str, BenchmarkOperatorBackend]] = {
 REGISTERED_METRICS: Dict[str, List[str]] = {}
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
-BASELINE_SKIP_METRICS = {"speedup", "accuracy", "mem_footprint_compression_ratio"}
+BASELINE_SKIP_METRICS = {
+    "speedup",
+    "accuracy",
+    "mem_footprint_compression_ratio",
+    "nsys_gpu_speedup",
+}
 X_ONLY_METRICS = set(["hw_roofline"])
 PRECISION_DTYPE_MAPPING = {
     "fp32": torch.float32,
@@ -222,6 +227,8 @@ class BenchmarkOperatorMetrics:
     mem_footprint_compression_ratio: Optional[float] = None
     # gbps
     gbps: Optional[float] = None
+    # speedup for the summary of kernel GPU time only
+    nsys_gpu_speedup: Optional[float] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
@@ -307,9 +314,25 @@ class BenchmarkOperatorResult:
                     )
                     metric_val = _metrics_dict.get(metric, None)
                     if isinstance(metric_val, list):
-                        row.append(numpy.median(metric_val))
+                        # Check if all elements are numbers before calculating median
+                        if all(isinstance(x, Number) for x in metric_val):
+                            row.append(numpy.median(metric_val))
+                        else:
+                            # For non-numeric lists, convert to string representation
+                            metric_val_str = str(metric_val)
+                            if ";" in metric_val_str:
+                                logger.warning(
+                                    f"Metric value '{metric_val_str}' contains semicolon which may cause CSV parsing issues"
+                                )
+                            row.append(metric_val_str)
                     elif isinstance(metric_val, bool):
                         row.append(1.0 if metric_val else 0.0)
+                    elif isinstance(metric_val, str):
+                        if ";" in metric_val:
+                            logger.warning(
+                                f"Metric value '{metric_val}' contains semicolon which may cause CSV parsing issues"
+                            )
+                        row.append(metric_val)
                     else:
                         row.append(metric_val)
             table.append(row)
@@ -1065,8 +1088,34 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.ncu_rep_ir = self.ncu_trace(
                     input_id, fn_name, replay=True, profile_ir=True
                 )
-            if "nsys_rep" in self.required_metrics:
-                metrics.nsys_rep = self.nsys_rep(input_id, fn_name)
+            nsys_metrics = []
+            for metric_name in nsys_analyzer.nsys_metrics_to_reports.keys():
+                if metric_name in self.required_metrics:
+                    nsys_metrics.append(metric_name)
+
+            if "nsys_rep" in self.required_metrics or nsys_metrics:
+                nsys_rep_path = self.nsys_rep(input_id, fn_name)
+                metrics.nsys_rep = nsys_rep_path
+                if nsys_metrics:
+                    nsys_analyzer_results = nsys_analyzer.read_nsys_report(
+                        nsys_rep_path, nsys_metrics
+                    )
+                    for metric_name, metric_value in nsys_analyzer_results.items():
+                        metrics.extra_metrics[metric_name] = metric_value
+            if "nsys_gpu_speedup" in self.required_metrics:
+                baseline_nsys_gpu_kernel_sum = (
+                    self.baseline_metrics.extra_metrics.get("nsys_gpu_kernel_sum", None)
+                    if self.baseline_metrics
+                    else None
+                )
+                current_nsys_gpu_kernel_sum = metrics.extra_metrics.get(
+                    "nsys_gpu_kernel_sum", None
+                )
+                metrics.nsys_gpu_speedup = (
+                    baseline_nsys_gpu_kernel_sum / current_nsys_gpu_kernel_sum
+                    if baseline_nsys_gpu_kernel_sum and current_nsys_gpu_kernel_sum
+                    else None
+                )
             if "kineto_trace" in self.required_metrics:
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
             if "best_config" in self.required_metrics:
