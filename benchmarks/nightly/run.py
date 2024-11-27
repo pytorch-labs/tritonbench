@@ -32,10 +32,10 @@ OPERATORS = [
 
 def run():
     setup_tritonbench_cwd()
-    from tritonbench.utils.runner import run_in_task
+    from tritonbench.utils.runner import tritonbench_run_in_subprocess
     for op in OPERATORS:
-        run_in_task(op)
-
+        tritonbench_run_in_subprocess(op)
+    # analyze the json files post run
 
 if __name__ == "__main__":
     run()
