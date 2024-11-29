@@ -4,7 +4,9 @@ import triton.language as tl
 
 
 def is_hip():
-    return triton.runtime.driver.active.get_current_target().backend == "hip"
+    # use pytorch to detect current device
+    # return triton.runtime.driver.active.get_current_target().backend == "hip"
+    return bool(torch.version.hip)
 
 
 @triton.jit
