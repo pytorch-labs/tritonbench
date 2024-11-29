@@ -141,8 +141,8 @@ from tritonbench.utils.triton_op import (
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=4, help="Batch size")
-    parser.add_argument("--seq-len", type=int, default=11, help="Batch size")
-    parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
+    parser.add_argument("--seq-len", type=int, default=16384, help="Sequence length")
+    parser.add_argument("--n-heads", type=int, default=None, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
     parser.add_argument(
         "--causal",
@@ -479,12 +479,17 @@ class Operator(BenchmarkOperator):
         return fn
 
     def get_input_iter(self) -> Generator:
+        import math
         D_HEAD = self.D_HEAD
         BATCH = self.BATCH
         H = self.H
+        seq_len_log2 = int(math.log2(self.SEQ_LEN))
 
         def get_ctx_vals():
-            for i in range(self.SEQ_LEN, 15):
+            if self.H:
+                yield (BATCH, self.H, self.SEQ_LEN, self.D_HEAD)
+                return
+            for i in range(seq_len_log2, 15):
                 N_CTX = 2**i
                 # BATCH = 16384 // N_CTX
                 # H = 2048 // D_HEAD
@@ -493,6 +498,8 @@ class Operator(BenchmarkOperator):
         ctx_vals = get_ctx_vals()
         if self.additional_inputs:
             shapes = self.__additional_example_input(ctx_vals)
+        else:
+            shapes = ctx_vals
         requires_grad = True
         for shape in shapes:
             BATCH, H, N_CTX, D_HEAD = shape
