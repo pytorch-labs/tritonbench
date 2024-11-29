@@ -34,7 +34,7 @@ jobs:
           # speedup install and skip compile
           ln -s /workspace/tritonbench/.data .
           . "${SETUP_SCRIPT}"
-          python install.py --colfax --tk --hstu
+          python install.py --hstu
       - name: Test Tritonbench operators on H100 GPU
         run: |
           bash ./.ci/tritonbench/test-gpu.sh
