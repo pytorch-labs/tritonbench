@@ -149,6 +149,7 @@ def parse_op_args(args: List[str]):
         action="store_true",
         help="enable causal (always true on backward)",
     )
+    parser.add_argument("--additional-inputs", action="store_true", help="enable additional inputs")
     return parser.parse_args(args)
 
 
@@ -172,6 +173,7 @@ class Operator(BenchmarkOperator):
         # Because Triton-Flash-V2 does not support backward with non-causal
         if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
             self.causal = True
+        self.additional_inputs = args.additional_inputs
         self.sm_scale = 1.3
 
     @register_benchmark()
@@ -489,7 +491,8 @@ class Operator(BenchmarkOperator):
                 yield (BATCH, H, N_CTX, D_HEAD)
 
         ctx_vals = get_ctx_vals()
-        shapes = self.__additional_example_input(ctx_vals)
+        if self.additional_inputs:
+            shapes = self.__additional_example_input(ctx_vals)
         requires_grad = True
         for shape in shapes:
             BATCH, H, N_CTX, D_HEAD = shape

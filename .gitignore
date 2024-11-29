@@ -14,4 +14,8 @@ __pycache__/
 .ipynb_checkpoints/
 .idea
 *.egg-info/
+<<<<<<< HEAD
 torch_compile_debug/
+=======
+build/
+>>>>>>> 1a642f1 (Add flash_attention_benchmark)
