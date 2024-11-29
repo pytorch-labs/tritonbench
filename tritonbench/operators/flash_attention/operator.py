@@ -57,6 +57,10 @@ from torch.nn.functional import scaled_dot_product_attention as sdpa
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
+from tritonbench.kernels.triton_fused_attention_vanilla import (
+    attention as triton_tutorial_FA2,
+)
+
 
 # [Optional] flash_attn v2
 try:
@@ -94,7 +98,7 @@ try:
     from .test_fmha_utils import permute_qkv
 
     HAS_XFORMERS = True
-except (ImportError, IOError, AttributeError):
+except (ImportError, IOError, AttributeError, TypeError):
     HAS_XFORMERS = False
 
 # [Optional] colfax cutlass backend
@@ -253,8 +257,8 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ) -> Callable:
         # base: do not enable TMA/WarpSpec/CompPipe
-        return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "base"
+        return lambda: triton_tutorial_FA2(
+            q, k, v, self.causal, self.sm_scale
         )
 
     @register_benchmark(enabled=HAS_CUDA_124)
