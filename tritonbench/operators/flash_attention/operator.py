@@ -303,6 +303,18 @@ class Operator(BenchmarkOperator):
             q, k, v, self.causal, self.sm_scale, "tma_ws"
         )
 
+    @register_benchmark(enabled=HAS_CUDA_124)
+    def triton_tutorial_flash_v2_tma_ws_persistent(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        # autotune TMA/WarpSpec/CompPipe/Persistent
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "tma_ws_persistent"
+        )
+
     @register_benchmark(enabled=HAS_KERNELS)
     def triton_op_flash_v2(
         self,
@@ -467,12 +479,13 @@ class Operator(BenchmarkOperator):
     def get_input_iter(self) -> Generator:
         D_HEAD = self.D_HEAD
         BATCH = self.BATCH
+        H = self.H
 
         def get_ctx_vals():
             for i in range(self.SEQ_LEN, 15):
                 N_CTX = 2**i
                 # BATCH = 16384 // N_CTX
-                H = 2048 // D_HEAD
+                # H = 2048 // D_HEAD
                 yield (BATCH, H, N_CTX, D_HEAD)
 
         ctx_vals = get_ctx_vals()

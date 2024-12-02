@@ -24,6 +24,7 @@ import triton.language as tl
 HAS_TMA_DESC = "nv_tma_desc_type" in dir(tl)
 WITH_COMPPIPE = os.getenv("ENABLE_COMPPIPE")
 PEEL_LAST = os.getenv("PEEL_LAST_ITER")
+WITH_TMA = os.getenv("WITH_TMA")
 
 if HAS_TMA_DESC:
     print(
@@ -333,6 +334,7 @@ has_warp_spec = hasattr(tl, "async_task")
 schedList = ["default", "FA_firstDot", "FA_secondDot"] if WITH_COMPPIPE else ["default"]
 # TODO: incorrect result with PEEL_LAST + FA_firstDot + WarpSpec + TMA
 schedList = ["FA_secondDot"] if PEEL_LAST else schedList
+tmaList = [True] if WITH_TMA else [False]
 # no WS, no TMA, with CompPipe
 configsOpt = [
     (
@@ -425,7 +427,9 @@ configsWS = [
     for w in [4]
     for buf in [2]
     for grp in [2]
-    for dec, inc in [(24, 240), (40, 232)]  # 32,240 hangs, 24, 240 works 40, 232 works
+    for dec, inc in [
+        (24, 240)
+    ]  # (24, 240), (40, 232)]  # 32,240 hangs, 24, 240 works 40, 232 works
 ]
 # BLOCK_M: 128, BLOCK_N: 128, ENABLE_TMA: False, LOOP_SCHEDULE: default, num_warps: 8, num_ctas: 1, num_stages: 3
 configsOrig = [
@@ -491,7 +495,50 @@ configsTmaWS = [
     for BM in [128]
     for BN in [128]
     for sched in schedList
-    for enable_tma in [True]
+    for enable_tma in tmaList
+    for enable_ws in [True]
+    for w in [4]
+    for buf in [2]
+    for grp in [2]  # 2
+    for dec, inc in [
+        (24, 240)
+    ]  # , (40, 232)] #32,240 hangs, 24, 240 works 40, 232 works
+]
+configsTmaWSPersistent = [
+    (
+        triton.Config(
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+                "GRID_MULTIPLE": mult,
+            },
+            num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
+            num_warps=w,
+            num_buffers_warp_spec=buf,
+            num_consumer_groups=grp,
+            reg_dec_producer=dec,
+            reg_inc_consumer=inc,
+        )
+        if has_warp_spec
+        else triton.Config(
+            {
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+                "GRID_MULTIPLE": mult,
+            },
+            num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
+            num_warps=w,
+        )
+    )
+    for BM in [128]
+    for BN in [128]
+    for mult in [1]
+    for sched in schedList
+    for enable_tma in tmaList
     for enable_ws in [True]
     for w in [4]
     for buf in [2]
@@ -538,6 +585,8 @@ def _attn_fwd_compute(
     stride_oh,
     stride_om,
     stride_on,  #
+    off_hz,
+    pid,
     Z,
     H,
     N_CTX,  #: tl.constexpr,  #
@@ -548,8 +597,8 @@ def _attn_fwd_compute(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
 ):
-    start_m = tl.program_id(0)
-    off_hz = tl.program_id(1)
+    start_m = pid  # tl.program_id(0)
+    # off_hz = tl.program_id(1)
     off_z = off_hz // H
     off_h = off_hz % H
     qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
@@ -718,6 +767,8 @@ def _attn_fwd_compute_ws(
     stride_oh,
     stride_om,
     stride_on,  #
+    off_hz,
+    pid,
     Z,
     H,
     N_CTX,  #: tl.constexpr,  #
@@ -728,8 +779,8 @@ def _attn_fwd_compute_ws(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
 ):
-    start_m = tl.program_id(0)
-    off_hz = tl.program_id(1)
+    start_m = pid  # tl.program_id(0)
+    # off_hz = tl.program_id(1)
     off_z = off_hz // H
     off_h = off_hz % H
     qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
@@ -913,6 +964,8 @@ def _attn_fwd_ws(
     ENABLE_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
+    pid = tl.program_id(0)
+    off_hz = tl.program_id(1)
     _attn_fwd_compute_ws(
         Q,
         K,
@@ -940,6 +993,8 @@ def _attn_fwd_ws(
         stride_oh,
         stride_om,
         stride_on,  #
+        off_hz,
+        pid,
         Z,
         H,
         N_CTX,  #: tl.constexpr,  #
@@ -993,6 +1048,8 @@ def _attn_fwd(
     ENABLE_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
+    pid = tl.program_id(0)
+    off_hz = tl.program_id(1)
     _attn_fwd_compute(
         Q,
         K,
@@ -1020,6 +1077,8 @@ def _attn_fwd(
         stride_oh,
         stride_om,
         stride_on,  #
+        off_hz,
+        pid,
         Z,
         H,
         N_CTX,  #: tl.constexpr,  #
@@ -1073,6 +1132,8 @@ def _attn_fwd_opt(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     ENABLE_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
+    pid = tl.program_id(0)
+    off_hz = tl.program_id(1)
     _attn_fwd_compute(
         Q,
         K,
@@ -1100,6 +1161,8 @@ def _attn_fwd_opt(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
         stride_oh,
         stride_om,
         stride_on,  #
+        off_hz,
+        pid,
         Z,
         H,
         N_CTX,  #: tl.constexpr,  #
@@ -1153,6 +1216,8 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     ENABLE_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
+    pid = tl.program_id(0)
+    off_hz = tl.program_id(1)
     _attn_fwd_compute(
         Q,
         K,
@@ -1180,6 +1245,8 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
         stride_oh,
         stride_om,
         stride_on,  #
+        off_hz,
+        pid,
         Z,
         H,
         N_CTX,  #: tl.constexpr,  #
@@ -1233,6 +1300,8 @@ def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     ENABLE_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
+    pid = tl.program_id(0)
+    off_hz = tl.program_id(1)
     _attn_fwd_compute_ws(
         Q,
         K,
@@ -1260,6 +1329,8 @@ def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
         stride_oh,
         stride_om,
         stride_on,  #
+        off_hz,
+        pid,
         Z,
         H,
         N_CTX,  #: tl.constexpr,  #
@@ -1270,6 +1341,109 @@ def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
         ENABLE_TMA,
         LOOP_SCHEDULE,
     )
+
+
+@triton.autotune(list(filter(keep, configsTmaWSPersistent)), key=["N_CTX"])
+@triton.jit
+def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
+    Q,
+    K,
+    V,
+    sm_scale,
+    M,
+    Out,  #
+    desc_q,
+    desc_k,
+    desc_v,
+    desc_o,
+    stride_qz,
+    stride_qh,
+    stride_qm,
+    stride_qk,  #
+    stride_kz,
+    stride_kh,
+    stride_kn,
+    stride_kk,  #
+    stride_vz,
+    stride_vh,
+    stride_vk,
+    stride_vn,  #
+    stride_oz,
+    stride_oh,
+    stride_om,
+    stride_on,  #
+    Z,
+    H,
+    N_CTX,  #: tl.constexpr,  #
+    BLOCK_M: tl.constexpr,  #
+    BLOCK_N: tl.constexpr,  #
+    HEAD_DIM: tl.constexpr,  #
+    STAGE: tl.constexpr,  #
+    ENABLE_TMA: tl.constexpr,
+    LOOP_SCHEDULE: tl.constexpr,
+    ENABLE_WS: tl.constexpr,
+    GRID_MULTIPLE: tl.constexpr,
+):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
+    # original grid
+    #   triton.cdiv(q.shape[2], META["BLOCK_M"]),
+    #   q.shape[0] * q.shape[1],
+    n_tile_num = tl.cdiv(N_CTX, BLOCK_M)
+    prog_id = tl.program_id(0)
+    num_progs = tl.num_programs(0)
+    total_tiles = n_tile_num * Z * H
+
+    tiles_per_sm = total_tiles // num_progs
+    if prog_id < total_tiles % num_progs:
+        tiles_per_sm += 1
+
+    tile_idx = prog_id
+    for _ in range(0, tiles_per_sm):
+        # This has much better cache locality than
+        #     pid = tile_idx // (Z * H)
+        #     off_hz = tile_idx % (Z * H)  # tl.program_id(1)
+        pid = tile_idx % n_tile_num
+        off_hz = tile_idx // n_tile_num
+        _attn_fwd_compute_ws(
+            Q,
+            K,
+            V,
+            sm_scale,
+            M,
+            Out,  #
+            desc_q,
+            desc_k,
+            desc_v,
+            desc_o,
+            stride_qz,
+            stride_qh,
+            stride_qm,
+            stride_qk,  #
+            stride_kz,
+            stride_kh,
+            stride_kn,
+            stride_kk,  #
+            stride_vz,
+            stride_vh,
+            stride_vk,
+            stride_vn,  #
+            stride_oz,
+            stride_oh,
+            stride_om,
+            stride_on,  #
+            off_hz,
+            pid,
+            Z,
+            H,
+            N_CTX,  #: tl.constexpr,  #
+            BLOCK_M,
+            BLOCK_N,
+            HEAD_DIM,
+            STAGE,
+            ENABLE_TMA,
+            LOOP_SCHEDULE,
+        )
+        tile_idx += num_progs
 
 
 @triton.jit
@@ -1693,10 +1867,81 @@ class _attention_opt(torch.autograd.Function):
                 o.element_size(),
             )
             return (
-                # grid partitioning: num_consumer_groups * BLOCK_M
-                # data partitioning: BLOCK_M
-                triton.cdiv(q.shape[2], META["BLOCK_M"]),  # num_consumer_groups
+                triton.cdiv(q.shape[2], META["BLOCK_M"]),
                 q.shape[0] * q.shape[1],
+                1,
+            )
+
+        NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
+
+        def grid_tma_persistent(META):
+            if META["ENABLE_TMA"] == False:
+                return (
+                    min(
+                        NUM_SMS * META["GRID_MULTIPLE"],
+                        triton.cdiv(q.shape[2], META["BLOCK_M"])
+                        * q.shape[0]
+                        * q.shape[1],
+                    ),
+                    1,
+                    1,
+                )
+            nonlocal desc_helper
+            desc_helper.fill_2d_tma_descriptor(
+                "k",
+                k.data_ptr(),
+                BATCH * H * N_CTX,
+                HEAD_DIM_Q,
+                META["BLOCK_N"],
+                HEAD_DIM_Q,
+                k.element_size(),
+            )
+            if v.dtype == torch.float8_e5m2:
+                desc_helper.fill_2d_tma_descriptor(
+                    "v",
+                    v.data_ptr(),
+                    BATCH * H * HEAD_DIM_Q,
+                    N_CTX,
+                    HEAD_DIM_Q,
+                    META["BLOCK_N"],
+                    v.element_size(),
+                )
+            else:
+                desc_helper.fill_2d_tma_descriptor(
+                    "v",
+                    v.data_ptr(),
+                    BATCH * H * N_CTX,
+                    HEAD_DIM_Q,
+                    META["BLOCK_N"],
+                    HEAD_DIM_Q,
+                    v.element_size(),
+                )
+            desc_helper.fill_2d_tma_descriptor(
+                "q",
+                q.data_ptr(),
+                BATCH * H * N_CTX,
+                HEAD_DIM_Q,
+                META["BLOCK_M"]
+                // (2 if META["ENABLE_WS"] else 1),  # data partitioning: halve
+                HEAD_DIM_Q,
+                q.element_size(),
+            )
+            desc_helper.fill_2d_tma_descriptor(
+                "o",
+                o.data_ptr(),
+                BATCH * H * N_CTX,
+                HEAD_DIM_Q,
+                META["BLOCK_M"]
+                // (2 if META["ENABLE_WS"] else 1),  # data partitioning: halve
+                HEAD_DIM_Q,
+                o.element_size(),
+            )
+            return (
+                min(
+                    NUM_SMS * META["GRID_MULTIPLE"],
+                    triton.cdiv(q.shape[2], META["BLOCK_M"]) * q.shape[0] * q.shape[1],
+                ),
+                1,
                 1,
             )
 
@@ -1854,6 +2099,42 @@ class _attention_opt(torch.autograd.Function):
             )
         elif baseVariant == "tma_ws":
             _attn_fwd_tma_ws[grid_tma](
+                q,
+                k,
+                v,
+                sm_scale,
+                M,
+                o,
+                desc_q,
+                desc_k,
+                desc_v,
+                desc_o,  #
+                q.stride(0),
+                q.stride(1),
+                q.stride(2),
+                q.stride(3),  #
+                k.stride(0),
+                k.stride(1),
+                k.stride(2),
+                k.stride(3),  #
+                v.stride(0),
+                v.stride(1),
+                v.stride(2),
+                v.stride(3),  #
+                o.stride(0),
+                o.stride(1),
+                o.stride(2),
+                o.stride(3),  #
+                q.shape[0],
+                q.shape[1],  #
+                N_CTX=q.shape[2],  #
+                HEAD_DIM=HEAD_DIM_K,  #
+                STAGE=stage,  #
+                ENABLE_WS=True,
+                **extra_kern_args,
+            )
+        elif baseVariant == "tma_ws_persistent":
+            _attn_fwd_tma_ws_persistent[grid_tma_persistent](
                 q,
                 k,
                 v,
