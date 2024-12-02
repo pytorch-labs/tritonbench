@@ -1898,6 +1898,8 @@ class _attention_opt(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, do):
+        if not ctx.causal:
+            raise NotImplementedError("only causal backward is implemented on Triton")
         q, k, v, o, M = ctx.saved_tensors
         assert do.is_contiguous()
         assert q.stride() == k.stride() == v.stride() == o.stride() == do.stride()

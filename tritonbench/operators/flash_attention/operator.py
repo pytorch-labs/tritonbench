@@ -144,7 +144,11 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--seq-len", type=int, default=11, help="Batch size")
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
-    parser.add_argument("--causal", action="store_true", help="enable causal")
+    parser.add_argument(
+        "--causal",
+        action="store_true",
+        help="enable causal (always true on backward)",
+    )
     return parser.parse_args(args)
 
 
@@ -164,6 +168,10 @@ class Operator(BenchmarkOperator):
         self.D_HEAD = args.d_head
         self.N_CTX = None
         self.causal = args.causal
+        # We always turn on causal for backward
+        # Because Triton-Flash-V2 does not support backward with non-causal
+        if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
+            self.causal = True
         self.sm_scale = 1.3
 
     @register_benchmark()
