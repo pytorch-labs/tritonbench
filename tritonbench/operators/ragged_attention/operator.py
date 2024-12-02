@@ -19,13 +19,15 @@ from .hstu import get_test_inputs, RaggedHSTUAttn
 
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
+    parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
     parser.add_argument("--heads", type=int, default=4, help="Number of heads")
-    parser.add_argument("--max-seq-len-log2", type=int, default=9)
+    parser.add_argument("--attn-dim", type=int, default=128)
+    parser.add_argument("--hidden-dim", type=int, default=128)
+    parser.add_argument("--max-seq-len-log2", type=int, default=15)
     parser.add_argument("--num-buckets", type=int, default=2048)
-    parser.add_argument("--seq-sparsity", type=float, default=0.8)
+    parser.add_argument("--seq-sparsity", type=float, default=0.95)
     parser.add_argument("--target-size", type=int, default=20)
-    parser.add_argument("--sort-by-length", type=bool, default=False)
+    parser.add_argument("--sort-by-length", type=bool, default=True)
     return parser.parse_args(args)
 
 
@@ -39,21 +41,23 @@ class Operator(BenchmarkOperator):
         args = parse_op_args(self.extra_args)
         self.batch_size = args.batch_size
         self.num_heads = args.heads
-        self.max_seq_len = 2**args.max_seq_len_log2
+        self.attn_dim = args.attn_dim
+        self.hidden_dim = args.hidden_dim
+        self.max_seq_len_log2 = args.max_seq_len_log2
         self.num_buckets = args.num_buckets
         self.sparsity = args.seq_sparsity
         self.target_size = args.target_size
         self.sort_by_length = args.sort_by_length
-        # set a default number of inputs
-        self._num_inputs = 10 if self._num_inputs is None else self._num_inputs
         self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
 
     @register_benchmark()
-    def hstu_triton_ragged_attention(self, qkv, seq_offsets, timestamps, num_targets):
+    def hstu_triton_ragged_attention(
+        self, q, k, v, seq_offsets, timestamps, num_targets, seq_len
+    ):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
-            self.max_seq_len,
+            seq_len,
             self.num_buckets,
             self.sparsity,
             self.target_size,
@@ -61,17 +65,24 @@ class Operator(BenchmarkOperator):
             self.requires_grad,
             persistent_kernel=False,
         )
-        return lambda: attn(qkv, seq_offsets, timestamps, num_targets)
+        return lambda: attn(q, k, v, seq_offsets, timestamps, num_targets)
 
     # TODO: enable persistent kernels when the OSS backward is ready
     @register_benchmark(enabled=False)
     def hstu_triton_ragged_attention_persistent(
-        self, qkv, seq_offsets, timestamps, num_targets
+        self,
+        q,
+        k,
+        v,
+        seq_offsets,
+        timestamps,
+        num_targets,
+        seq_len,
     ):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
-            self.max_seq_len,
+            seq_len,
             self.num_buckets,
             self.sparsity,
             self.target_size,
@@ -79,13 +90,14 @@ class Operator(BenchmarkOperator):
             self.requires_grad,
             persistent_kernel=True,
         )
-        return lambda: attn(qkv, seq_offsets, timestamps, num_targets)
+        return lambda: attn(q, k, v, seq_offsets, timestamps, num_targets)
 
     def get_x_val(self, example_inputs):
+        seq_len = example_inputs[-1]
         return (
             self.batch_size,
             self.num_heads,
-            self.max_seq_len,
+            seq_len,
             self.num_buckets,
             self.sparsity,
             self.target_size,
@@ -93,17 +105,18 @@ class Operator(BenchmarkOperator):
         )
 
     def get_input_iter(self):
-        for _input_id in range(self._num_inputs):
-            inputs = get_test_inputs(
+        for seq_len in [2**i for i in range(8, self.max_seq_len_log2)]:
+            yield get_test_inputs(
                 self.batch_size,
                 self.num_heads,
-                self.max_seq_len,
+                self.attn_dim,
+                self.hidden_dim,
+                seq_len,
                 self.sparsity,
                 self.target_size,
                 self.sort_by_length,
                 self.requires_grad,
             )
-            yield inputs
 
     def get_bwd_fn(self, fwd_fn: Callable[..., Any]) -> Callable[..., Any]:
         o = fwd_fn()
@@ -123,9 +136,7 @@ class Operator(BenchmarkOperator):
         f1 = 0.0
         f2 = 0.0
         jagged = True
-        qkv, seq_offsets, timestamps, num_targets = example_inputs
-        q = qkv[:, :, :128]
-        v = qkv[:, :, 256:384]
+        q, k, v, seq_offsets, timestamps, num_targets = example_inputs
         _, nheads, attn_dim = q.shape
         _, _, hidden_dim = v.shape
         max_seqlen = timestamps.size(1) - 1
