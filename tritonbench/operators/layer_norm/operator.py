@@ -38,7 +38,9 @@ class Operator(BenchmarkOperator):
         # so donated buffer have to be disabled
         if self.mode == Mode.BWD or self.mode == Mode.FWD_BWD:
             import torch._functorch.config
+
             torch._functorch.config.donated_buffer = False
+
         @torch.compile
         def inner(*args):
             return F.layer_norm(*args)
