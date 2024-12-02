@@ -40,6 +40,7 @@ class Operator(BenchmarkOperator):
             import torch._functorch.config
 
             torch._functorch.config.donated_buffer = False
+        import torch
 
         @torch.compile
         def inner(*args):
