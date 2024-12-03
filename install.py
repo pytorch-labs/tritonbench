@@ -82,7 +82,6 @@ def setup_hip(args: argparse.Namespace):
     # We have to disable all third-parties that donot support hip/rocm
     args.all = False
     args.liger = True
-    args.hstu = True
 
 
 if __name__ == "__main__":
@@ -102,7 +101,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fa3", action="store_true", help="Install optional flash_attention 3 kernels"
     )
-    parser.add_argument("--hstu", action="store_true", help="Install HSTU.")
     parser.add_argument("--jax", action="store_true", help="Install jax nightly")
     parser.add_argument("--tk", action="store_true", help="Install ThunderKittens")
     parser.add_argument("--liger", action="store_true", help="Install Liger-kernel")
@@ -151,11 +149,6 @@ if __name__ == "__main__":
         from tools.xformers.install import install_xformers
 
         install_xformers()
-    if args.hstu or args.all:
-        logger.info("[tritonbench] installing hstu...")
-        from tools.hstu.install import install_hstu
-
-        install_hstu()
     logger.info("[tritonbench] installation complete!")
     # run tests to check installation
     if args.test:

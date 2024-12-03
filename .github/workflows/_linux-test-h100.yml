@@ -29,12 +29,9 @@ jobs:
           nvidia-smi
       - name: Install Tritonbench
         run: |
-          # todo: remove this when the new docker rolls out
+          # speedup install and skip compile by reusing the docker .so files
           mkdir -p /workspace/tritonbench/.data
-          # speedup install and skip compile
           ln -s /workspace/tritonbench/.data .
-          . "${SETUP_SCRIPT}"
-          python install.py --colfax --tk --hstu
       - name: Test Tritonbench operators on H100 GPU
         run: |
           bash ./.ci/tritonbench/test-gpu.sh
