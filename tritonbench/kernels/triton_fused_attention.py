@@ -1513,7 +1513,6 @@ def _attn_bwd_dkdv(
         offs_m = curr_m + tl.arange(0, BLOCK_M1)
         m = tl.load(M + offs_m)
         qkT = tl.dot(k, qT)
-        #dpT = tl.dot(v, tl.trans(do)).to(tl.float32)
         pT = tl.math.exp2(qkT - m[None, :])
         # Autoregressive masking.
         if MASK:
@@ -1930,8 +1929,8 @@ def _attn_bwd_compute(
     offs_m = start_m + tl.arange(0, BLOCK_M2)
 
     q = tl.load(Q + offs_m[:, None] * stride_tok + offs_k[None, :] * stride_d)
-    do = tl.load(DO + offs_m[:, None] * stride_tok + offs_k[None, :] * stride_d)
     dq = tl.zeros([BLOCK_M2, HEAD_DIM], dtype=tl.float32)
+    do = tl.load(DO + offs_m[:, None] * stride_tok + offs_k[None, :] * stride_d)
 
     m = tl.load(M + offs_m)
     m = m[:, None]
