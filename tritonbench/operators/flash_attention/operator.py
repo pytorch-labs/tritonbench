@@ -470,8 +470,6 @@ class Operator(BenchmarkOperator):
         BATCH, H, N_CTX, D_HEAD = q.shape
         flops_per_matmul = 2.0 * BATCH * H * N_CTX * N_CTX * D_HEAD
         tflops = 2 * flops_per_matmul
-        print("causal, mode: ", self.causal, self.mode)
-        print("fn_name: ", fn_name, metrics.latency)
         if self.causal:
             tflops *= 0.5
         if self.mode == BenchmarkMode.BWD:
