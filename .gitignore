@@ -14,3 +14,4 @@ __pycache__/
 .ipynb_checkpoints/
 .idea
 *.egg-info/
+torch_compile_debug/
