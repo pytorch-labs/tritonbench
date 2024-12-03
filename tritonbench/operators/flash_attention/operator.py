@@ -252,11 +252,11 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # base: do not enable TMA/WarpSpec/CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "base"#, "base"
+            q, k, v, self.causal, self.sm_scale, "base", "base"
         )
 
     @register_benchmark()
-    def triton_tutorial_flash_v2_bwd2(
+    def triton_tutorial_flash_v2_bwd_ws(
         self,
         q: torch.Tensor,
         k: torch.Tensor,
@@ -264,7 +264,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # base: do not enable TMA/WarpSpec/CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "base", "base2"
+            q, k, v, self.causal, self.sm_scale, "base", "ws"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124)

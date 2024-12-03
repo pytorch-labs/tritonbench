@@ -1644,7 +1644,7 @@ configsBwd = [
     for s in [3]#, 4, 7]
     for w in [4]#, 8]
 ]
-configsBwd2 = [
+configsBwdWs = [
     (
         triton.Config(
             {
@@ -1655,8 +1655,8 @@ configsBwd2 = [
             },
             num_stages=s,
             num_warps=w,
-            num_buffers_warp_spec=0,
-            num_consumer_groups=0,
+            num_buffers_warp_spec=2,
+            num_consumer_groups=2,
         )
         if has_warp_spec
         else triton.Config(
@@ -1670,8 +1670,8 @@ configsBwd2 = [
             num_warps=w,
         )
     )
-    for BM in [32] #32, 64] # BLOCK_N1 % BLOCK_M1 == 0
-    for BN in [64] #64, 128]
+    for BM in [64] #32, 64] # BLOCK_N1 % BLOCK_M1 == 0
+    for BN in [128] #[64] #64, 128]
     for s in [3]#, 4, 7]
     for w in [4]#, 8]
 ]
@@ -1922,9 +1922,9 @@ def _attn_bwd(
     )
 
 
-@triton.autotune(list(filter(keep2, configsBwd2)), key=["N_CTX"])
+@triton.autotune(list(filter(keep2, configsBwdWs)), key=["N_CTX"])
 @triton.jit
-def _attn_bwd2(
+def _attn_bwd_ws(
     Q,
     K,
     V,
@@ -1978,7 +1978,7 @@ def _attn_bwd2(
 
 class _attention_opt(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, q, k, v, causal, sm_scale, baseVariant): #, bwdVariant):
+    def forward(ctx, q, k, v, causal, sm_scale, baseVariant, bwdVariant):
         # shape constraints
         HEAD_DIM_Q, HEAD_DIM_K = q.shape[-1], k.shape[-1]
         # when v is in float8_e5m2 it is transposed.
@@ -2366,7 +2366,7 @@ class _attention_opt(torch.autograd.Function):
         ctx.sm_scale = sm_scale
         ctx.HEAD_DIM = HEAD_DIM_K
         ctx.causal = causal
-        #ctx.bwdVariant = bwdVariant
+        ctx.bwdVariant = bwdVariant
         # If we want to use different variants for bwd, save bwd mode here.
         return o
 
@@ -2385,8 +2385,6 @@ class _attention_opt(torch.autograd.Function):
 
         #NUM_WARPS, NUM_STAGES = 4, 5
         #BLOCK_M1, BLOCK_N1, BLOCK_M2, BLOCK_N2 = 32, 128, 128, 32
-        NUM_WARPS, NUM_STAGES = 4, 3
-        BLOCK_M1, BLOCK_N1, BLOCK_M2, BLOCK_N2 = 64, 128, 128, 64
 
         BLK_SLICE_FACTOR = 2
         RCP_LN2 = 1.4426950408889634  # = 1.0 / ln(2)
@@ -2409,7 +2407,7 @@ class _attention_opt(torch.autograd.Function):
         grid = lambda args: (N_CTX // args["BLOCK_N1"], 1, BATCH * N_HEAD)
         #grid = (N_CTX // BLOCK_N1, 1, BATCH * N_HEAD)
         print(q.stride(0), q.stride(1), q.stride(2), q.stride(3))
-        if True: #ctx.bwdVariant == "base":
+        if ctx.bwdVariant == "base":
             _attn_bwd[grid](
                 q,
                 arg_k,
@@ -2436,8 +2434,8 @@ class _attention_opt(torch.autograd.Function):
                 #num_warps=NUM_WARPS,  #
                 #num_stages=NUM_STAGES,  #
             )
-        else: #if ctx.bwdVariant == "base2":
-            _attn_bwd2[grid](
+        elif ctx.bwdVariant == "ws":
+            _attn_bwd_ws[grid](
                 q,
                 arg_k,
                 v,
