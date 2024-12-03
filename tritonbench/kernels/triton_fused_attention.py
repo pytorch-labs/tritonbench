@@ -1640,7 +1640,7 @@ def _attn_bwd_dkdv_ws(
         m = tl.load(M + offs_m)
         #with tl.async_task([0]):
         #    do = tl.load(do_ptrs)
-        with tl.async_task([1]):
+        with tl.async_task([1, 2]):
             qkT = tl.dot(k, qT)
             #dpT = tl.dot(v, tl.trans(do)).to(tl.float32)
             pT = tl.math.exp2(qkT - m[None, :])
@@ -1651,7 +1651,7 @@ def _attn_bwd_dkdv_ws(
         with tl.async_task([0]):
             do = tl.load(do_ptrs)
         # Compute dV.
-        with tl.async_task([1]):
+        with tl.async_task([1, 2]):
             ppT = pT
             ppT = ppT.to(tl.bfloat16)
             dv += tl.dot(ppT, do)
@@ -1708,7 +1708,7 @@ def _attn_bwd_dq_ws(
         with tl.async_task([0]):
             kT = tl.load(kT_ptrs)
             vT = tl.load(vT_ptrs)
-        with tl.async_task([1]):
+        with tl.async_task([1, 2]):
             qk = tl.dot(q, kT)
             p = tl.math.exp2(qk - m)
             # Autoregressive masking.
