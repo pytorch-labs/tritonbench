@@ -10,6 +10,8 @@ bf16xint16_gemm:
 flash_attention:
   # thunderkittens cannot handle the default input shapes
   - tk
+  # triton_op_flash_v2 will segfault on triton-pytorch
+  - triton_op_flash_v2
   # triton_tutorial_* kernels require triton-main
   - triton_tutorial_flash_v2
   - triton_tutorial_flash_v2_opt
