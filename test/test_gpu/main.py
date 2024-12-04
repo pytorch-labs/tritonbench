@@ -18,14 +18,11 @@ if IS_FBCODE:
     fbcode_skip_file_path = "fb/skip_tests_h100_fbcode.yaml"
     SKIP_FILE = importlib.resources.files(__package__).joinpath(fbcode_skip_file_path)
 else:
-    SKIP_FILE_NAME = "skip_tests_h100_pytorch.yaml"
-    try:
-        # test if it is Triton main branch
-        import triton.tools.experimental_descriptor  # @manual  # noqa: F401
-
+    import triton
+    if "site-packages" in triton.__file__:
+        SKIP_FILE_NAME = "skip_tests_h100_pytorch.yaml"
+    else:
         SKIP_FILE_NAME = "skip_tests_h100_triton_main.yaml"
-    except ModuleNotFoundError:
-        pass
     import os
 
     SKIP_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), SKIP_FILE_NAME))
