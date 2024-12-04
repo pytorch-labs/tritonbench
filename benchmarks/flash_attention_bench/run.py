@@ -12,7 +12,7 @@ from tritonbench.utils.parser import get_parser
 
 
 def run():
-    args = ["--batch", "4", "--seq-len", "16384", "--n-heads", "32", "--d-head", "64", "--precision", "bf16", "--bwd", "--only", "triton_tutorial_flash_v2", "--causal", "--metrics", "tflops", "--precision", "fp16"]
+    args = ["--batch", "4", "--seq-len", "16384", "--n-heads", "32", "--d-head", "64", "--precision", "fp16", "--bwd", "--only", "triton_tutorial_flash_v2", "--causal", "--metrics", "tflops"]
     flash_attn_op = tritonbench.load_opbench_by_name("flash_attention")
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)

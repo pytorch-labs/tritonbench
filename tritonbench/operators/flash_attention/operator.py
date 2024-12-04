@@ -57,9 +57,6 @@ from torch.nn.functional import scaled_dot_product_attention as sdpa
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
-from tritonbench.kernels.triton_fused_attention_vanilla import (
-    attention as triton_tutorial_FA2,
-)
 
 
 # [Optional] flash_attn v2
@@ -257,8 +254,8 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ) -> Callable:
         # base: do not enable TMA/WarpSpec/CompPipe
-        return lambda: triton_tutorial_FA2(
-            q, k, v, self.causal, self.sm_scale
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "base"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124)
