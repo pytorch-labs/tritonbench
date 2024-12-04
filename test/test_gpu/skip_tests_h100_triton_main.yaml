@@ -16,16 +16,7 @@ fp8_attention:
   - colfax_fmha
 # fb-only kernels
 fp8_fused_quant_gemm_rowwise:
-fp8_gemm:
-  # FIXME: out of shared memory
-  - triton_persistent_fp8_gemm
-  # FIXME: out of shared memory
-  - triton_tma_persistent_fp8_gemm
 gemm:
-  # FIXME: out of shared memory
-  - triton_tma_persistent_matmul
-  # FIXME: out of shared memory
-  - triton_tma_persistent_cached_matmul
   # internal only kernels
   - hstu_triton_matmul
   - colfax_cutlass_matmul
