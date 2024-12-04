@@ -150,7 +150,9 @@ def parse_op_args(args: List[str]):
         action="store_true",
         help="enable causal (always true on backward)",
     )
-    parser.add_argument("--additional-inputs", action="store_true", help="enable additional inputs")
+    parser.add_argument(
+        "--additional-inputs", action="store_true", help="enable additional inputs"
+    )
     return parser.parse_args(args)
 
 
@@ -481,6 +483,7 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self) -> Generator:
         import math
+
         D_HEAD = self.D_HEAD
         BATCH = self.BATCH
         H = self.H
