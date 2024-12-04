@@ -34,6 +34,7 @@ It benchmarks the following FMHA kernels:
 import argparse
 import math
 import os
+from contextlib import nullcontext
 from itertools import chain
 
 import torch
@@ -150,6 +151,7 @@ def parse_op_args(args: List[str]):
         action="store_true",
         help="enable causal (always true on backward)",
     )
+    parser.add_argument("--native-sdpa", action="store_true", help="Use SDPA native choice.")
     parser.add_argument(
         "--additional-inputs", action="store_true", help="enable additional inputs"
     )
@@ -172,6 +174,7 @@ class Operator(BenchmarkOperator):
         self.D_HEAD = args.d_head
         self.N_CTX = None
         self.causal = args.causal
+        self.native_sdpa = args.native_sdpa
         # We always turn on causal for backward
         # Because Triton-Flash-V2 does not support backward with non-causal
         if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
@@ -206,7 +209,9 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ) -> Callable:
         def sdpa_flash_attention(q, k, v):
-            with sdpa_kernel([SDPBackend.FLASH_ATTENTION]):
+            cxt = nullcontext if self.native_sdpa else \
+                sdpa_kernel([SDPBackend.FLASH_ATTENTION])
+            with cxt:
                 return sdpa(
                     q,
                     k,
