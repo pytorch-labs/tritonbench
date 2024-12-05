@@ -16,16 +16,7 @@ fp8_attention:
   - colfax_fmha
 # fb-only kernels
 fp8_fused_quant_gemm_rowwise:
-fp8_gemm:
-  # FIXME: out of shared memory
-  - triton_persistent_fp8_gemm
-  # FIXME: out of shared memory
-  - triton_tma_persistent_fp8_gemm
 gemm:
-  # FIXME: out of shared memory
-  - triton_tma_persistent_matmul
-  # FIXME: out of shared memory
-  - triton_tma_persistent_cached_matmul
   # internal only kernels
   - hstu_triton_matmul
   - colfax_cutlass_matmul
@@ -34,6 +25,13 @@ jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
 jagged_sum:
-# FIXME: ragged attention will Abort (Core Dump) on Triton Main
 ragged_attention:
+  # ../../../lib/Tools/LinearLayout.cpp:565: LinearLayout
+  # mlir::triton::LinearLayout::reshapeOuts(ArrayRef<std::pair<StringAttr, int32_t>>) const:
+  # Assertion `getTotalOutDimSize() == std::accumulate( newOutDims.begin(), newOutDims.end(),
+  # 1, [&](int32_t acc, auto &outDim) { return acc * outDim.second; })' failed.
+  - hstu_triton_ragged_attention
+  # presistent kernel is not ready for OSS
+  - hstu_triton_ragged_attention_persistent
+# cpu-op for testing
 test_op:
