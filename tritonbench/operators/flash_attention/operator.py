@@ -212,7 +212,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         def sdpa_flash_attention(q, k, v):
             cxt = (
-                nullcontext
+                nullcontext()
                 if self.native_sdpa
                 else sdpa_kernel([SDPBackend.FLASH_ATTENTION])
             )
