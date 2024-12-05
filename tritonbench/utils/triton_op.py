@@ -381,9 +381,7 @@ class BenchmarkOperatorResult:
                 provider, _dash, metrics = header.partition("-")
                 metric_name = f"tritonbench_{self.op_name}_{self.op_mode}[x_{x_val}-{provider}]_{metrics}"
                 userbenchmark_metrics_dict[metric_name] = value
-                agg_metric_name = (
-                    f"tritonbench_{self.op_name}_{self.op_mode}[{provider}]_{metrics}"
-                )
+                agg_metric_name = f"tritonbench_{self.op_name}_{self.op_mode}[{provider}]-{metrics}-avg"
                 if value is None:
                     continue
                 if isinstance(value, (int, float)):
