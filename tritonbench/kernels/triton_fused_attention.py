@@ -458,10 +458,10 @@ configsOrig = [
             num_warps=w,
         )
     )
-    for BM in [128]  # 64, 128]
-    for BN in [128]  # 64, 128]
-    for s in [3]  # 3, 4, 7]
-    for w in [8]  # 4, 8]
+    for BM in [64, 128]
+    for BN in [64, 128]
+    for s in [3, 4, 7]
+    for w in [4, 8]
 ]
 # TMA, WS, and CompPipe
 configsTmaWS = [
