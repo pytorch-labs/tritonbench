@@ -65,9 +65,10 @@ def get_parser(args=None):
         help="Print result as csv.",
     )
     parser.add_argument(
-        "--dump-csv",
-        action="store_true",
-        help="Dump result as csv.",
+        "--output",
+        type=str,
+        default=None,
+        help="Output result csv to file.",
     )
     parser.add_argument(
         "--skip-print",

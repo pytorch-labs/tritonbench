@@ -30,8 +30,6 @@ try:
 except ImportError:
     usage_report_logger = lambda *args, **kwargs: None
 
-TRITON_BENCH_CSV_DUMP_PATH = tempfile.gettempdir() + "/tritonbench/"
-
 
 def _run_in_task(op: str) -> None:
     op_task_cmd = [] if IS_FBCODE else [sys.executable]
@@ -93,10 +91,10 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             except NotImplementedError:
                 print(f"Plotting is not implemented for {args.op}")
 
-        if args.dump_csv:
-            os.makedirs(TRITON_BENCH_CSV_DUMP_PATH, exist_ok=True)
-            path = metrics.write_csv(TRITON_BENCH_CSV_DUMP_PATH)
-            print(f"[TritonBench] Dumped csv to {path}")
+        if args.output:
+            with open(args.output, "w") as f:
+                metrics.write_csv_to_file(f)
+            print(f"[TritonBench] Output result csv to {args.output}")
         return metrics
 
 
