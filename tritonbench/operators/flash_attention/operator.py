@@ -34,6 +34,7 @@ It benchmarks the following FMHA kernels:
 import argparse
 import math
 import os
+from contextlib import nullcontext
 from itertools import chain
 
 import torch
@@ -57,6 +58,7 @@ from torch.nn.functional import scaled_dot_product_attention as sdpa
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
+
 
 # [Optional] flash_attn v2
 try:
@@ -94,7 +96,7 @@ try:
     from .test_fmha_utils import permute_qkv
 
     HAS_XFORMERS = True
-except (ImportError, IOError, AttributeError):
+except (ImportError, IOError, AttributeError, TypeError):
     HAS_XFORMERS = False
 
 # [Optional] colfax cutlass backend
@@ -141,13 +143,19 @@ from tritonbench.utils.triton_op import (
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=4, help="Batch size")
-    parser.add_argument("--seq-len", type=int, default=11, help="Batch size")
+    parser.add_argument("--seq-len", type=int, default=None, help="Sequence length")
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
     parser.add_argument(
         "--causal",
         action="store_true",
         help="enable causal (always true on backward)",
+    )
+    parser.add_argument(
+        "--native-sdpa", action="store_true", help="Use SDPA native choice."
+    )
+    parser.add_argument(
+        "--additional-inputs", action="store_true", help="enable additional inputs"
     )
     return parser.parse_args(args)
 
@@ -168,10 +176,12 @@ class Operator(BenchmarkOperator):
         self.D_HEAD = args.d_head
         self.N_CTX = None
         self.causal = args.causal
+        self.native_sdpa = args.native_sdpa
         # We always turn on causal for backward
         # Because Triton-Flash-V2 does not support backward with non-causal
         if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
             self.causal = True
+        self.additional_inputs = args.additional_inputs
         self.sm_scale = 1.3
 
     @register_benchmark()
@@ -201,7 +211,12 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ) -> Callable:
         def sdpa_flash_attention(q, k, v):
-            with sdpa_kernel([SDPBackend.FLASH_ATTENTION]):
+            cxt = (
+                nullcontext
+                if self.native_sdpa
+                else sdpa_kernel([SDPBackend.FLASH_ATTENTION])
+            )
+            with cxt:
                 return sdpa(
                     q,
                     k,
@@ -480,16 +495,23 @@ class Operator(BenchmarkOperator):
         D_HEAD = self.D_HEAD
         BATCH = self.BATCH
         H = self.H
+        SEQ_LEN_LOG2 = 7
 
         def get_ctx_vals():
-            for i in range(self.SEQ_LEN, 15):
+            if self.SEQ_LEN:
+                yield (BATCH, self.H, self.SEQ_LEN, self.D_HEAD)
+                return
+            for i in range(SEQ_LEN_LOG2, 15):
                 N_CTX = 2**i
                 # BATCH = 16384 // N_CTX
                 # H = 2048 // D_HEAD
                 yield (BATCH, H, N_CTX, D_HEAD)
 
         ctx_vals = get_ctx_vals()
-        shapes = self.__additional_example_input(ctx_vals)
+        if self.additional_inputs:
+            shapes = self.__additional_example_input(ctx_vals)
+        else:
+            shapes = ctx_vals
         requires_grad = True
         for shape in shapes:
             BATCH, H, N_CTX, D_HEAD = shape
