@@ -138,6 +138,7 @@ from tritonbench.utils.triton_op import (
     register_metric,
     register_x_val,
 )
+from tritonbench.utils.triton_utils import has_warp_spec
 
 
 def parse_op_args(args: List[str]):
@@ -294,7 +295,7 @@ class Operator(BenchmarkOperator):
             q, k, v, self.causal, self.sm_scale, "tma"
         )
 
-    @register_benchmark(enabled=HAS_CUDA_124)
+    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
     def triton_tutorial_flash_v2_ws(
         self,
         q: torch.Tensor,
@@ -306,7 +307,7 @@ class Operator(BenchmarkOperator):
             q, k, v, self.causal, self.sm_scale, "ws"
         )
 
-    @register_benchmark(enabled=HAS_CUDA_124)
+    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
     def triton_tutorial_flash_v2_tma_ws(
         self,
         q: torch.Tensor,
@@ -318,7 +319,7 @@ class Operator(BenchmarkOperator):
             q, k, v, self.causal, self.sm_scale, "tma_ws"
         )
 
-    @register_benchmark(enabled=HAS_CUDA_124)
+    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
     def triton_tutorial_flash_v2_tma_ws_persistent(
         self,
         q: torch.Tensor,
@@ -415,7 +416,7 @@ class Operator(BenchmarkOperator):
             default_scale,
         )
 
-    @register_benchmark(enabled=bool(tk_fwd is not None))
+    @register_benchmark(enabled=not IS_FBCODE and bool(tk_fwd is not None))
     def tk(self, q, k, v):
         o = torch.zeros_like(v)
         l_tensor = torch.zeros_like(o).to(torch.float32)
