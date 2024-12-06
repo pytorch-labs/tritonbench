@@ -719,9 +719,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 for _dryrun_input_id in range(self._input_id):
                     self.example_inputs = self.get_example_inputs()
             for input_id in input_id_range:
+                x_val = self.get_x_val(self.example_inputs)
                 if "proton" in self.required_metrics:
                     proton.activate(self._proton_session_id)
-                    proton.enter_scope(f"input_id_{input_id}")
+                    proton.enter_scope(f"x_val_{x_val}")
                     proton.deactivate(self._proton_session_id)
                 self._cur_input_id = input_id
                 self.example_inputs = self.get_example_inputs()
@@ -743,7 +744,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.baseline_fn = None
                 self.baseline_metrics = None
                 self._op_flops = {}
-                x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
                 else:
@@ -786,11 +786,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 del self.example_inputs  # save some memory
                 if "proton" in self.required_metrics:
                     proton.activate(self._proton_session_id)
-                    proton.exit_scope(f"input_{input_id}")
+                    proton.exit_scope(f"x_val_{x_val}")
                     proton.deactivate(self._proton_session_id)
             if "proton" in self.required_metrics:
                 proton.activate(self._proton_session_id)
-                proton.exit_scope("tritonbench_run")
+                proton.exit_scope(f"tritonbench_run_op_{self.name}")
                 proton.finalize()
         except (KeyboardInterrupt, Exception):
             logger.warning(
