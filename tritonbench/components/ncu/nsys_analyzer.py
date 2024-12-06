@@ -32,7 +32,7 @@ def read_nsys_report(
             reports_required.extend(nsys_metrics_to_reports[metric])
     reports_required = list(set(reports_required))
     assert reports_required, "No nsys reports required"
-    cmd = f"nsys stats --report {','.join(reports_required)} --force-export=true --format csv --output . --force-overwrite=true {report_path}"
+    cmd = f"nsys stats --report {','.join(reports_required)} --timeunit ns --force-export=true --format csv --output . --force-overwrite=true {report_path}"
     try:
         subprocess.check_call(
             cmd.split(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
@@ -70,8 +70,6 @@ def read_nsys_report(
     if "nvtx_sum" in csv_contents:
         # It is supposed to be only one row. The nvtx range is `:tritonbench_range`
         assert len(csv_contents["nvtx_sum"]) == 1
-        # @TODO: nsys has a bug that the unit of nvtx range duration is ms sometimes.
-        # waiting for nvidia replys.
         nvtx_range_duration = (
             float(csv_contents["nvtx_sum"][0]["Total Time (ns)"]) / 1_000_000
         )
