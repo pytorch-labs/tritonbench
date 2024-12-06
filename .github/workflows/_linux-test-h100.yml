@@ -22,11 +22,23 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - uses: dorny/paths-filter@v3
+        id: flash_attn_updated
+        with:
+          filters: |
+            src:
+              - 'submodules/flash-attention/**'
       - name: Tune Nvidia GPU
         run: |
           sudo nvidia-smi -pm 1
           sudo ldconfig
           nvidia-smi
+      - name: Reinstall flash-attn (optional)
+        if: steps.flash_attn_updated
+        run: |
+          . "${SETUP_SCRIPT}"
+          python install.py --fa2
+          python install.py --fa3
       - name: Install Tritonbench
         run: |
           # speedup install and skip compile by reusing the docker .so files
