@@ -28,6 +28,8 @@ jobs:
           filters: |
             fa:
               - 'submodules/flash-attention/**'
+            xformers:
+              - 'submodules/xformers/**'
       - name: Tune Nvidia GPU
         run: |
           sudo nvidia-smi -pm 1
@@ -39,6 +41,11 @@ jobs:
           . "${SETUP_SCRIPT}"
           python install.py --fa2
           python install.py --fa3
+      - name: Reinstall xformers (optional)
+        if: steps.submodules_changes.outputs.xformers == 'true'
+        run: |
+          . "${SETUP_SCRIPT}"
+          python install.py --xformers
       - name: Install Tritonbench
         run: |
           # speedup install and skip compile by reusing the docker .so files
