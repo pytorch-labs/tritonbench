@@ -35,6 +35,10 @@ def install_xformers():
     patch_xformers()
     os_env = os.environ.copy()
     os_env["TORCH_CUDA_ARCH_LIST"] = "8.0;9.0;9.0a"
+    # Do not use built-in flash_attn
+    # Since it will be incompatible with xformers code
+    # Instead, use the flash_attn module built-in as xformers submodule
+    os_env["XFORMERS_PT_FLASH_ATTN"] = "0"
     XFORMERS_PATH = REPO_PATH.joinpath("submodules", "xformers")
     cmd = ["pip", "install", "-e", XFORMERS_PATH]
     subprocess.check_call(cmd, env=os_env)
