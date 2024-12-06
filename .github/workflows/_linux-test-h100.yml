@@ -23,10 +23,10 @@ jobs:
         with:
           submodules: recursive
       - uses: dorny/paths-filter@v3
-        id: flash_attn_updated
+        id: submodules_changes
         with:
           filters: |
-            src:
+            fa:
               - 'submodules/flash-attention/**'
       - name: Tune Nvidia GPU
         run: |
@@ -34,7 +34,7 @@ jobs:
           sudo ldconfig
           nvidia-smi
       - name: Reinstall flash-attn (optional)
-        if: steps.flash_attn_updated
+        if: steps.submodules_changes.outputs.fa == 'true'
         run: |
           . "${SETUP_SCRIPT}"
           python install.py --fa2
