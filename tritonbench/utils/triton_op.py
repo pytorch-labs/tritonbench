@@ -707,6 +707,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         """Benchmarking the operator and returning its metrics."""
         metrics = []
         try:
+            if "proton" in self.required_metrics:
+                import triton.profiler as proton
+                self._proton_session_id = proton.start()
+                proton.enter_scope(f"tritonbench_run_op_{self.name}")
+                proton.deactivate(self._proton_session_id)
             input_id_range = range(self._input_id, self._input_id + self._num_inputs)
             if tqdm is not None:
                 input_id_range = tqdm(input_id_range)
@@ -714,6 +719,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 for _dryrun_input_id in range(self._input_id):
                     self.example_inputs = self.get_example_inputs()
             for input_id in input_id_range:
+                if "proton" in self.required_metrics:
+                    proton.activate(self._proton_session_id)
+                    proton.enter_scope(f"input_id_{input_id}")
+                    proton.deactivate(self._proton_session_id)
                 self._cur_input_id = input_id
                 self.example_inputs = self.get_example_inputs()
                 if self.example_inputs is None:
@@ -759,9 +768,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         if self.name in BASELINE_BENCHMARKS
                         else False
                     )
-                    if "proton" in self.required_metrics:
-                        import triton.profiler as proton
-                        proton.start()
                     acc[bm_name] = self._do_bench(
                         input_id=input_id,
                         fn_name=bm_name,
@@ -772,18 +778,20 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     )
                     if baseline:
                         self.baseline_metrics = acc[bm_name]
-                    if "proton" in self.required_metrics:
-                        import triton.profiler as proton
-                        proton.finalize()
-                        # write proton trace as x_only metric
                     return acc
-
                 y_vals: Dict[str, BenchmarkOperatorMetrics] = functools.reduce(
                     _reduce_benchmarks, benchmarks, {}
                 )
                 metrics.append((x_val, y_vals))
-                del self.example_inputs
-                gc.collect()
+                del self.example_inputs  # save some memory
+                if "proton" in self.required_metrics:
+                    proton.activate(self._proton_session_id)
+                    proton.exit_scope(f"input_{input_id}")
+                    proton.deactivate(self._proton_session_id)
+            if "proton" in self.required_metrics:
+                proton.activate(self._proton_session_id)
+                proton.exit_scope("tritonbench_run")
+                proton.finalize()
         except (KeyboardInterrupt, Exception):
             logger.warning(
                 "Caught exception, terminating early with partial results",
@@ -1115,10 +1123,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
             if "proton" in self.required_metrics:
                 from tritonbench.components.proton import proton_trace
-                scope_name = f"{self.name}/{fn_name}"
+                scope_name = fn_name
                 flops = self.flops() if self.has_metric("flops") else None
                 num_bytes = self.bytes() if self.has_metric("bytes") else None
-                proton_trace(scope_name, fn, warmup=warmup, flops=flops, bytes=num_bytes)
+                proton_trace(self._proton_session_id, scope_name, fn, warmup=warmup, flops=flops, bytes=num_bytes)
             if "best_config" in self.required_metrics:
                 metrics.best_config = self.best_config(fn)
             # run the hidden metric "_compile_time_in_task"
