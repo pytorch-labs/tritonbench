@@ -75,6 +75,7 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
                 "benchmark_name": args.op,
                 "device": args.device,
                 "logging_group": args.logging_group,
+                "precision": args.precision,
             }
             if args.production_shapes:
                 from tritonbench.utils.fb.durin_data import productionDataLoader
