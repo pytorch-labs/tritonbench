@@ -23,6 +23,7 @@ import tabulate
 import torch
 import triton
 
+from tritonbench.components.do_bench import do_bench_wrapper
 from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
@@ -758,6 +759,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         if self.name in BASELINE_BENCHMARKS
                         else False
                     )
+                    if "proton" in self.required_metrics:
+                        import triton.profiler as proton
+                        proton.start()
                     acc[bm_name] = self._do_bench(
                         input_id=input_id,
                         fn_name=bm_name,
@@ -768,6 +772,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     )
                     if baseline:
                         self.baseline_metrics = acc[bm_name]
+                    if "proton" in self.required_metrics:
+                        import triton.profiler as proton
+                        proton.finalize()
+                        # write proton trace as x_only metric
                     return acc
 
                 y_vals: Dict[str, BenchmarkOperatorMetrics] = functools.reduce(
@@ -968,27 +976,14 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if {"latency", "tflops", "speedup", "compile_time"} & set(
                 self.required_metrics
             ):
-                if self.use_cuda_graphs:
-                    with torch.cuda.stream(torch.cuda.Stream()):
-                        metrics.latency = triton.testing.do_bench_cudagraph(
-                            fn,
-                            rep=rep,
-                            return_mode="median",
-                            grad_to_none=self.get_grad_to_none(self.example_inputs),
-                        )
-                else:
-                    try:
-                        metrics.latency = triton.testing.do_bench(
-                            fn,
-                            warmup=warmup,
-                            rep=rep,
-                            return_mode="median",
-                            grad_to_none=self.get_grad_to_none(self.example_inputs),
-                        )
-                    except Exception as e:
-                        if not self.tb_args.bypass_fail:
-                            raise e
-                        metrics.latency = None
+                metrics.latency = do_bench_wrapper(
+                    fn,
+                    warmup,
+                    rep,
+                    grad_to_none=self.get_grad_to_none(self.example_inputs),
+                    use_cuda_graphs=self.use_cuda_graphs,
+                    bypass_fail=self.tb_args.bypass_fail,
+                )
             if {
                 "gpu_peak_mem",
                 "gpu_mem_footprint_compression_ratio",
@@ -1118,6 +1113,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if "kineto_trace" in self.required_metrics:
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
+            if "proton" in self.required_metrics:
+                from tritonbench.components.proton import proton_trace
+                scope_name = f"{self.name}/{fn_name}"
+                flops = self.flops() if self.has_metric("flops") else None
+                num_bytes = self.bytes() if self.has_metric("bytes") else None
+                proton_trace(scope_name, fn, warmup=warmup, flops=flops, bytes=num_bytes)
             if "best_config" in self.required_metrics:
                 metrics.best_config = self.best_config(fn)
             # run the hidden metric "_compile_time_in_task"
@@ -1592,3 +1593,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     @classmethod
     def has_bwd(cls) -> bool:
         return cls.get_bwd_fn is not BenchmarkOperator.get_bwd_fn
+
+    @classmethod
+    def has_metric(cls, metric_name: str) -> bool:
+        return bool(getattr(cls, metric_name, None))
