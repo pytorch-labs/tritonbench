@@ -146,8 +146,6 @@ class Operator(BenchmarkOperator):
             self.liger_op.teacher_lin.weight.data
         ) = torch.rand(self.V, self.H, device=self.device, dtype=self.dtype)
 
-        self.use_cuda_graphs = False
-
     def get_input_iter(self) -> Generator:
         for BT in [2**i for i in range(10, 14)]:
             student_input = torch.rand(

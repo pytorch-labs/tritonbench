@@ -29,7 +29,6 @@ class Operator(BenchmarkOperator):
         self.T = 2048
         self.baseline_model = CrossEntropyLoss()
         self.liger_model = LigerCrossEntropyLoss()
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for V in [2**i for i in range(12, 18)]:
