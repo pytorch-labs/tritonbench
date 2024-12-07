@@ -19,20 +19,15 @@ if not hasattr(torch.version, "git_version"):
     from .fb.run_utils import trace_handler
 
 
-def do_bench_kineto_cudagraph(fn, warmup, grad_to_none, profile_opts, output_dir) -> str:
+def do_bench_kineto_cudagraph(
+    fn, warmup, grad_to_none, profile_opts, output_dir
+) -> str:
     activity_groups = [
         profiler.ProfilerActivity.CUDA,
         profiler.ProfilerActivity.CPU,
     ]
     with torch.cuda.stream(torch.cuda.Stream()):
-        # step 1 - warmup
-        fn()
-        if grad_to_none is not None:
-            for x in grad_to_none:
-                x.detach_()
-                x.requires_grad_(True)
-                x.grad = None
-        # step 2 - construct a cuda graph
+        # step 1 - construct a cuda graph
         g = torch.cuda.CUDAGraph()
         with torch.cuda.graph(g):
             if grad_to_none is not None:
@@ -42,7 +37,7 @@ def do_bench_kineto_cudagraph(fn, warmup, grad_to_none, profile_opts, output_dir
         torch.cuda.synchronize()
         prefix = f"tritonbench_cudagraph_{fn._name}"
         name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{''.join(random.choices(string.digits, k=10))}.json"
-        # step 3 - profile cuda graph with kineto
+        # step 2 - profile cuda graph launch with kineto
         with profiler.profile(
             schedule=profiler.schedule(wait=0, warmup=warmup, active=1, repeat=1),
             activities=activity_groups,
@@ -70,6 +65,7 @@ def do_bench_kineto_cudagraph(fn, warmup, grad_to_none, profile_opts, output_dir
             return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/test/{name}.gz&bucket=pyper_traces"
         else:
             return output_dir
+
 
 def do_bench_kineto(
     fn: Callable,
@@ -126,7 +122,9 @@ def do_bench_kineto(
     # compute number of warmup and repeat
     n_warmup = max(1, int(warmup / estimate_ms))
     if use_cuda_graphs:
-        return do_bench_kineto_cudagraph(fn, n_warmup, grad_to_none, profile_opts, output_dir)
+        return do_bench_kineto_cudagraph(
+            fn, n_warmup, grad_to_none, profile_opts, output_dir
+        )
 
     activity_groups = [
         profiler.ProfilerActivity.CUDA,
