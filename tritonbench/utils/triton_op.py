@@ -23,6 +23,7 @@ import tabulate
 import torch
 import triton
 
+from tritonbench.components.do_bench import do_bench_wrapper
 from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 from tritonbench.utils.env_utils import (
     apply_precision,
@@ -704,6 +705,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         """Benchmarking the operator and returning its metrics."""
         metrics = []
         try:
+            if "proton" in self.required_metrics:
+                import triton.profiler as proton
+
+                self._proton_session_id = proton.start()
+                proton.enter_scope(f"tritonbench_run_op_{self.name}")
+                proton.deactivate(self._proton_session_id)
             input_id_range = range(self._input_id, self._input_id + self._num_inputs)
             if tqdm is not None:
                 input_id_range = tqdm(input_id_range)
@@ -711,8 +718,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 for _dryrun_input_id in range(self._input_id):
                     self.example_inputs = self.get_example_inputs()
             for input_id in input_id_range:
-                self._cur_input_id = input_id
                 self.example_inputs = self.get_example_inputs()
+                x_val = self.get_x_val(self.example_inputs)
+                if "proton" in self.required_metrics:
+                    proton.activate(self._proton_session_id)
+                    proton.enter_scope(f"x_val_{x_val}")
+                    proton.deactivate(self._proton_session_id)
+                self._cur_input_id = input_id
                 if self.example_inputs is None:
                     logger.warn(
                         f"The input generator get_input_iter() has depleted at id {input_id}. Available number of "
@@ -731,7 +743,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.baseline_fn = None
                 self.baseline_metrics = None
                 self._op_flops = {}
-                x_val = self.get_x_val(self.example_inputs)
                 if self._only:
                     benchmarks = self._only
                 else:
@@ -772,8 +783,15 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     _reduce_benchmarks, benchmarks, {}
                 )
                 metrics.append((x_val, y_vals))
-                del self.example_inputs
-                gc.collect()
+                del self.example_inputs  # save some memory
+                if "proton" in self.required_metrics:
+                    proton.activate(self._proton_session_id)
+                    proton.exit_scope()
+                    proton.deactivate(self._proton_session_id)
+            if "proton" in self.required_metrics:
+                proton.activate(self._proton_session_id)
+                proton.exit_scope()
+                proton.finalize()
         except (KeyboardInterrupt, Exception):
             logger.warning(
                 "Caught exception, terminating early with partial results",
@@ -966,27 +984,14 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if {"latency", "tflops", "speedup", "compile_time"} & set(
                 self.required_metrics
             ):
-                if self.use_cuda_graphs:
-                    with torch.cuda.stream(torch.cuda.Stream()):
-                        metrics.latency = triton.testing.do_bench_cudagraph(
-                            fn,
-                            rep=rep,
-                            return_mode="median",
-                            grad_to_none=self.get_grad_to_none(self.example_inputs),
-                        )
-                else:
-                    try:
-                        metrics.latency = triton.testing.do_bench(
-                            fn,
-                            warmup=warmup,
-                            rep=rep,
-                            return_mode="median",
-                            grad_to_none=self.get_grad_to_none(self.example_inputs),
-                        )
-                    except Exception as e:
-                        if not self.tb_args.bypass_fail:
-                            raise e
-                        metrics.latency = None
+                metrics.latency = do_bench_wrapper(
+                    fn,
+                    warmup,
+                    rep,
+                    grad_to_none=self.get_grad_to_none(self.example_inputs),
+                    use_cuda_graphs=self.use_cuda_graphs,
+                    bypass_fail=self.tb_args.bypass_fail,
+                )
             if {
                 "gpu_peak_mem",
                 "gpu_mem_footprint_compression_ratio",
@@ -1116,6 +1121,20 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if "kineto_trace" in self.required_metrics:
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
+            if "proton" in self.required_metrics:
+                from tritonbench.components.proton import proton_trace
+
+                scope_name = fn_name
+                flops = self.flops() if self.has_metric("flops") else None
+                num_bytes = self.bytes() if self.has_metric("bytes") else None
+                proton_trace(
+                    self._proton_session_id,
+                    scope_name,
+                    fn,
+                    warmup=warmup,
+                    flops=flops,
+                    bytes=num_bytes,
+                )
             if "best_config" in self.required_metrics:
                 metrics.best_config = self.best_config(fn)
             # run the hidden metric "_compile_time_in_task"
@@ -1590,3 +1609,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     @classmethod
     def has_bwd(cls) -> bool:
         return cls.get_bwd_fn is not BenchmarkOperator.get_bwd_fn
+
+    @classmethod
+    def has_metric(cls, metric_name: str) -> bool:
+        return bool(getattr(cls, metric_name, None))
