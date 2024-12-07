@@ -21,7 +21,7 @@ The profiling iteration runs after all warm-up iteraions and is labeled by `Prof
 
 ![Kineto Trace](https://ossci-datasets.s3.us-east-1.amazonaws.com/tritonbench/docs/_static/img/kineto_trace_fig_1.png "Kineto Trace - Global View")
 
-Zooming into the profile iteration, we find two GPU kernels launched. The first one corresponds to the L2 Cache clearance.
+Zooming into the profile iteration, we find two GPU kernels launched. The first one corresponds to the L2 Cache flush to clear the cache.
 The second one corresponds to the actual computation kernel, which is from CUDNN in this flash_attention operator.
 
 ![Kineto Trace](https://ossci-datasets.s3.us-east-1.amazonaws.com/tritonbench/docs/_static/img/kineto_trace_fig_2.png "Kineto Trace - Zoomed into Profile Iteration")
