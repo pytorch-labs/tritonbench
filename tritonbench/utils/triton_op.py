@@ -786,11 +786,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 del self.example_inputs  # save some memory
                 if "proton" in self.required_metrics:
                     proton.activate(self._proton_session_id)
-                    proton.exit_scope(f"x_val_{x_val}")
+                    proton.exit_scope()
                     proton.deactivate(self._proton_session_id)
             if "proton" in self.required_metrics:
                 proton.activate(self._proton_session_id)
-                proton.exit_scope(f"tritonbench_run_op_{self.name}")
+                proton.exit_scope()
                 proton.finalize()
         except (KeyboardInterrupt, Exception):
             logger.warning(
