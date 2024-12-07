@@ -1,7 +1,15 @@
 import torch
 import triton
 
-def do_bench_wrapper(fn, warmup, rep, grad_to_none, use_cuda_graphs: bool=False, bypass_fail: bool=False):
+
+def do_bench_wrapper(
+    fn,
+    warmup,
+    rep,
+    grad_to_none,
+    use_cuda_graphs: bool = False,
+    bypass_fail: bool = False,
+):
     """Wrapper to triton's do_bench to gain latency."""
     if use_cuda_graphs:
         with torch.cuda.stream(torch.cuda.Stream()):

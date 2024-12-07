@@ -709,6 +709,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         try:
             if "proton" in self.required_metrics:
                 import triton.profiler as proton
+
                 self._proton_session_id = proton.start()
                 proton.enter_scope(f"tritonbench_run_op_{self.name}")
                 proton.deactivate(self._proton_session_id)
@@ -779,6 +780,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     if baseline:
                         self.baseline_metrics = acc[bm_name]
                     return acc
+
                 y_vals: Dict[str, BenchmarkOperatorMetrics] = functools.reduce(
                     _reduce_benchmarks, benchmarks, {}
                 )
@@ -1123,10 +1125,18 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
             if "proton" in self.required_metrics:
                 from tritonbench.components.proton import proton_trace
+
                 scope_name = fn_name
                 flops = self.flops() if self.has_metric("flops") else None
                 num_bytes = self.bytes() if self.has_metric("bytes") else None
-                proton_trace(self._proton_session_id, scope_name, fn, warmup=warmup, flops=flops, bytes=num_bytes)
+                proton_trace(
+                    self._proton_session_id,
+                    scope_name,
+                    fn,
+                    warmup=warmup,
+                    flops=flops,
+                    bytes=num_bytes,
+                )
             if "best_config" in self.required_metrics:
                 metrics.best_config = self.best_config(fn)
             # run the hidden metric "_compile_time_in_task"

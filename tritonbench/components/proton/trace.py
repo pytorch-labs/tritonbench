@@ -1,8 +1,16 @@
-import triton.profiler as proton
-
 from typing import Callable, Optional
 
-def proton_trace(session_id: int, scope_name: str, fn: Callable, warmup: int, flops: Optional[int]=None, bytes: Optional[int]=None):
+import triton.profiler as proton
+
+
+def proton_trace(
+    session_id: int,
+    scope_name: str,
+    fn: Callable,
+    warmup: int,
+    flops: Optional[int] = None,
+    bytes: Optional[int] = None,
+):
     # warmup
     for _ in range(warmup):
         fn()
