@@ -222,12 +222,16 @@ class Operator(BenchmarkOperator):
                 else sdpa_kernel([SDPBackend.FLASH_ATTENTION])
             )
             with cxt:
-                sdpa_impl = torch.compile(
-                    sdpa,
-                    fullgraph=True,
-                    backend="inductor",
-                    mode="max-autotune",
-                ) if self.pt2_sdpa else sdpa
+                sdpa_impl = (
+                    torch.compile(
+                        sdpa,
+                        fullgraph=True,
+                        backend="inductor",
+                        mode="max-autotune",
+                    )
+                    if self.pt2_sdpa
+                    else sdpa
+                )
                 return sdpa_impl(
                     q,
                     k,
