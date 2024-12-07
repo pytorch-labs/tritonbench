@@ -40,6 +40,8 @@ except ImportError:
     tqdm = None
 
 logger = logging.getLogger(__name__)
+# TODO: remove this once we have a better way to handle backward benchmarking
+torch._functorch.config.donated_buffer = False
 
 
 @dataclass
