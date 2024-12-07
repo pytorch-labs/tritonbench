@@ -57,14 +57,15 @@ def do_bench_kineto_cudagraph(fn, warmup, grad_to_none, profile_opts, output_dir
                 else profiler.tensorboard_trace_handler(output_dir)
             ),
         ) as prof:
-            # we don't want `fn` to accumulate gradient values
-            # if it contains a backward pass. So we clear the
-            # provided gradients
-            if grad_to_none is not None:
-                for x in grad_to_none:
-                    x.grad = None
-            g.replay()
-            prof.step()
+            for _i in range(warmup + 1):
+                # we don't want `fn` to accumulate gradient values
+                # if it contains a backward pass. So we clear the
+                # provided gradients
+                if grad_to_none is not None:
+                    for x in grad_to_none:
+                        x.grad = None
+                g.replay()
+                prof.step()
         if not hasattr(torch.version, "git_version"):
             return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/test/{name}.gz&bucket=pyper_traces"
         else:
@@ -98,8 +99,6 @@ def do_bench_kineto(
     """
     if profile_opts is None:
         profile_opts = DEFAULT_PROFILE_OPTS
-    if use_cuda_graphs:
-        return do_bench_kineto_cudagraph(fn, warmup, grad_to_none, profile_opts, output_dir)
     import torch
 
     fn()
@@ -126,6 +125,9 @@ def do_bench_kineto(
 
     # compute number of warmup and repeat
     n_warmup = max(1, int(warmup / estimate_ms))
+    if use_cuda_graphs:
+        return do_bench_kineto_cudagraph(fn, n_warmup, grad_to_none, profile_opts, output_dir)
+
     activity_groups = [
         profiler.ProfilerActivity.CUDA,
         profiler.ProfilerActivity.CPU,
