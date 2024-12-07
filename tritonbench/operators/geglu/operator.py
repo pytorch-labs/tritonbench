@@ -40,7 +40,6 @@ class Operator(BenchmarkOperator):
         self.liger_model = (
             LigerGEGLUMLP(self.llama_config).to(self.device).to(self.dtype)
         )
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for T in [2**i for i in range(10, 14)]:

@@ -96,10 +96,6 @@ class Operator(BenchmarkOperator):
     DEFAULT_METRICS = ["latency", "accuracy"]
     DEFAULT_PRECISION = "fp32"
 
-    use_cuda_graphs = (
-        False  # enables GPU/CPU sync (for methods like NestedTensor unbind)
-    )
-
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):

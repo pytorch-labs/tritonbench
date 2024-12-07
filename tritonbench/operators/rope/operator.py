@@ -30,7 +30,6 @@ class Operator(BenchmarkOperator):
         # they are generated later
         self.baseline_op = None
         self.liger_op = None
-        self.use_cuda_graphs = False
         self.num_q_heads = 32
         self.num_kv_heads = 8
 

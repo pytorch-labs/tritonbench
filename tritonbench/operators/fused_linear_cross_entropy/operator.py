@@ -78,7 +78,6 @@ class Operator(BenchmarkOperator):
         self.liger_model = LigerLMHeadCE(
             H=self.hidden_size, V=self.vocab_size, dtype=self.dtype
         ).to(self.device)
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for BT in [2**i for i in range(12, 16)]:

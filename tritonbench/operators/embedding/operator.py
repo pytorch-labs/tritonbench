@@ -27,7 +27,6 @@ class Operator(BenchmarkOperator):
         # they are generated later
         self.baseline_op = None
         self.liger_op = None
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for B, T, D in [(32, 512, 768), (8, 2048, 4096)]:

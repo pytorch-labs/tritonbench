@@ -1470,6 +1470,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             fn=fn,
             grad_to_none=self.get_grad_to_none(self.example_inputs),
             output_dir=kineto_output_dir,
+            use_cuda_graphs=self.use_cuda_graphs,
         )
 
     def compile_time(

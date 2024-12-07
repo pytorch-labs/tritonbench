@@ -141,7 +141,6 @@ class Operator(BenchmarkOperator):
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
-        self.use_cuda_graphs = False
         gemm_args = parse_args(self.extra_args)
         self.layout = gemm_args.layout
         if IS_FBCODE and tb_args.production_shapes:
