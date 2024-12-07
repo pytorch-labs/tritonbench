@@ -16,5 +16,5 @@ __pycache__/
 *.egg-info/
 torch_compile_debug/
 build/
-*.csv
+/*.csv
 *.hatchet
