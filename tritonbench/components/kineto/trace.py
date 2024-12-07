@@ -96,6 +96,8 @@ def do_bench_kineto(
     :param output_dir: Output directory to store the trace
     :type output_dir: str, optional
     """
+    if profile_opts is None:
+        profile_opts = DEFAULT_PROFILE_OPTS
     if use_cuda_graphs:
         return do_bench_kineto_cudagraph(fn, warmup, grad_to_none, profile_opts, output_dir)
     import torch
@@ -128,8 +130,6 @@ def do_bench_kineto(
         profiler.ProfilerActivity.CUDA,
         profiler.ProfilerActivity.CPU,
     ]
-    if profile_opts is None:
-        profile_opts = DEFAULT_PROFILE_OPTS
     prefix = f"tritonbench_{fn._name}"
     name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{''.join(random.choices(string.digits, k=10))}.json"
     with profiler.profile(
