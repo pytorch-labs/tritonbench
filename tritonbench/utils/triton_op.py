@@ -40,8 +40,6 @@ except ImportError:
     tqdm = None
 
 logger = logging.getLogger(__name__)
-# TODO: remove this once we have a better way to handle backward benchmarking
-torch._functorch.config.donated_buffer = False
 
 
 @dataclass
@@ -622,6 +620,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.tb_args.mode == "bwd"
             ), "We only accept test modes: fwd, bwd, fwd_bwd, or fwd_no_grad."
             self.mode = Mode.BWD
+        if self.mode in [Mode.FWD_BWD, Mode.BWD]:
+            # TODO: remove this once we have a better way to handle backward benchmarking
+            torch._functorch.config.donated_buffer = False
         self.device = tb_args.device
         self.required_metrics = (
             list(set(tb_args.metrics.split(",")))
