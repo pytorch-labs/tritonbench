@@ -39,8 +39,8 @@ jobs:
         if: steps.submodules_changes.outputs.fa == 'true'
         run: |
           . "${SETUP_SCRIPT}"
-          python install.py --fa2
-          python install.py --fa3
+          python install.py --fa2 --ci
+          python install.py --fa3 --ci
       - name: Reinstall xformers (optional)
         if: steps.submodules_changes.outputs.xformers == 'true'
         run: |
