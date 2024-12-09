@@ -45,7 +45,6 @@ class Operator(BenchmarkOperator):
         # they are generated later
         self.llama_rms_op = None
         self.liger_rms_op = None
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for H in [2**i for i in range(10, 16)]:

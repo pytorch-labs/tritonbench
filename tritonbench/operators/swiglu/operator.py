@@ -39,7 +39,6 @@ class Operator(BenchmarkOperator):
         self.liger_op = (
             LigerSwiGLUMLP(config=llama_config).to(self.device).to(self.dtype)
         )
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for seq_len in [2**i for i in range(10, 14)]:

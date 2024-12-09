@@ -65,7 +65,6 @@ class Operator(BenchmarkOperator):
         self.T = 2048
         self.baseline_op = TorchJSD()
         self.liger_op = LigerJSD()
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for V in [2**i for i in range(12, 18)]:

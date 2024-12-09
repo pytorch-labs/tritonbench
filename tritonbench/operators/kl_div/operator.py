@@ -27,7 +27,6 @@ class Operator(BenchmarkOperator):
         self.T = 512
         self.baseline_op = torch.nn.KLDivLoss(reduction="batchmean").to(self.device)
         self.liger_op = LigerKLDIVLoss(reduction="batchmean").to(self.device)
-        self.use_cuda_graphs = False
 
     def get_input_iter(self) -> Generator:
         for V in [2**i for i in range(12, 18)]:
