@@ -8,6 +8,7 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
+    Mode,
     register_benchmark,
     register_x_val,
 )
@@ -59,6 +60,12 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def inductor_geglu(self, input) -> Callable:
+        # TODO: remove this once we have a better way to handle backward benchmarking
+        # We need to run backward multiple times for proper benchmarking
+        # so donated buffer have to be disabled
+        if self.mode == Mode.BWD or self.mode == Mode.FWD_BWD:
+            import torch._functorch.config
+
         compiled = torch.compile(self.baseline_model)
         return lambda: compiled(input)
 

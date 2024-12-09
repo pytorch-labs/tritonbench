@@ -34,6 +34,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def torch_compile_layer_norm(self, *args):
+        # TODO: remove this once we have a better way to handle backward benchmarking
         # We need to run backward multiple times for proper benchmarking
         # so donated buffer have to be disabled
         if self.mode == Mode.BWD or self.mode == Mode.FWD_BWD:
