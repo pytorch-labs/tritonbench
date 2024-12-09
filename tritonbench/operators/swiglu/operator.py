@@ -7,6 +7,7 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
+    Mode,
     register_benchmark,
     register_x_val,
 )
