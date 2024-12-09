@@ -622,6 +622,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             self.mode = Mode.BWD
         if self.mode in [Mode.FWD_BWD, Mode.BWD]:
             # TODO: remove this once we have a better way to handle backward benchmarking
+            import torch._functorch.config
             torch._functorch.config.donated_buffer = False
         self.device = tb_args.device
         self.required_metrics = (
