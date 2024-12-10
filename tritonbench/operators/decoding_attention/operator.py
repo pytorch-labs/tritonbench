@@ -27,7 +27,7 @@ HAS_FLASH_V3 = True
 try:
     torch_lib_path = os.path.join(os.path.dirname(__file__), "lib")
     with add_ld_library_path(torch_lib_path):
-        from flash_attn_interface import flash_attn_func as flash_attn_v3
+        import flash_attn_interface as flash_attn_v3
 except (ImportError, IOError, AttributeError):
     try:
         from ai_codesign.gen_ai.flash_attention_v2.hopper import (
