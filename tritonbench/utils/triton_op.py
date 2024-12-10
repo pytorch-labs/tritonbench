@@ -223,6 +223,8 @@ class BenchmarkOperatorMetrics:
     hw_roofline: Optional[float] = None
     # best config
     best_config: Optional[Dict[str, Any]] = None
+    # all configs
+    all_configs: Optional[str] = None
     # extra metrics
     extra_metrics: Optional[Dict[str, float]] = None
     # mem footprint
@@ -280,6 +282,8 @@ class BenchmarkOperatorResult:
                     m in BASELINE_SKIP_METRICS
                     and backend == BASELINE_BENCHMARKS[self.op_name]
                 ):
+                    return False
+                if m == "all_configs":
                     return False
                 return True
 
@@ -863,6 +867,31 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             return autotuner.best_config.all_kwargs()
         return None
 
+    def all_configs(self, fn):
+        from unittest import mock
+
+        from triton.runtime import Autotuner
+
+        original_run = Autotuner.run
+        autotuner = None
+
+        def run_and_capture(self, *args, **kwargs):
+            nonlocal autotuner
+            autotuner = self
+            original_run(self, *args, **kwargs)
+
+        with mock.patch.object(Autotuner, "run", run_and_capture):
+            fn()
+
+        if autotuner is not None:
+            configs = []
+            for config in autotuner.configs:
+                configs.append(str(config))
+            all_c = ",".join(configs)
+            hashed = hashlib.sha256(all_c.encode("utf-8")).hexdigest()
+            return hashed
+        return None
+
     def kernel_hash(self, fn):
         AST = triton.compiler.ASTSource(fn=fn, signature={}, constants={})
         sorted_sig = [v for k, v in sorted(AST.signature.items())]
@@ -1158,6 +1187,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if "best_config" in self.required_metrics:
                 metrics.best_config = self.best_config(fn)
+            if "all_configs" in self.required_metrics:
+                metrics.all_configs = self.all_configs(fn)
             if "kernel_source_hash" in self.required_metrics or "gemm" in self.name:
                 metrics.kernel_source_hash = self.kernel_hash(fn)
             # run the hidden metric "_compile_time_in_task"
