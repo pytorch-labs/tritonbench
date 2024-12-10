@@ -11,4 +11,4 @@ tritonbench_dir=$(dirname "$(readlink -f "$0")")/../..
 cd ${tritonbench_dir}
 
 # Install Tritonbench and all its customized packages
-python install.py --all --ci
+python install.py --all

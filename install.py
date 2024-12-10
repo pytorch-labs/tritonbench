@@ -53,30 +53,22 @@ def test_fbgemm():
     print("OK")
 
 
-def install_fa2(compile=False, ci=False):
+def install_fa2(compile=False):
     if compile:
         # compile from source (slow)
-        env = os.environ.copy()
-        # limit max jobs to save memory in CI
-        if ci:
-            env["MAX_JOBS"] = "1"
         FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
         cmd = [sys.executable, "setup.py", "install"]
-        subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()), env=env)
+        subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
     else:
         # Install the pre-built binary
         cmd = ["pip", "install", "flash-attn", "--no-build-isolation"]
         subprocess.check_call(cmd)
 
 
-def install_fa3(ci=False):
+def install_fa3():
     FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
-    env = os.environ.copy()
-    # limit max jobs to save memory in CI
-    if ci:
-        env["MAX_JOBS"] = "1"
     cmd = [sys.executable, "setup.py", "install"]
-    subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()), env=env)
+    subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()))
 
 
 def install_liger():
@@ -117,7 +109,6 @@ if __name__ == "__main__":
         "--all", action="store_true", help="Install all custom kernel repos"
     )
     parser.add_argument("--test", action="store_true", help="Run tests")
-    parser.add_argument("--ci", action="store_true", help="Indicate running in CI environment.")
     args = parser.parse_args()
 
     if args.all and is_hip():
@@ -133,10 +124,10 @@ if __name__ == "__main__":
         install_fbgemm()
     if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2 from source...")
-        install_fa2(compile=True, ci=args.ci)
+        install_fa2(compile=True)
     if args.fa3 or args.all:
         logger.info("[tritonbench] installing fa3...")
-        install_fa3(ci=args.ci)
+        install_fa3()
     if args.colfax or args.all:
         logger.info("[tritonbench] installing colfax cutlass-kernels...")
         from tools.cutlass_kernels.install import install_colfax_cutlass
