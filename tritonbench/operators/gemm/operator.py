@@ -41,7 +41,7 @@ from .triton_matmul import (
 )
 
 if IS_FBCODE:
-    import hammer.oss.generative_recommenders.ops.triton.triton_addmm as hstu_triton_addmm
+    import generative_recommenders.ops.triton.triton_addmm as hstu_triton_addmm
 
     # without this set we can only pick a single config for AMD, Nvidia has 8
     # with this set AMD will pick from 256 different configs (not the actual full
