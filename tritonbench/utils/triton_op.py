@@ -3,6 +3,7 @@ import copy
 import csv
 import functools
 import gc
+import hashlib
 import logging
 import os
 import random
@@ -230,6 +231,8 @@ class BenchmarkOperatorMetrics:
     gbps: Optional[float] = None
     # speedup for the summary of kernel GPU time only
     nsys_gpu_speedup: Optional[float] = None
+    # hashed source code for the kernel
+    kernel_source_hash: Optional[str] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
@@ -287,11 +290,17 @@ class BenchmarkOperatorResult:
                 # add extra metrics
                 headers.append(f"{label}-{metric}")
         # generate rows
+        hashes = {}
+        if "kernel_source_hash" in self.metrics:
+            self.result.append(tuple(["hashes", {}]))
         for x_val, y_val in self.result:
             row = []
             row.append(x_val)
             # Append x_only metrics
             for x_only_metric in x_only_metrics:
+                if x_val == "hashes" and len(hashes) > 0:
+                    continue
+
                 # retrieve x_only metrics from the first backend metrics
                 x_only_metric_dict = asdict(y_val[backends[0]])
                 if (
@@ -302,7 +311,12 @@ class BenchmarkOperatorResult:
                 else:
                     row.append(x_only_metric_dict[x_only_metric])
             for backend in backends:
+                if x_val == "hashes" and len(hashes) > 0:
+                    row.append(hashes[backend])
+                    continue
                 metrics_dict = asdict(y_val[backend])
+                if "kernel_source_hash" in metrics_dict:
+                    hashes[backend] = metrics_dict.pop("kernel_source_hash")
                 if metrics_dict["error_msg"]:
                     row.append(metrics_dict["error_msg"])
                     row.extend([None] * (len(key_metrics[backend]) - 1))
@@ -849,6 +863,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             return autotuner.best_config.all_kwargs()
         return None
 
+    def kernel_hash(self, fn):
+        AST = triton.compiler.ASTSource(fn=fn, signature={}, constants={})
+        sorted_sig = [v for k, v in sorted(AST.signature.items())]
+        key = f"{AST.attrs.hash()}-{sorted_sig}"
+        hashed = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        return hashed
+
     def enable_bf16(self):
         tensor_cond = lambda x: x.dtype == torch.float32
         tensor_action = lambda x: x.to(torch.bfloat16)
@@ -1137,6 +1158,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if "best_config" in self.required_metrics:
                 metrics.best_config = self.best_config(fn)
+            if "kernel_source_hash" in self.required_metrics or "gemm" in self.name:
+                metrics.kernel_source_hash = self.kernel_hash(fn)
             # run the hidden metric "_compile_time_in_task"
             # to get the compile time in parent process
             if "_compile_time_in_task" in self.required_metrics:
