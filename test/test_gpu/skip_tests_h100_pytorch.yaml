@@ -37,3 +37,6 @@ ragged_attention:
   - hstu_triton_ragged_attention_persistent
 # cpu-op for testing
 test_op:
+# TODO: decoding attention requires updated xformers and flash_attn
+# Which will RAM OOM on the CI machine
+decoding_attention:

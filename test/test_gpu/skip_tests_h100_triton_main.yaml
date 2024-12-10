@@ -16,10 +16,10 @@ fp8_attention:
   - colfax_fmha
 # fb-only kernels
 fp8_fused_quant_gemm_rowwise:
-gemm:
-  # internal only kernels
-  - hstu_triton_matmul
-  - colfax_cutlass_matmul
+# gemm:
+#  # internal only kernels
+#   - hstu_triton_matmul
+#   - colfax_cutlass_matmul
 # jagged tests are slow, so disable them in OSS
 jagged_layer_norm:
 jagged_mean:
@@ -35,3 +35,13 @@ ragged_attention:
   - hstu_triton_ragged_attention_persistent
 # cpu-op for testing
 test_op:
+# TODO: decoding attention requires updated xformers and flash_attn
+# Which will RAM OOM on the CI machine
+decoding_attention:
+# FIXME: PT2 is broken with Triton-main
+launch_latency:
+addmm:
+gemm:
+flash_attention:
+gather_gemv:
+layer_norm:
