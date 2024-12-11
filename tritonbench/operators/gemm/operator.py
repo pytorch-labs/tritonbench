@@ -235,7 +235,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: hstu_triton_matmul_kernel(a, b)
 
-    @register_benchmark(enabled=bool(colfax_gemm))
+    @register_benchmark(enabled=bool(colfax_gemm) and torch.version.cuda != "12.4")
     def colfax_cutlass_matmul(self, a, b, bias) -> Callable:
         assert colfax_gemm, f"colfax_gemm operator is not available."
         if not bias == None:
