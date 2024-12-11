@@ -129,14 +129,14 @@ class Operator(BenchmarkOperator):
         return fn
 
     @register_metric()
-    def tflops(
+    def flops(
         self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics
     ) -> float:
         ratio = 2.0  # triangular masking
         f1 = 0.0
         f2 = 0.0
         jagged = True
-        q, k, v, seq_offsets, timestamps, num_targets = example_inputs
+        q, k, v, seq_offsets, timestamps, num_targets, seq_len = example_inputs
         _, nheads, attn_dim = q.shape
         _, _, hidden_dim = v.shape
         max_seqlen = timestamps.size(1) - 1
@@ -152,9 +152,9 @@ class Operator(BenchmarkOperator):
             # (QK^T)V, d(QK^T) = dOV^T, dV = (QK^T)^TdO,
             f2 += 2 * self.num_heads * hidden_dim * seq_len**2 // ratio
         if self.mode == Mode.FWD:
-            tflops = f1 + f2  # computes (QK^T) and (QK^T)V
+            flops = f1 + f2  # computes (QK^T) and (QK^T)V
         elif self.mode == Mode.BWD:
-            tflops = 3 * f1 + 2 * f2  # computes (QK^T), dQ, dK, dV, d(QK^T)
+            flops = 3 * f1 + 2 * f2  # computes (QK^T), dQ, dK, dV, d(QK^T)
         elif self.mode == Mode.FWD_BWD:
-            tflops = 4 * f1 + 3 * f2
-        return tflops / metrics.latency * 1e-9
+            flops = 4 * f1 + 3 * f2
+        return flops

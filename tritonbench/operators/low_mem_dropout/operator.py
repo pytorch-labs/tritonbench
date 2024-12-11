@@ -26,10 +26,10 @@ class Operator(BenchmarkOperator):
         )
 
     @register_metric()
-    def tflops(self, fn_name: str, example_inputs, metrics: BenchmarkOperatorMetrics):
+    def flops(self, fn_name: str, example_inputs, metrics: BenchmarkOperatorMetrics):
         p, a = example_inputs
         flops = 2 * len(a)
-        return flops / metrics.latency
+        return flops
 
     @register_benchmark()
     def triton_dropout(self, p, x):

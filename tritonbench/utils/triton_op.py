@@ -651,14 +651,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         if self.tb_args.precision == "bypass":
             self.tb_args.precision = self.DEFAULT_PRECISION
         self.dtype = PRECISION_DTYPE_MAPPING.get(self.tb_args.precision, None)
-        self.DEFAULT_METRICS.extend(
-            [
-                x
-                for x in REGISTERED_METRICS.get(self.name, [])
-                if x not in BUILTIN_METRICS
-            ]
-        )
-        self.DEFAULT_METRICS = list(set(self.DEFAULT_METRICS))
         if self.tb_args.baseline:
             BASELINE_BENCHMARKS[self.name] = self.tb_args.baseline
         self._only = _split_params_by_comma(self.tb_args.only)
@@ -1607,6 +1599,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def tflops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> float:
+        if self.has_metric("flops"):
+            flops = self.flops(fn_name, example_inputs, metrics)
+            return flops / metrics.latency / 1e12 * 1e3
+
         def _get_flops(self, func: Callable) -> float:
             """By default, use the torch.__dispatch__ based flops counter."""
             from torch.utils.flop_counter import FlopCounterMode
@@ -1678,4 +1674,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     @classmethod
     def has_metric(cls, metric_name: str) -> bool:
+        if metric_name == "tflops":
+            return bool(getattr(cls, "flops", None))
         return bool(getattr(cls, metric_name, None))
