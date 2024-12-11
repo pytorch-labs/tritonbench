@@ -1,14 +1,11 @@
 import argparse
+import logging
 import os
-import statistics
 
 from typing import Any, List, Optional
 
 import torch
 import triton
-import triton.language as tl
-
-from triton.runtime.jit import reinterpret
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -20,6 +17,7 @@ from tritonbench.utils.triton_op import (
 
 from .tutorial import matmul as tutorial_matmul
 
+logger = logging.getLogger(__name__)
 try:
     from .persistent import (
         allocate_matmul_tma,
@@ -30,6 +28,10 @@ try:
     HAS_TMA = True
 except ModuleNotFoundError:
     HAS_TMA = False
+    logger.warning("Failed to import TMA due to module not being found")
+except Exception as e:
+    HAS_TMA = False
+    logger.warning(f"Failed to import TMA: {e}")
 
 
 def parse_args(args):
