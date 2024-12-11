@@ -872,18 +872,29 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
         from triton.runtime import Autotuner
 
+        from triton.runtime.jit import JITFunction
+
         original_run = Autotuner.run
+        original_run_jit = JITFunction.run
         autotuner = None
+        compiled_kernels = []
 
         def run_and_capture(self, *args, **kwargs):
             nonlocal autotuner
             autotuner = self
             original_run(self, *args, **kwargs)
 
-        with mock.patch.object(Autotuner, "run", run_and_capture):
-            fn()
+        # There isn't really a great way to get the compiled kernels without monkeypatching
+        def run_and_capture_jit(self, *args, **kwargs):
+            compiled_kernel = original_run_jit(self, *args, **kwargs)
+            compiled_kernels.append(compiled_kernel)
+            return compiled_kernel
 
-        if autotuner is not None:
+        with mock.patch.object(JITFunction, "run", run_and_capture_jit):
+            with mock.patch.object(Autotuner, "run", run_and_capture):
+                fn()
+
+        if autotuner is not None and len(compiled_kernels):
             configs = []
             for config in autotuner.configs:
                 configs.append(str(config))
