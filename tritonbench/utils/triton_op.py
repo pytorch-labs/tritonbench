@@ -1265,31 +1265,28 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def do_bench_cudagraph_mem(
         self, fn, n_repeat=2, grad_to_none=None, device_type="cuda"
     ):
-        if torch.cuda.current_stream() == torch.cuda.default_stream():
-            raise RuntimeError(
-                "Cannot capture graph in default stream. Please use side stream in benchmark code."
-            )
-        # warmup
-        fn()
-        if grad_to_none is not None:
-            for x in grad_to_none:
-                x.detach_()
-                x.requires_grad_(True)
-                x.grad = None
-        g = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(g):
+        with torch.cuda.stream(torch.cuda.Stream()):
+            # warmup
             fn()
-        torch.cuda.synchronize()
-        g.replay()
-        torch.cuda.synchronize()
-        g = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(g):
-            for _ in range(n_repeat):
-                if grad_to_none is not None:
-                    for x in grad_to_none:
-                        x.grad = None
+            if grad_to_none is not None:
+                for x in grad_to_none:
+                    x.detach_()
+                    x.requires_grad_(True)
+                    x.grad = None
+            g = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(g):
                 fn()
-        torch.cuda.synchronize()
+            torch.cuda.synchronize()
+            g.replay()
+            torch.cuda.synchronize()
+            g = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(g):
+                for _ in range(n_repeat):
+                    if grad_to_none is not None:
+                        for x in grad_to_none:
+                            x.grad = None
+                    fn()
+            torch.cuda.synchronize()
 
     def do_bench_mem(self, fn, n_repeat=2, grad_to_none=None, device_type="cuda"):
         di = torch._dynamo.device_interface.get_interface_for_device(device_type)
