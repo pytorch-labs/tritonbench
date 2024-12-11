@@ -89,6 +89,7 @@ class Mode(Enum):
     FWD = "fwd"
     BWD = "bwd"
     FWD_BWD = "fwd_bwd"
+    FWD_BWD_IN_ONE = "fwd_bwd_in_one"
     FWD_NO_GRAD = "fwd_no_grad"
 
 
@@ -615,6 +616,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             self.mode = Mode.FWD_BWD
         elif self.tb_args.mode == "fwd_no_grad":
             self.mode = Mode.FWD_NO_GRAD
+        elif self.tb_args.mode == "fwd_bwd_in_one":
+            self.mode = Mode.FWD_BWD_IN_ONE
         else:
             assert (
                 self.tb_args.mode == "bwd"
@@ -688,6 +691,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             ), f"Backend {bm_func_name} does not support backward pass."
             bwd_fn = self.get_bwd_fn(fwd_fn)
             fwd_bwd_fn = lambda: (fwd_fn(), bwd_fn())
+            setattr(fwd_bwd_fn, "_name", bm_func_name)
+            return fwd_bwd_fn
+        elif self.mode == Mode.FWD_BWD_IN_ONE:
+            fwd_bwd_fn = self.get_fwd_bwd_in_one_fn(fwd_fn)
             setattr(fwd_bwd_fn, "_name", bm_func_name)
             return fwd_bwd_fn
         elif self.mode == Mode.FWD_NO_GRAD:
@@ -812,6 +819,11 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         raise NotImplementedError(
             "Each operator must implement its own backward function."
+        )
+
+    def get_fwd_bwd_in_one_fn(self, fwd_fn: Callable, bwd_fn: Callable) -> Callable:
+        raise NotImplementedError(
+            "Each operator must implement its own fwd_bwd_in_one function."
         )
 
     def get_input_iter(self) -> Generator:

@@ -60,3 +60,12 @@ class Operator(BenchmarkOperator):
 
     def get_grad_to_none(self, args) -> List[torch.Tensor]:
         return [args[0]]
+
+    def get_fwd_bwd_in_one_fn(self, fwd_fn: Callable) -> Callable:
+        def fwd_bwd_in_one_fn():
+            y = fwd_fn()
+            y.backward(retain_graph=True)
+            return y
+
+        return fwd_bwd_in_one_fn
+

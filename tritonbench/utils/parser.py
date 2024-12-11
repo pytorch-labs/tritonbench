@@ -23,7 +23,7 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--mode",
-        choices=["fwd", "bwd", "fwd_bwd", "fwd_no_grad"],
+        choices=["fwd", "bwd", "fwd_bwd", "fwd_no_grad", "fwd_bwd_in_one"],
         default="fwd",
         help="Test mode (fwd, bwd, fwd_bwd, or fwd_no_grad).",
     )
