@@ -38,9 +38,9 @@ class Operator(BenchmarkOperator):
         # We need to run backward multiple times for proper benchmarking
         # so donated buffer have to be disabled
         if self.mode == Mode.BWD or self.mode == Mode.FWD_BWD:
-            import torch._functorch.config
+            from torch._functorch import config as functorch_config
 
-            torch._functorch.config.donated_buffer = False
+            functorch_config.donated_buffer = False
         import torch
 
         @torch.compile
