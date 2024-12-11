@@ -120,14 +120,14 @@ class Operator(BenchmarkOperator):
         return gb / metrics.latency * 1e3
 
     @register_metric()
-    def tflops(
+    def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> float:
         a, b = example_inputs
         m, k = a.size()
         _, n = b.size()
         flops = 2 * m * n * k
-        return flops / metrics.latency / 1e12 * 1e3
+        return flops
 
     def plot(self):
         @triton.testing.perf_report(

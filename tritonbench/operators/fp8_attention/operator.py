@@ -150,10 +150,9 @@ class Operator(BenchmarkOperator):
             yield (q, k, v)
 
     @register_metric()
-    def tflops(
+    def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> float:
         H = self.embedding_dim // self.D_HEAD
         flops_per_matmul = 2.0 * self.BATCH * H * self.N_CTX * self.N_CTX * self.D_HEAD
-        tflops = 2 * flops_per_matmul
-        return tflops / metrics.latency * 1e-9
+        return 2 * flops_per_matmul

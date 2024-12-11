@@ -478,13 +478,6 @@ class Operator(BenchmarkOperator):
 
         return lambda: flex_attention(q, k, v, block_mask=block_mask)
 
-    @register_metric()
-    def tflops(
-        self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
-    ) -> float:
-        analytic_flops = self.flops(fn_name, example_inputs, metrics)
-        return analytic_flops / metrics.latency * 1e-9
-
     @register_metric(x_only=True)
     def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics

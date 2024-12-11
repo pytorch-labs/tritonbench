@@ -126,14 +126,14 @@ class Operator(BenchmarkOperator):
         return numel / metrics.latency * 1e3
 
     @register_metric()
-    def tflops(
+    def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> float:
         _, mat1, mat2 = example_inputs
         m, k = mat1.size()
         k, n = mat2.size()
         flops = m * k * 2 * n
-        return flops / metrics.latency / 1e12 * 1e3
+        return flops
 
     @register_x_val(label="(M, N, K)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
