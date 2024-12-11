@@ -1337,10 +1337,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             torch.cuda.reset_peak_memory_stats()
             torch.cuda.empty_cache()
         if use_cuda_graphs:
-            with torch.cuda.stream(torch.cuda.Stream()):
-                self.do_bench_cudagraph_mem(
-                    fn, n_repeat=2, grad_to_none=grad_to_none, device_type=device_type
-                )
+            self.do_bench_cudagraph_mem(
+                fn, n_repeat=2, grad_to_none=grad_to_none, device_type=device_type
+            )
         else:
             self.do_bench_mem(
                 fn, n_repeat=2, grad_to_none=grad_to_none, device_type=device_type
