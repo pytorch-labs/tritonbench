@@ -116,6 +116,10 @@ def run(args: List[str] = []):
     else:
         ops = list_operators_by_collection(args.op_collection)
 
+    # Force isolation in subprocess if testing more than one op.
+    if len(ops) >= 2:
+        args.isolate = True
+
     with gpu_lockdown(args.gpu_lockdown):
         for op in ops:
             args.op = op
