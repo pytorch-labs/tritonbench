@@ -8,6 +8,7 @@ Note: make sure to `python install.py` first or otherwise make sure the benchmar
 import argparse
 import copy
 import subprocess
+import sys
 from typing import List
 
 from tritonbench.operator_loader import load_opbench_by_name_from_loader
