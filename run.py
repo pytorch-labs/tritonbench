@@ -7,10 +7,7 @@ Note: make sure to `python install.py` first or otherwise make sure the benchmar
 
 import argparse
 import copy
-import os
 import subprocess
-import sys
-import tempfile
 from typing import List
 
 from tritonbench.operator_loader import load_opbench_by_name_from_loader
@@ -36,6 +33,7 @@ def _run_in_task(op: str) -> None:
     copy_sys_argv = copy.deepcopy(sys.argv)
     copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
     copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
+    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op-collection")
     add_cmd_parameter(copy_sys_argv, "--op", op)
     op_task_cmd.extend(copy_sys_argv)
     try:
