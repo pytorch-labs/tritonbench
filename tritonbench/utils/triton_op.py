@@ -1489,7 +1489,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             "ncu",
             "--nvtx",
             "--nvtx-include",
-            f"{_RANGE_NAME}/",
+            # it is for range_start and range_end. no ending /.
+            f"{_RANGE_NAME}",
             "--target-processes",
             "all",
             "--import-source",
