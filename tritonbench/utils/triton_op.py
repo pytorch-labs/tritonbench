@@ -1490,14 +1490,16 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         ).resolve()
         ncu_args = [
             "ncu",
-            "--nvtx",
-            "--nvtx-include",
-            f"{_RANGE_NAME}/",
             "--target-processes",
             "all",
             "--import-source",
             "yes",
         ]
+        # NCU does not recognize NVTX range on backward
+        # So we have to trace the entire process over backward
+        # See: https://github.com/pytorch-labs/tritonbench/issues/87
+        if not (self.mode == Mode.BWD or self.mode == Mode.FWD_BWD):
+            ncu_args.extend(["--nvtx", "--nvtx-include", f"{_RANGE_NAME}/"])
         ncu_args.extend(extend_ncu_args)
         if replay:
             ncu_args.extend(
