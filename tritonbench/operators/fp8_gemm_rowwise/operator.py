@@ -168,14 +168,14 @@ class Operator(BenchmarkOperator):
     #     return lambda: _cublass(xq, wq, x_scale, w_scale)
 
     @register_metric()
-    def tflops(
+    def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> List[float]:
         xq, wq, _, _ = example_inputs
         m, k = xq.size()
         n, k = wq.size()
         flops = m * k * 2 * n
-        return flops / metrics.latency / 1e12 * 1e3
+        return flops
 
     @register_x_val(label="(M, N, K)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
