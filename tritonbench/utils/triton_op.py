@@ -1194,8 +1194,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.all_configs = self.all_configs(fn)
             if "kernel_source_hash" in self.required_metrics:
                 metrics.kernel_source_hash = self.kernel_hash(fn)
-            # run the hidden metric "_compile_time_in_task"
-            # to get the compile time in parent process
             if "_compile_time_in_task" in self.required_metrics:
                 assert (
                     self.required_metrics == ["_compile_time_in_task"]
@@ -1205,9 +1203,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     "_compile_time_in_task must be measured by itself. "
                     f"required_metrics: {self.required_metrics}, _only: {self._only}, _input_id: {self._input_id}"
                 )
-                metrics.extra_metrics["_compile_time_in_task"] = (
-                    self._compile_time_in_task(fn)
-                )
+                from tritonbench.components.compile_time import do_compile_time_in_task
+
+                metrics.extra_metrics["_compile_time_in_task"] = do_compile_time_in_task(fn)
             if "_ncu_trace_in_task" in self.required_metrics:
                 assert (
                     self.required_metrics == ["_ncu_trace_in_task"]
