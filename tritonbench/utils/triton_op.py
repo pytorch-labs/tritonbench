@@ -1540,7 +1540,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             op_task_args = remove_cmd_parameter(op_task_args, override_option)
         op_task_args.extend(
             [
-                "--name",
+                "--op",
                 self.name,
                 "--only",
                 fn_name,
