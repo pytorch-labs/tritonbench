@@ -1540,6 +1540,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             op_task_args = remove_cmd_parameter(op_task_args, override_option)
         op_task_args.extend(
             [
+                "--name",
+                self.name,
                 "--only",
                 fn_name,
                 "--num-inputs",
@@ -1552,7 +1554,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         )
         op_task = OpTask(name=self.name)
         op_task.make_operator_instance(
-            mode=self.mode.value, device=self.device, extra_args=op_task_args
+            args = op_task_args
         )
         op_task.run()
         latency_with_compile = op_task.get_attribute("_latency_with_compile_in_task")
