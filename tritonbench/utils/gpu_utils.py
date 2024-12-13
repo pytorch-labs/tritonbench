@@ -24,6 +24,16 @@ NV_H100 = {
     "int8": 3958 // 2,
 }
 
+# https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-platform-data-sheet.pdf
+AMD_MI300X = {
+    "fp32": 1300 // 8,
+    "tf32": 5200 // 8,
+    "bf16": 10500 // 8,
+    "fp16": 10500 // 8,
+    "fp8": 20900 // 8,
+    "int8": 20900 // 8,
+}
+
 
 HW_ROOFLINE_SPECS: Dict[
     bool, Dict[str, Dict[str, float]]
@@ -32,11 +42,14 @@ HW_ROOFLINE_SPECS: Dict[
         "NVIDIA A100-SXM4-40GB": NV_A100,
         "NVIDIA A100-PG509-200": NV_A100,
         "NVIDIA H100": NV_H100,
+        "AMD MI300X": AMD_MI300X,
     },
     False: {
         # https://www.nvidia.com/en-gb/data-center/h100
         # values in gbps
         "NVIDIA H100": 2000,
+        # https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-platform-data-sheet.pdf
+        "AMD MI300X": 5300,
     },
 }
 
