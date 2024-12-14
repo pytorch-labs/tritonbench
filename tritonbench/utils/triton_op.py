@@ -1205,7 +1205,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
                 from tritonbench.components.compile_time import do_compile_time_in_task
 
-                metrics.extra_metrics["_compile_time_in_task"] = do_compile_time_in_task(fn)
+                metrics.extra_metrics["_compile_time_in_task"] = do_compile_time_in_task(fn) 
+                self._latency_with_compile_in_task = metrics.extra_metrics["_compile_time_in_task"]
             if "_ncu_trace_in_task" in self.required_metrics:
                 assert (
                     self.required_metrics == ["_ncu_trace_in_task"]
@@ -1578,21 +1579,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             return rooflines[self.tb_args.precision]
         return rooflines
 
-    def _compile_time_in_task(
-        self,
-        fn: Callable,
-    ) -> float:
-        with fresh_triton_cache():
-            torch.cuda.synchronize()
-            start_event = torch.cuda.Event(enable_timing=True)
-            end_event = torch.cuda.Event(enable_timing=True)
-            start_event.record()
-            fn()
-            end_event.record()
-            torch.cuda.synchronize()  # Wait for the events to be recorded!
-        latency_with_compile = start_event.elapsed_time(end_event)
-        self._latency_with_compile_in_task = latency_with_compile
-        return latency_with_compile
 
     def tflops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
