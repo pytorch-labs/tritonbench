@@ -1,7 +1,8 @@
+from typing import Callable
+
 import torch
 from tritonbench.utils.env_utils import fresh_triton_cache
 
-from typing import Callable
 
 def do_compile_time_in_task(fn: Callable) -> float:
     with fresh_triton_cache():

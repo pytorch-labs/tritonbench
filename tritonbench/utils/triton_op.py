@@ -1205,8 +1205,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
                 from tritonbench.components.compile_time import do_compile_time_in_task
 
-                metrics.extra_metrics["_compile_time_in_task"] = do_compile_time_in_task(fn) 
-                self._latency_with_compile_in_task = metrics.extra_metrics["_compile_time_in_task"]
+                metrics.extra_metrics["_compile_time_in_task"] = (
+                    do_compile_time_in_task(fn)
+                )
+                self._latency_with_compile_in_task = metrics.extra_metrics[
+                    "_compile_time_in_task"
+                ]
             if "_ncu_trace_in_task" in self.required_metrics:
                 assert (
                     self.required_metrics == ["_ncu_trace_in_task"]
@@ -1552,9 +1556,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             ]
         )
         op_task = OpTask(name=self.name)
-        op_task.make_operator_instance(
-            args = op_task_args
-        )
+        op_task.make_operator_instance(args=op_task_args)
         op_task.run()
         latency_with_compile = op_task.get_attribute("_latency_with_compile_in_task")
         del op_task
@@ -1578,7 +1580,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             ), f"{self.tb_args.precision} is not supported by {device_name}."
             return rooflines[self.tb_args.precision]
         return rooflines
-
 
     def tflops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
