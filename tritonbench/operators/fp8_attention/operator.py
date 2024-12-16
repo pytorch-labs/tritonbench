@@ -56,6 +56,7 @@ class Operator(BenchmarkOperator):
         self.embedding_dim = args.embedding_dim
         self.D_HEAD = args.d_head
         self.causal = args.causal
+        self.requires_grad = not self.tb_args.mode == "fwd_no_grad"
         self.sm_scale = 1.3
 
     def colfax_preprocess(self, q, k, v):
@@ -123,7 +124,6 @@ class Operator(BenchmarkOperator):
         head_dims = [64, 128, 256]
         BATCH = self.BATCH
         D_HEAD = self.D_HEAD
-        requires_grad = True
         for N_CTX in [2**i for i in range(7, 15)]:
             self.N_CTX = N_CTX
             H = self.embedding_dim // D_HEAD
@@ -133,19 +133,19 @@ class Operator(BenchmarkOperator):
                 (BATCH, H, N_CTX, D_HEAD),
                 dtype=torch.float16,
                 device=self.device,
-                requires_grad=True,
+                requires_grad=self.requires_grad,
             )
             k = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
                 dtype=torch.float16,
                 device=self.device,
-                requires_grad=True,
+                requires_grad=self.requires_grad,
             )
             v = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
                 dtype=torch.float16,
                 device=self.device,
-                requires_grad=True,
+                requires_grad=self.requires_grad,
             )
             yield (q, k, v)
 
@@ -153,6 +153,7 @@ class Operator(BenchmarkOperator):
     def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> float:
-        H = self.embedding_dim // self.D_HEAD
-        flops_per_matmul = 2.0 * self.BATCH * H * self.N_CTX * self.N_CTX * self.D_HEAD
+        q, _, _ = example_inputs
+        BATCH, H, N_CTX, D_HEAD = q.shape
+        flops_per_matmul = 2.0 * BATCH * H * N_CTX * N_CTX * D_HEAD
         return 2 * flops_per_matmul
