@@ -69,7 +69,7 @@ def install_fa3():
     FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
     env = os.environ.copy()
     # nvcc will now spawn cicc and will cost ~1G memory
-    env["MAX_JOBS"] = "4"
+    env["MAX_JOBS"] = "8"
     cmd = [sys.executable, "setup.py", "install"]
     subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()), env=env)
 
