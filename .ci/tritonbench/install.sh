@@ -10,5 +10,8 @@ fi
 tritonbench_dir=$(dirname "$(readlink -f "$0")")/../..
 cd ${tritonbench_dir}
 
+# probe memory available
+free -h
+
 # Install Tritonbench and all its customized packages
 python install.py --all
