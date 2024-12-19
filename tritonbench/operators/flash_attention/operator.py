@@ -439,7 +439,7 @@ class Operator(BenchmarkOperator):
 
         return tk_dispatcher
 
-    @register_benchmark(enabled=False, label=f"cudnn_{torch.backends.cudnn.version()}")
+    @register_benchmark(enabled=False, label=f"cudnn")
     def cudnn(self, q, k, v):
         os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
 

@@ -1569,7 +1569,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
         rooflines = HW_ROOFLINE_SPECS[self.is_compute_bound]
 
-        device_name = torch.cuda.get_device_name()
+        device_name = (
+            torch.cuda.get_device_name() if not torch.version.hip else "AMD MI300X"
+        )
         assert (
             device_name in rooflines
         ), f"{device_name} is not supported in HW roofline specs."
