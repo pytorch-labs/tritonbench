@@ -131,7 +131,7 @@ if __name__ == "__main__":
     if args.fa3 or args.all:
         logger.info("[tritonbench] installing fa3...")
         install_fa3()
-    if args.colfax or args.all:
+    if args.colfax:
         logger.info("[tritonbench] installing colfax cutlass-kernels...")
         from tools.cutlass_kernels.install import install_colfax_cutlass
 
