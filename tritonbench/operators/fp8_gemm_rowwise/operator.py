@@ -118,14 +118,16 @@ class Operator(BenchmarkOperator):
         super().__init__(tb_args, extra_args)
         self.use_cuda_graphs = True
         addmm_args = parse_args(self.extra_args)
-        if hasattr(tb_args, "production_shapes") and tb_args.production_shapes:
-            self.shapes = get_production_shapes(self.name, "fp32_gemm")
-        elif addmm_args.m and addmm_args.n and addmm_args.k:
+        if addmm_args.m and addmm_args.n and addmm_args.k:
             self.shapes = [(addmm_args.m, addmm_args.n, addmm_args.k)]
         elif addmm_args.llama:
             self.shapes = gemm_shapes()
         else:
             self.shapes = BUILDIN_SHAPES
+        if hasattr(tb_args, "production_shapes") and tb_args.production_shapes:
+            extras = get_production_shapes(self.name, "fp32_gemm")
+            if len(extras):
+                self.shapes.extend(extras)
         self.fp8_fast_accum = addmm_args.fp8_fast_accum
         self.use_tma = addmm_args.use_tma
         self.no_use_persistent = addmm_args.no_use_persistent
