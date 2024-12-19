@@ -14,4 +14,5 @@ cd ${tritonbench_dir}
 free -h
 
 # Install Tritonbench and all its customized packages
-python install.py --all
+# Test: only install fa3
+python install.py --fa3
