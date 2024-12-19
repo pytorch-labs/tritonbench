@@ -65,15 +65,6 @@ def install_fa2(compile=False):
         subprocess.check_call(cmd)
 
 
-def install_fa3():
-    FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
-    env = os.environ.copy()
-    # nvcc will now spawn cicc and will cost ~1G memory
-    env["MAX_JOBS"] = "8"
-    cmd = [sys.executable, "setup.py", "install"]
-    subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()), env=env)
-
-
 def install_liger():
     # Liger-kernel has a conflict dependency `triton` with pytorch,
     # so we need to install it without dependencies
@@ -130,6 +121,8 @@ if __name__ == "__main__":
         install_fa2(compile=True)
     if args.fa3 or args.all:
         logger.info("[tritonbench] installing fa3...")
+        from tools.flash_attn.install import install_fa3
+
         install_fa3()
     if args.colfax:
         logger.info("[tritonbench] installing colfax cutlass-kernels...")
