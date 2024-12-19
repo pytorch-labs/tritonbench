@@ -67,8 +67,11 @@ def install_fa2(compile=False):
 
 def install_fa3():
     FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
+    env = os.environ.copy()
+    # nvcc will now spawn cicc and will cost ~1G memory
+    env["MAX_JOBS"] = "8"
     cmd = [sys.executable, "setup.py", "install"]
-    subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()))
+    subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()), env=env)
 
 
 def install_liger():
@@ -128,7 +131,7 @@ if __name__ == "__main__":
     if args.fa3 or args.all:
         logger.info("[tritonbench] installing fa3...")
         install_fa3()
-    if args.colfax or args.all:
+    if args.colfax:
         logger.info("[tritonbench] installing colfax cutlass-kernels...")
         from tools.cutlass_kernels.install import install_colfax_cutlass
 
