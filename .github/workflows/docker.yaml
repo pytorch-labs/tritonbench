@@ -42,6 +42,8 @@ jobs:
           # branch name is github.head_ref when triggered by pull_request
           # and it is github.ref_name when triggered by workflow_dispatch
           branch_name=${{ github.head_ref || github.ref_name }}
+          # show disk space
+          df -h
           docker build . --memory 80g --shm-size 4g --build-arg TRITONBENCH_BRANCH="${branch_name}" --build-arg FORCE_DATE="${NIGHTLY_DATE}" \
               -f tritonbench-nightly.dockerfile -t ghcr.io/pytorch-labs/tritonbench:latest
           # Extract pytorch version from the docker
