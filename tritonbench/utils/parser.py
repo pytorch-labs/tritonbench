@@ -1,6 +1,5 @@
 import argparse
-
-from typing import List
+from typing import List, Optional
 
 from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
 from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP, IS_FBCODE
@@ -79,11 +78,6 @@ def get_parser(args=None):
         "--plot",
         action="store_true",
         help="Plot the result.",
-    )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="Run in the CI mode.",
     )
     parser.add_argument(
         "--metrics",
@@ -187,8 +181,6 @@ def get_parser(args=None):
         )
 
     args, extra_args = parser.parse_known_args(args)
-    if args.op and args.ci:
-        parser.error("cannot specify operator when in CI mode")
     if not args.op and not args.op_collection:
         print(
             "Neither operator nor operator collection is specified. Running all operators in the default collection."
