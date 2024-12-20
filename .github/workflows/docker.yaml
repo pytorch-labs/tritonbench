@@ -46,7 +46,7 @@ jobs:
           df -h
           # show cpu
           lscpu
-          taskset -c 4-31 docker build . --memory 80g --shm-size 4g --build-arg TRITONBENCH_BRANCH="${branch_name}" --build-arg FORCE_DATE="${NIGHTLY_DATE}" \
+          taskset -c 16-31 docker build . --memory 80g --shm-size 4g --build-arg TRITONBENCH_BRANCH="${branch_name}" --build-arg FORCE_DATE="${NIGHTLY_DATE}" \
                   -f tritonbench-nightly.dockerfile -t ghcr.io/pytorch-labs/tritonbench:latest
           # Extract pytorch version from the docker
           PYTORCH_VERSION=$(docker run -e SETUP_SCRIPT="${SETUP_SCRIPT}" ghcr.io/pytorch-labs/tritonbench:latest bash -c '. "${SETUP_SCRIPT}"; python -c "import torch; print(torch.__version__)"')
