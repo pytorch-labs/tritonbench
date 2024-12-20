@@ -20,6 +20,10 @@ env:
 jobs:
   build-push-docker:
     if: ${{ github.repository_owner == 'pytorch-labs' }}
+    # spec:
+    # 120G RAM
+    # 32 logical CPU cores
+    # 1T disk
     runs-on: 32-core-ubuntu
     environment: docker-s3-upload
     steps:
@@ -42,10 +46,7 @@ jobs:
           # branch name is github.head_ref when triggered by pull_request
           # and it is github.ref_name when triggered by workflow_dispatch
           branch_name=${{ github.head_ref || github.ref_name }}
-          # show disk space
-          df -h
-          # show cpu
-          lscpu
+          # limit CPU core and memory usage to keep runner daemon alive on CI machine
           taskset -c 16-31 docker build . --memory 80g --shm-size 4g --build-arg TRITONBENCH_BRANCH="${branch_name}" --build-arg FORCE_DATE="${NIGHTLY_DATE}" \
                   -f tritonbench-nightly.dockerfile -t ghcr.io/pytorch-labs/tritonbench:latest
           # Extract pytorch version from the docker
