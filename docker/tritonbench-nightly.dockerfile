@@ -50,7 +50,7 @@ RUN cd /workspace/tritonbench && \
 RUN sudo apt update && sudo apt-get install -y libnvidia-compute-550 patchelf patch
 
 # Workaround: installing Ninja from setup.py hits "Failed to decode METADATA with UTF-8" error
-RUN pip install ninja
+RUN . ${SETUP_SCRIPT} && pip install ninja
 
 # Install Tritonbench
 RUN cd /workspace/tritonbench && \
