@@ -121,7 +121,7 @@ if __name__ == "__main__":
     if args.fbgemm or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
-    if args.fa2 or args.all:
+    if args.fa2:
         logger.info("[tritonbench] installing fa2 from source...")
         install_fa2(compile=True)
     if args.colfax:
