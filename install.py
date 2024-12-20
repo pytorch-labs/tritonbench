@@ -121,7 +121,7 @@ if __name__ == "__main__":
     if args.fbgemm or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
-    if args.fa2:
+    if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2 from source...")
         install_fa2(compile=True)
     if args.colfax:
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
-    if args.xformers or args.all:
+    if args.xformers:
         logger.info("[tritonbench] installing xformers...")
         from tools.xformers.install import install_xformers
 
