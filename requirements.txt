@@ -2,5 +2,4 @@ packaging
 pynvml
 psutil
 tabulate
-ninja
 transformers==4.46.1
