@@ -57,18 +57,12 @@ def install_fa2(compile=False):
     if compile:
         # compile from source (slow)
         FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
-        cmd = [sys.executable, "setup.py", "install"]
+        cmd = ["pip", "install", "-e", "."]
         subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
     else:
         # Install the pre-built binary
         cmd = ["pip", "install", "flash-attn", "--no-build-isolation"]
         subprocess.check_call(cmd)
-
-
-def install_fa3():
-    FA3_PATH = REPO_PATH.joinpath("submodules", "flash-attention", "hopper")
-    cmd = [sys.executable, "setup.py", "install"]
-    subprocess.check_call(cmd, cwd=str(FA3_PATH.resolve()))
 
 
 def install_liger():
@@ -119,16 +113,19 @@ if __name__ == "__main__":
     # checkout submodules
     checkout_submodules(REPO_PATH)
     # install submodules
+    if args.fa3 or args.all:
+        # we need to install fa3 above all other dependencies
+        logger.info("[tritonbench] installing fa3...")
+        from tools.flash_attn.install import install_fa3
+
+        install_fa3()
     if args.fbgemm or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm()
     if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2 from source...")
         install_fa2(compile=True)
-    if args.fa3 or args.all:
-        logger.info("[tritonbench] installing fa3...")
-        install_fa3()
-    if args.colfax or args.all:
+    if args.colfax:
         logger.info("[tritonbench] installing colfax cutlass-kernels...")
         from tools.cutlass_kernels.install import install_colfax_cutlass
 
@@ -136,7 +133,7 @@ if __name__ == "__main__":
     if args.jax or args.all:
         logger.info("[tritonbench] installing jax...")
         install_jax()
-    if args.tk or args.all:
+    if args.tk:
         logger.info("[tritonbench] installing thunderkittens...")
         from tools.tk.install import install_tk
 
@@ -144,7 +141,7 @@ if __name__ == "__main__":
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
-    if args.xformers or args.all:
+    if args.xformers:
         logger.info("[tritonbench] installing xformers...")
         from tools.xformers.install import install_xformers
 
