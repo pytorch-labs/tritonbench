@@ -57,7 +57,7 @@ def install_fa2(compile=False):
     if compile:
         # compile from source (slow)
         FA2_PATH = REPO_PATH.joinpath("submodules", "flash-attention")
-        cmd = [sys.executable, "setup.py", "install"]
+        cmd = ["pip", "install", "-e", "."]
         subprocess.check_call(cmd, cwd=str(FA2_PATH.resolve()))
     else:
         # Install the pre-built binary
