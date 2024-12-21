@@ -124,6 +124,17 @@ class SubprocessWorker(base.WorkerBase):
             worker_env["PYTHONPATH"] = f'{worker_env["PYTHONPATH"]}:{parent_sys_path}'
         else:
             worker_env["PYTHONPATH"] = parent_sys_path
+        # setup additional library path for fbcode
+        if "#platform-runtime" in sys.executable:
+            old_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+            lib_dir = os.path.join(
+                os.path.dirname(os.path.dirname(sys.executable)), "lib"
+            )
+            if os.path.exists(lib_dir):
+                worker_env["LD_LIBRARY_PATH"] = (
+                    f"{lib_dir}:{old_library_path}" if old_library_path else lib_dir
+                )
+
         self._proc = subprocess.Popen(
             args=self.args,
             stdin=subprocess.PIPE,
