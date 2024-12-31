@@ -34,6 +34,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         dest="no_use_persistent",
         action="store_true",
     )
+    parser.add_argument("--warp_specialization", action="store_true")
     parsed_args = parser.parse_args(args)
     return parsed_args
 
@@ -131,6 +132,7 @@ class Operator(BenchmarkOperator):
         self.fp8_fast_accum = addmm_args.fp8_fast_accum
         self.use_tma = addmm_args.use_tma
         self.no_use_persistent = addmm_args.no_use_persistent
+        self.warp_specialization = addmm_args.warp_specialization
 
     @register_benchmark(enabled=HAS_TRITON, baseline=True)
     def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
@@ -142,6 +144,7 @@ class Operator(BenchmarkOperator):
             fp8_fast_accum=self.fp8_fast_accum,
             tma_persistent=self.use_tma,
             no_use_persistent=self.no_use_persistent,
+            use_warp_specialization=self.warp_specialization,
         )
 
     @register_benchmark(
