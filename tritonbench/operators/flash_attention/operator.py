@@ -100,17 +100,17 @@ except (ImportError, IOError, AttributeError, TypeError):
     HAS_XFORMERS = False
 
 # [Optional] colfax cutlass backend
-try:
-    if not hasattr(torch.version, "git_version"):
-        # colfax Flash Attention V2 for Hopper
-        torch.ops.load_library("//ai_codesign/gen_ai/cutlass-kernels:fmha_forward_lib")
-    else:
-        from tritonbench.utils.loader import load_library
+# try:
+if not hasattr(torch.version, "git_version"):
+    # colfax Flash Attention V2 for Hopper
+    torch.ops.load_library("//ai_codesign/gen_ai/cutlass-kernels:fmha_forward_lib")
+else:
+    from tritonbench.utils.loader import load_library
 
-        load_library("cutlass_kernels/fmha_forward_lib.so")
-    colfax_cutlass_fmha = torch.ops.cutlass.fmha_forward
-except (ImportError, IOError, AttributeError):
-    colfax_cutlass_fmha = None
+    load_library("cutlass_kernels/fmha_forward_lib.so")
+colfax_cutlass_fmha = torch.ops.cutlass.fmha_forward
+# except (ImportError, IOError, AttributeError):
+#     colfax_cutlass_fmha = None
 
 # [Optional] ThunderKittens backend
 try:
