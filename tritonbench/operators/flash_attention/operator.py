@@ -280,7 +280,19 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # base: do not enable TMA/WarpSpec/CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "base"
+            q, k, v, self.causal, self.sm_scale, "base", "base"
+        )
+
+    @register_benchmark()
+    def triton_tutorial_flash_v2_bwd_ws(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        # base: do not enable TMA/WarpSpec/CompPipe
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "base", "ws"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124)
@@ -292,7 +304,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # autotune CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "opt"
+            q, k, v, self.causal, self.sm_scale, "opt", "base"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124)
@@ -304,7 +316,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # autotune TMA/CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "tma"
+            q, k, v, self.causal, self.sm_scale, "tma", "base"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
@@ -316,7 +328,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # autotune WarpSpec/CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "ws"
+            q, k, v, self.causal, self.sm_scale, "ws", "base"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
@@ -328,7 +340,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # autotune TMA/WarpSpec/CompPipe
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "tma_ws"
+            q, k, v, self.causal, self.sm_scale, "tma_ws", "base"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
@@ -340,7 +352,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         # autotune TMA/WarpSpec/CompPipe/Persistent
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "tma_ws_persistent"
+            q, k, v, self.causal, self.sm_scale, "tma_ws_persistent", "base"
         )
 
     @register_benchmark(enabled=HAS_KERNELS)
