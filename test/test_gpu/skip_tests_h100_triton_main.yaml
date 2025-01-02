@@ -7,6 +7,10 @@
 flash_attention:
   # thunderkittens cannot handle the default input shapes
   - tk
+  # xformers fa is not included in the docker anymore
+  # because of docker build time constraint
+  - xformers
+  - xformers_splitk
   # _ws kernels require Triton with warp specialization
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
