@@ -11,6 +11,7 @@ flash_attention:
   # because of docker build time constraint
   - xformers
   - xformers_splitk
+  - colfax_cutlass
   # triton_op_flash_v2 will segfault on triton-pytorch
   - triton_op_flash_v2
   # triton_tutorial_*_ws kernels require triton-main

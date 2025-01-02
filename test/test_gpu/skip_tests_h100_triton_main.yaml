@@ -11,6 +11,7 @@ flash_attention:
   # because of docker build time constraint
   - xformers
   - xformers_splitk
+  - colfax_cutlass
   # _ws kernels require Triton with warp specialization
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
