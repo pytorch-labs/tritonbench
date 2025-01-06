@@ -1,7 +1,27 @@
-from typing import Callable
+from typing import Callable, Dict
 
 import torch
+from triton.fb.triton_util import triton_add_listener, TritonHook
 from tritonbench.utils.env_utils import fresh_triton_cache
+
+
+def fbcode_do_compile_time_in_task(fn: Callable) -> Dict[str, float]:
+    # not yet getting results that make sense to me
+    detailed_data = {}
+    with fresh_triton_cache():
+
+        def _inner(**kwargs):
+            stats = kwargs.get("stats", {})
+            if not stats:
+                return
+            if "compile_time_stats" in stats:
+                detailed_data["compile_time_stats"] = stats["compile_time_stats"]
+
+        triton_add_listener(TritonHook.POST_COMPILE, _inner)
+        fn()
+    if "compile_time_stats" in detailed_data:
+        return detailed_data["compile_time_stats"]
+    return None
 
 
 def do_compile_time_in_task(fn: Callable) -> float:
