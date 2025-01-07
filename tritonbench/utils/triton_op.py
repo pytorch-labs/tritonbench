@@ -619,6 +619,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     example_inputs: Any = None
     use_cuda_graphs: bool = False
     is_compute_bound = True
+    # reset dynamo to avoid errors like https://github.com/pytorch-labs/tritonbench/issues/90
+    reset_dynamo = False
 
     """
     A base class for adding operators to torch benchmark.
@@ -743,6 +745,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     self.example_inputs = self.get_example_inputs()
             for input_id in input_id_range:
                 self.example_inputs = self.get_example_inputs()
+                if self.reset_dynamo:
+                    torch._dynamo.reset()
                 x_val = self.get_x_val(self.example_inputs)
                 if "proton" in self.required_metrics:
                     proton.activate(self._proton_session_id)
