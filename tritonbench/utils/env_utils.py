@@ -1,9 +1,15 @@
+"""
+Utils for checking and modifying the environment.
+"""
+
 import logging
 import os
 import shutil
 from contextlib import contextmanager, ExitStack
-
 from typing import Optional
+
+import torch
+import triton
 
 from tritonbench.utils.path_utils import REPO_PATH
 
@@ -22,6 +28,23 @@ AVAILABLE_PRECISIONS = [
     "amp_bf16",
     "fp8",
 ]
+
+
+def is_cuda() -> bool:
+    return torch.version.cuda is not None
+
+
+def is_hip() -> bool:
+    return torch.version.hip is not None
+
+
+def is_hip_mi200():
+    target = triton.runtime.driver.active.get_current_target()
+    return is_hip() and target.arch == "gfx90a"
+
+
+def supports_tma():
+    return is_cuda() and torch.cuda.get_device_capability()[0] >= 9
 
 
 def set_env():

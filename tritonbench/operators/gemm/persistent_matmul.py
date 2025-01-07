@@ -3,13 +3,13 @@ from functools import lru_cache
 import torch
 import triton
 import triton.language as tl
-
+from tritonbench.utils.env_utils import is_cuda
 from tritonbench.utils.triton_op import IS_FBCODE
 
 if not IS_FBCODE:
     import triton.tools.experimental_descriptor
 
-    if torch.cuda.is_available():
+    if is_cuda():
         from triton._C.libtriton import nvidia
 
         cublas_workspace = torch.empty(
@@ -18,14 +18,6 @@ if not IS_FBCODE:
         cublas = nvidia.cublas.CublasLt(cublas_workspace)
     else:
         cublas = None
-
-
-def is_cuda():
-    return triton.runtime.driver.active.get_current_target().backend == "cuda"
-
-
-def supports_tma():
-    return is_cuda() and torch.cuda.get_device_capability()[0] >= 9
 
 
 def _matmul_launch_metadata(grid, kernel, args):

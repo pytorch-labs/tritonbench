@@ -70,6 +70,18 @@ def get_configs_io_bound():
     return configs
 
 
+# estimate_matmul_time is not compatible with AMD/ROCm
+prune_configs_by = (
+    {
+        "early_config_prune": early_config_prune,
+        "perf_model": estimate_matmul_time,
+        "top_k": 10,
+    }
+    if torch.version.hip is None
+    else {}
+)
+
+
 @autotune(
     configs=[
         # basic configs for compute-bound matmuls
@@ -167,11 +179,7 @@ def get_configs_io_bound():
     ]
     + get_configs_io_bound(),
     key=["M", "N", "K"],
-    prune_configs_by={
-        "early_config_prune": early_config_prune,
-        "perf_model": estimate_matmul_time,
-        "top_k": 10,
-    },
+    prune_configs_by=prune_configs_by,
 )
 @heuristics(
     {

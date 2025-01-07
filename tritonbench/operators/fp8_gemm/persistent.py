@@ -4,9 +4,10 @@ import torch
 import triton
 import triton.language as tl
 import triton.tools.experimental_descriptor
+from tritonbench.utils.env_utils import is_cuda
 
 cublas = None
-if torch.cuda.is_available():
+if is_cuda():
     try:
         from triton._C.libtriton import nvidia
 
@@ -16,14 +17,6 @@ if torch.cuda.is_available():
         cublas = nvidia.cublas.CublasLt(cublas_workspace)
     except (ImportError, IOError, AttributeError):
         pass
-
-
-def is_cuda():
-    return triton.runtime.driver.active.get_current_target().backend == "cuda"
-
-
-def supports_tma():
-    return is_cuda() and torch.cuda.get_device_capability()[0] >= 9
 
 
 def _matmul_launch_metadata(grid, kernel, args):

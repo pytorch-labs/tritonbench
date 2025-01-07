@@ -455,10 +455,14 @@ def find_enabled_benchmarks(mode, benchmark_backends, skip_benchmarks):
         return (not (m == Mode.BWD or m == Mode.FWD_BWD)) or not backend.fwd_only
 
     if skip_benchmarks:
+        # even if we are skipping benchmarks, we have to check if the backend is enabled
+        # e.g., we can't run CUTLASS on AMD even if it isn't explicitly skipped
         benchmarks = [
             bm
             for bm in benchmark_backends.keys()
-            if bm not in skip_benchmarks and runnable(mode, benchmark_backends[bm])
+            if bm not in skip_benchmarks
+            and runnable(mode, benchmark_backends[bm])
+            and benchmark_backends[bm].enabled
         ]
     else:
         benchmarks = [

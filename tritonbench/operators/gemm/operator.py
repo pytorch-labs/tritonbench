@@ -7,7 +7,11 @@ import torch
 import torch._inductor.config as inductor_config
 import triton
 
+from tritonbench.operators.gemm.kernels import matmul as kernels
+from tritonbench.operators.gemm.partition_k import matmul_partition_k
+
 from tritonbench.utils.data_utils import get_production_shapes
+from tritonbench.utils.env_utils import is_cuda
 
 from tritonbench.utils.path_utils import REPO_PATH
 
@@ -21,24 +25,18 @@ from tritonbench.utils.triton_op import (
     register_x_val,
 )
 
-from .kernels import matmul as kernels
-from .partition_k import matmul_partition_k
-
 try:
-    from .persistent_matmul import (
+    from tritonbench.operators.gemm.persistent_matmul import (
         matmul_persistent,
         matmul_tma_persistent,
         matmul_tma_persistent_cached,
     )
 
-    HAS_PRESISTENT = True
+    HAS_PERSISTENT = True
 except ModuleNotFoundError:
-    HAS_PRESISTENT = False
+    HAS_PERSISTENT = False
 
-from .triton_matmul import (
-    matmul as triton_tutorial_matmul,
-    matmul_kernel as triton_tutorial_matmul_kernel,
-)
+from tritonbench.operators.gemm.triton_matmul import matmul as triton_tutorial_matmul
 
 if IS_FBCODE:
     import generative_recommenders.ops.triton.triton_addmm as hstu_triton_addmm
@@ -182,14 +180,14 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_partition_k(a, bt)
 
-    @register_benchmark(enabled=HAS_PRESISTENT)
+    @register_benchmark(enabled=HAS_PERSISTENT)
     def triton_persistent_matmul(self, a, b, bias) -> Callable:
         if not bias == None:
             return lambda: matmul_persistent(a, b) + bias
         else:
             return lambda: matmul_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_PRESISTENT)
+    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT)
     def triton_tma_persistent_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if not bias == None:
@@ -197,7 +195,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_tma_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_PRESISTENT)
+    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT)
     def triton_tma_persistent_cached_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if not bias == None:
@@ -205,7 +203,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_tma_persistent_cached(a, b)
 
-    @register_benchmark(enabled=torch.version.cuda is not None)
+    @register_benchmark(enabled=is_cuda())
     def triton_ops_matmul(self, a, b, bias) -> Callable:
         if bias is None:
             return lambda: kernels.matmul(a, b)
@@ -266,9 +264,10 @@ class Operator(BenchmarkOperator):
                 f = lambda a, b: a.matmul(b)
             compiled = torch.compile(f, dynamic=False)
             compiled(a, b)
+
         return lambda: compiled(a, b)
 
-    @register_benchmark(enabled=not torch.version.hip)
+    @register_benchmark(enabled=is_cuda())
     def pt2_cutlass_matmul(self, a, b, bias) -> Callable:
         torch._dynamo.reset()
         with inductor_config.patch(
