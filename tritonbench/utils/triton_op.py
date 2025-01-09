@@ -1650,9 +1650,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
             with flop_counter:
                 work_func()
-            total_flops = sum(
-                [v for _, v in flop_counter.flop_counts["Global"].items()]
-            )
+            total_flops = flop_counter.get_total_flops()
             return total_flops
 
         fn = self._get_bm_func(fn_name)
