@@ -1,5 +1,6 @@
 """
 Utils for checking and modifying the environment.
+Requires PyTorch
 """
 
 import logging
@@ -29,6 +30,9 @@ AVAILABLE_PRECISIONS = [
     "fp8",
 ]
 
+
+def is_fbcode() -> bool:
+    return not hasattr(torch.version, "git_version")
 
 def is_cuda() -> bool:
     return torch.version.cuda is not None

@@ -66,9 +66,10 @@ def run():
         op_args = OPERATORS[op]
         output_file = output_dir.joinpath(f"{op}.csv")
         op_args.extend(["--output", str(output_file.absolute())])
-        op = op_task.make_operator_instance(op_args)
-        op.run()
+        op_task.make_operator_instance(op_args)
+        op_task.run()
         output_files.append(output_file)
+        del op_task
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(output_files)
 
