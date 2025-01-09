@@ -1,5 +1,6 @@
 __pycache__/
 .data/
+.benchmarks/
 ._*
 */**/__pycache__
 */**/*.pkl
