@@ -23,30 +23,54 @@ def setup_tritonbench_cwd():
     return original_dir
 
 OPERATORS = {
-    "launch_latency": [],
-    "addmm": [],
-    "gemm": [],
-    "flash_attention": [],
+    "launch_latency": [
+        "--op",
+        "launch_latency",
+        "--metrics",
+        "latency,walltime",
+    ],
+    "softmax": [
+        "--op",
+        "softmax",
+        "--metrics",
+        "latency,gbps,compile_time",
+    ],
+    "bf16_gemm": [
+        "--op",
+        "gemm",
+        "--only",
+        "aten_matmul,triton_tutorial_matmul",
+        "--precision",
+        "bf16",
+        "--metrics",
+        "latency,tflops",
+        "--num-inputs",
+        "4",
+    ],
 }
 
 
-def reduce(output_dir):
+def reduce(output_files):
+    # TODO: reduce and aggregate all outputs
     pass
+
 
 def run():
     setup_tritonbench_cwd()
     from tritonbench.operators.op_task import OpTask
-    output_dir = setup_output_dir()
-    common_args = ["--output", output_dir]
+    output_dir = setup_output_dir("nightly")
     # Run each operator
+    output_files = []
     for op in OPERATORS:
         op_task = OpTask(op)
         op_args = OPERATORS[op]
-        op_args.extend(common_args)
+        output_file = output_dir.joinpath(f"{op}.csv")
+        op_args.extend(["--output", str(output_file.absolute())])
         op = op_task.make_operator_instance(op_args)
         op.run()
-    # Reduce all operators to a single output json
-    result_json_file = reduce(output_dir)
+        output_files.append(output_file)
+    # Reduce all operator CSV outputs to a single output json
+    result_json_file = reduce(output_files)
 
 
 if __name__ == "__main__":
