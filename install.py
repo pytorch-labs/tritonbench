@@ -8,6 +8,7 @@ from pathlib import Path
 from tools.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from tools.git_utils import checkout_submodules
 from tools.python_utils import pip_install_requirements
+
 from tritonbench.utils.env_utils import is_hip
 
 
