@@ -73,7 +73,7 @@ def get_best_config_from_output(output_str):
 
 def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
     B, M = x.shape[0], x.shape[2]
-    cached_config = jagged_cache.get_config(M, max_seqlen)
+    cached_config = jagged_cache.get_config(M)
     grid = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     kernel_output = torch.zeros((B, M), device=x.device)
 
@@ -131,7 +131,7 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
         config = get_best_config_from_output(output)
         if config:
             print("Parsed config:", config)
-            jagged_cache.store_config(M, max_seqlen, config)
+            jagged_cache.store_config(M, config)
     return kernel_output
 
 

@@ -30,15 +30,15 @@ class AutotuneCache:
         with open(self.cache_file, 'w') as f:
             json.dump(self.cache, f, indent=2)
 
-    def get_key(self, M, max_seqlen):
-        return f"{M}_{max_seqlen}"
+    def get_key(self, M):
+        return f"{M}"
 
-    def get_config(self, M, max_seqlen):
-        key = self.get_key(M, max_seqlen)
+    def get_config(self, M):
+        key = self.get_key(M)
         return self.cache["configs"].get(key)
 
-    def store_config(self, M, max_seqlen, config, perf = 0.0):
-        key = self.get_key(M, max_seqlen)
+    def store_config(self, M, config, perf = 0.0):
+        key = self.get_key(M)
         current = self.cache["configs"].get(key)
         
         # print(f"Storing config for key {key}")  # Debug print

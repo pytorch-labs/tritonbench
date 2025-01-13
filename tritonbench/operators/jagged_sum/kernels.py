@@ -237,7 +237,7 @@ def triton_jagged_sum_kernel_simple_fused_buffer_then_sum(
             NUM_STAGES,  # number of stages
         )
     ],
-    key=["M","MAX_SEQLEN"],
+    key=["M"],
 )
 @triton.jit
 def triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer(
