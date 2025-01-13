@@ -8,7 +8,9 @@ from pathlib import Path
 from tools.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from tools.git_utils import checkout_submodules
 from tools.python_utils import pip_install_requirements
-from tools.torch_utils import is_hip
+
+from tritonbench.utils.env_utils import is_hip
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

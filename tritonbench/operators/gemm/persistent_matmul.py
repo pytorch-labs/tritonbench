@@ -3,6 +3,7 @@ from functools import lru_cache
 import torch
 import triton
 import triton.language as tl
+
 from tritonbench.utils.env_utils import is_cuda
 from tritonbench.utils.triton_op import IS_FBCODE
 
