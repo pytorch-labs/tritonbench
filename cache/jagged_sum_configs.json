@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "last_updated": 1736797112.89125
+  },
+  "configs": {
+    "1_4": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 8,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 4,
+        "num_ctas": 1,
+        "num_stages": 4,
+        "maxnreg": null
+      },
+      "perf": 0.0,
+      "timestamp": 1736797112.8912494
+    }
+  }
+}
