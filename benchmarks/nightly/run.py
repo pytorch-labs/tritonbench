@@ -2,9 +2,12 @@
 Tritonbench nightly run
 """
 import os
+import logging
 import sys
 from os.path import abspath, exists
 from benchmarks.utils import setup_output_dir
+
+logger = logging.getLogger(__name__)
 
 def setup_tritonbench_cwd():
     original_dir = abspath(os.getcwd())
@@ -51,7 +54,7 @@ OPERATORS = {
 
 
 def reduce(output_files):
-    # TODO: reduce and aggregate all outputs
+    # TODO: reduce and aggregate all operator outputs
     pass
 
 
@@ -62,6 +65,7 @@ def run():
     # Run each operator
     output_files = []
     for op in OPERATORS:
+        logger.info(f"[nightly] running operator benchmark: {op}")
         op_task = OpTask(op)
         op_args = OPERATORS[op]
         output_file = output_dir.joinpath(f"{op}.csv")
@@ -72,6 +76,7 @@ def run():
         del op_task
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(output_files)
+    logger.info(f"[nightly] logging result json file to {result_json_file}.")
 
 
 if __name__ == "__main__":
