@@ -70,6 +70,7 @@ def run():
         logger.info(f"[nightly] running operator benchmark: {op_bench}")
         op_args = OPERATOR_BENCHMARKS[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.csv")
+        op_args.insert(0, "run.py")
         op_args.extend(["--output", str(output_file.absolute())])
         run_in_task(op=op_bench, op_args=op_args)
         output_files.append(output_file)

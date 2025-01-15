@@ -3,7 +3,7 @@ import sys
 import subprocess
 
 from tritonbench.utils.env_utils import is_fbcode
-from tritonbench.utils.path_utils import remove_cmd_parameter, add_cmd_parameter
+from tritonbench.utils.path_utils import REPO_PATH, remove_cmd_parameter, add_cmd_parameter
 
 from typing import Optional, List
 
@@ -19,8 +19,8 @@ def run_in_task(op: str, op_args: Optional[List[str]]=None) -> None:
     else:
         op_task_cmd.extend(op_args)
     try:
-        print("[tritonbench] running command: " + " ".join(op_task_cmd))
-        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr)
+        print("[tritonbench] running benchmark: " + " ".join(op_task_cmd))
+        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr, cwd=REPO_PATH)
     except subprocess.CalledProcessError:
         # By default, we will continue on the failed operators
         pass
