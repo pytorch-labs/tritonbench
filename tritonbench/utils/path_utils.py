@@ -47,7 +47,7 @@ def _find_param_loc(params, key: str) -> int:
 def _param_has_argument(params, index: str) -> bool:
     if index == -1 or index == len(params) - 1:
         return False
-    if params[index+1].starswith("-"):
+    if params[index+1].startswith("-"):
         return False
     return True
 
