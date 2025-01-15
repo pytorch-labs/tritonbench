@@ -71,7 +71,7 @@ def run():
         op_args = OPERATOR_BENCHMARKS[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.csv")
         op_args.extend(["--output", str(output_file.absolute())])
-        run_in_task(OPERATOR_BENCHMARKS[op_bench])
+        run_in_task(op=op_bench, op_args=op_args)
         output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(output_files)
