@@ -9,6 +9,7 @@ from benchmarks.utils import setup_output_dir
 from tritonbench.utils.path_utils import get_cmd_parameter
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 def setup_tritonbench_cwd():
     original_dir = abspath(os.getcwd())
@@ -37,7 +38,7 @@ OPERATOR_BENCHMARKS = {
         "--op",
         "softmax",
         "--metrics",
-        "latency,gbps,compile_time",
+        "latency,gbps",
     ],
     "bf16_gemm": [
         "--op",
