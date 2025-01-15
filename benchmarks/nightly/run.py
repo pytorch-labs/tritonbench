@@ -6,6 +6,7 @@ import logging
 import sys
 from os.path import abspath, exists
 from benchmarks.utils import setup_output_dir
+from tritonbench.utils.path_utils import get_cmd_parameter
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def setup_tritonbench_cwd():
         sys.path.append(tritonbench_dir)
     return original_dir
 
-OPERATORS = {
+OPERATOR_BENCHMARKS = {
     "launch_latency": [
         "--op",
         "launch_latency",
@@ -64,11 +65,13 @@ def run():
     output_dir = setup_output_dir("nightly")
     # Run each operator
     output_files = []
-    for op in OPERATORS:
-        logger.info(f"[nightly] running operator benchmark: {op}")
-        op_task = OpTask(op)
-        op_args = OPERATORS[op]
-        output_file = output_dir.joinpath(f"{op}.csv")
+    for op_bench in OPERATOR_BENCHMARKS:
+        logger.info(f"[nightly] running operator benchmark: {op_bench}")
+        op_name = get_cmd_parameter(OPERATOR_BENCHMARKS[op_bench], "--op")
+        assert op_name, f"Could not find op name for benchmark {op_bench}: {OPERATOR_BENCHMARKS[op_bench]}"
+        op_task = OpTask(op_name)
+        op_args = OPERATOR_BENCHMARKS[op_bench]
+        output_file = output_dir.joinpath(f"{op_bench}.csv")
         op_args.extend(["--output", str(output_file.absolute())])
         op_task.make_operator_instance(op_args)
         op_task.run()
