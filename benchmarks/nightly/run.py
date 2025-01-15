@@ -6,7 +6,7 @@ import logging
 import sys
 from os.path import abspath, exists
 from benchmarks.utils import setup_output_dir
-from tritonbench.utils.path_utils import get_cmd_parameter
+from tritonbench.utils.run_utils import run_in_task
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -68,16 +68,11 @@ def run():
     output_files = []
     for op_bench in OPERATOR_BENCHMARKS:
         logger.info(f"[nightly] running operator benchmark: {op_bench}")
-        op_name = get_cmd_parameter(OPERATOR_BENCHMARKS[op_bench], "--op")
-        assert op_name, f"Could not find op name for benchmark {op_bench}: {OPERATOR_BENCHMARKS[op_bench]}"
-        op_task = OpTask(op_name)
         op_args = OPERATOR_BENCHMARKS[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.csv")
         op_args.extend(["--output", str(output_file.absolute())])
-        op_task.make_operator_instance(op_args)
-        op_task.run()
+        run_in_task(OPERATOR_BENCHMARKS[op_bench])
         output_files.append(output_file)
-        del op_task
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(output_files)
     logger.info(f"[nightly] logging result json file to {result_json_file}.")
