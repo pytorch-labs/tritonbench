@@ -2,6 +2,7 @@
 Tritonbench nightly run
 """
 import os
+import json
 import logging
 import sys
 from os.path import abspath, exists
@@ -39,6 +40,8 @@ OPERATOR_BENCHMARKS = {
         "softmax",
         "--metrics",
         "latency,gbps",
+        "--num-inputs",
+        "6",
     ],
     "bf16_gemm": [
         "--op",
@@ -55,9 +58,16 @@ OPERATOR_BENCHMARKS = {
 }
 
 
-def reduce(output_files):
-    # TODO: reduce and aggregate all operator outputs
-    pass
+def reduce(output_dir, output_files):
+    """aggregate all op benchmark csvs into json file"""
+    aggregated_obj = { "metrics": {} }
+    for result_json_file in output_files:
+        with open(result_json_file, "r",) as fp:
+            result_obj = json.load(fp)
+            aggregated_obj["metrics"].update(result_obj)
+    result_json_path = os.path.join(output_dir, "result.json")
+    with open(result_json_path, "w") as fp:
+        json.dump(aggregated_obj, fp)
 
 
 def run():
@@ -69,13 +79,13 @@ def run():
     for op_bench in OPERATOR_BENCHMARKS:
         logger.info(f"[nightly] running operator benchmark: {op_bench}")
         op_args = OPERATOR_BENCHMARKS[op_bench]
-        output_file = output_dir.joinpath(f"{op_bench}.csv")
+        output_file = output_dir.joinpath(f"{op_bench}.json")
         op_args.insert(0, "run.py")
-        op_args.extend(["--output", str(output_file.absolute())])
+        op_args.extend(["--output-json", str(output_file.absolute())])
         run_in_task(op=op_bench, op_args=op_args)
         output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
-    result_json_file = reduce(output_files)
+    result_json_file = reduce(output_dir, output_files)
     logger.info(f"[nightly] logging result json file to {result_json_file}.")
 
 

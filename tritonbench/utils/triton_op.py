@@ -380,6 +380,10 @@ class BenchmarkOperatorResult:
             self.write_csv_to_file(fileobj)
             return fileobj.name
 
+    def write_json_to_file(self, fileobj):
+        import json
+        json.dump(self.userbenchmark_dict, fileobj, indent=4)
+
     @property
     def x_vals(self):
         return sorted(self._get_result_dict().keys())

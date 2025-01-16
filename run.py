@@ -76,6 +76,9 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             with open(args.output, "w") as f:
                 metrics.write_csv_to_file(f)
             print(f"[tritonbench] Output result csv to {args.output}")
+        if args.output_json:
+            with open(args.output_json, "w") as f:
+                metrics.write_json_to_file(f)
         return metrics
 
 
