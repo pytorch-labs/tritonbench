@@ -2,7 +2,6 @@ import argparse
 import copy
 import csv
 import functools
-import gc
 import hashlib
 import logging
 import os
@@ -26,12 +25,7 @@ import triton
 
 from tritonbench.components.do_bench import do_bench_wrapper
 from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
-from tritonbench.utils.env_utils import (
-    apply_precision,
-    fresh_triton_cache,
-    set_env,
-    set_random_seed,
-)
+from tritonbench.utils.env_utils import apply_precision, set_env, set_random_seed
 from tritonbench.utils.input import input_cast
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
 
@@ -381,6 +375,11 @@ class BenchmarkOperatorResult:
         ) as fileobj:
             self.write_csv_to_file(fileobj)
             return fileobj.name
+
+    def write_json_to_file(self, fileobj):
+        import json
+
+        json.dump(self.userbenchmark_dict, fileobj, indent=4)
 
     @property
     def x_vals(self):
@@ -754,7 +753,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     proton.deactivate(self._proton_session_id)
                 self._cur_input_id = input_id
                 if self.example_inputs is None:
-                    logger.warn(
+                    logger.warning(
                         f"The input generator get_input_iter() has depleted at id {input_id}. Available number of "
                         f"inputs: {self._available_num_inputs}.",
                         stacklevel=1,

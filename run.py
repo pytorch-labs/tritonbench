@@ -16,7 +16,7 @@ from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.gpu_utils import gpu_lockdown
 from tritonbench.utils.parser import get_parser
-from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
+from tritonbench.utils.run_utils import run_in_task
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
 
@@ -27,25 +27,6 @@ try:
         usage_report_logger = lambda *args, **kwargs: None
 except ImportError:
     usage_report_logger = lambda *args, **kwargs: None
-
-
-def _run_in_task(op: str) -> None:
-    op_task_cmd = [] if IS_FBCODE else [sys.executable]
-    copy_sys_argv = copy.deepcopy(sys.argv)
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
-    copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op-collection")
-    add_cmd_parameter(copy_sys_argv, "--op", op)
-    op_task_cmd.extend(copy_sys_argv)
-    try:
-        print("[tritonbench] running command: " + " ".join(op_task_cmd))
-        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr)
-    except subprocess.CalledProcessError:
-        # By default, we will continue on the failed operators
-        pass
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt received, exiting...")
-        sys.exit(1)
 
 
 def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorResult:
@@ -94,7 +75,10 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
         if args.output:
             with open(args.output, "w") as f:
                 metrics.write_csv_to_file(f)
-            print(f"[TritonBench] Output result csv to {args.output}")
+            print(f"[tritonbench] Output result csv to {args.output}")
+        if args.output_json:
+            with open(args.output_json, "w") as f:
+                metrics.write_json_to_file(f)
         return metrics
 
 
@@ -124,7 +108,7 @@ def run(args: List[str] = []):
         for op in ops:
             args.op = op
             if args.isolate:
-                _run_in_task(op)
+                run_in_task(op)
             else:
                 _run(args, extra_args)
 
