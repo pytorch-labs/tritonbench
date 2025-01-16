@@ -1,0 +1,37 @@
+name: linux-nightly-h100
+on:
+  workflow_call:
+    inputs:
+      conda_env:
+        required: True
+        type: string
+        description: |
+          Conda environment to activate when testing Triton
+
+jobs:
+  linux-test-h100:
+    if: github.repository_owner == 'pytorch-labs'
+    runs-on: [gcp-h100-runner]
+    timeout-minutes: 240
+    environment: docker-s3-upload
+    env:
+      SETUP_SCRIPT: "/workspace/setup_instance.sh"
+      CONDA_ENV: ${{ inputs.conda_env }}
+    steps:
+      - name: Tune Nvidia GPU
+        run: |
+          sudo nvidia-smi -pm 1
+          sudo ldconfig
+          nvidia-smi
+      - name: Nightly benchmarking
+        run: |
+          cd /workspace/tritonbench
+          bash ./.ci/tritonbench/test-nightly.sh
+      - name: Upload metrics to Scribe
+        run: |
+          latest_run_dir=$(find -name "run-*" .benchmarks/nightly | tail -n 1)
+          latest_run_result_json="${latest_run_dir}/result.json"
+          if [ ! -f "${latest_run_result_json}" ]; then
+            echo "Result json not found at ${latest_run_result_json}."
+          fi
+          bash ./.ci/scuba/upload.py ${latest_run_result_json}
