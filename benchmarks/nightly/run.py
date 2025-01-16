@@ -67,7 +67,7 @@ def reduce(output_dir, output_files):
             aggregated_obj["metrics"].update(result_obj)
     result_json_path = os.path.join(output_dir, "result.json")
     with open(result_json_path, "w") as fp:
-        json.dump(aggregated_obj, fp)
+        json.dump(aggregated_obj, fp, indent=4)
 
 
 def run():
