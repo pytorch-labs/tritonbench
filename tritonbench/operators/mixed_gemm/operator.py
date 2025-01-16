@@ -18,9 +18,15 @@ from tritonbench.utils.triton_op import (
 
 from .quantize import quantize_bf16_to_int2
 
-torch.ops.load_library(
-    "//pytorch/tritonbench/tritonbench/operators/mixed_gemm/kernels:w2a16_gemm_lib"
-)
+W2A16_ENABLED = False
+try:
+    torch.ops.load_library(
+        "//pytorch/tritonbench/tritonbench/operators/mixed_gemm/kernels:w2a16_gemm_lib"
+    )
+    W2A16_ENABLED = True
+except Exception:
+    W2A16_ENABLED = False
+
 
 try:
     from marlin.quantize import marlin_quantize
@@ -127,7 +133,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         return lambda: torch.matmul(a, w)
 
-    @register_benchmark()
+    @register_benchmark(enabled=W2A16_ENABLED)
     def cutlass_w2a16(
         self,
         a: torch.Tensor,
