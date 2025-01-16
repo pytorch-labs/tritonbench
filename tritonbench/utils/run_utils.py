@@ -1,27 +1,34 @@
 import copy
 import logging
 import os
+import subprocess
 import sys
 import time
-import subprocess
 
 from datetime import datetime
 from pathlib import Path
-from tritonbench.utils.env_utils import is_fbcode, get_current_hash
-from tritonbench.utils.path_utils import REPO_PATH, remove_cmd_parameter, add_cmd_parameter
 
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
+from tritonbench.utils.env_utils import get_current_hash, is_fbcode
+from tritonbench.utils.path_utils import (
+    add_cmd_parameter,
+    remove_cmd_parameter,
+    REPO_PATH,
+)
 
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
 def get_run_env() -> Dict[str, str]:
     """
     Gather envrionment of the benchmark.
     """
     import torch
+
     run_env = {}
     run_env["cuda_version"] = torch.version.cuda if torch.version.cuda else "unknown"
     try:
@@ -34,7 +41,8 @@ def get_run_env() -> Dict[str, str]:
     run_env["tritonbench_commit"] = get_current_hash()
     return run_env
 
-def run_in_task(op: str, op_args: Optional[List[str]]=None) -> None:
+
+def run_in_task(op: str, op_args: Optional[List[str]] = None) -> None:
     op_task_cmd = [] if is_fbcode() else [sys.executable]
     if not op_args:
         copy_sys_argv = copy.deepcopy(sys.argv)
@@ -47,7 +55,9 @@ def run_in_task(op: str, op_args: Optional[List[str]]=None) -> None:
         op_task_cmd.extend(op_args)
     try:
         logger.info("[tritonbench] Running benchmark: " + " ".join(op_task_cmd))
-        subprocess.check_call(op_task_cmd, stdout=sys.stdout, stderr=sys.stderr, cwd=REPO_PATH)
+        subprocess.check_call(
+            op_task_cmd, stdout=sys.stdout, stderr=sys.stderr, cwd=REPO_PATH
+        )
     except subprocess.CalledProcessError:
         # By default, we will continue on the failed operators
         pass

@@ -2,8 +2,10 @@ from typing import Callable, Dict
 
 import torch
 from tritonbench.utils.env_utils import fresh_triton_cache, is_fbcode
+
 if is_fbcode():
     from triton.fb.triton_util import triton_add_listener, TritonHook
+
 
 def fbcode_do_compile_time_in_task(fn: Callable) -> Dict[str, float]:
     # not yet getting results that make sense to me

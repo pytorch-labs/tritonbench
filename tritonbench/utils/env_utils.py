@@ -35,6 +35,7 @@ AVAILABLE_PRECISIONS = [
 def is_fbcode() -> bool:
     return not hasattr(torch.version, "git_version")
 
+
 def is_cuda() -> bool:
     return torch.version.cuda is not None
 
@@ -42,8 +43,9 @@ def is_cuda() -> bool:
 def is_hip() -> bool:
     return torch.version.hip is not None
 
+
 def get_current_hash() -> str:
-    """Get the hash of Tritonbench repo """
+    """Get the hash of Tritonbench repo"""
     try:
         cmd = ["git", "rev-parse", "--verify", "HEAD"]
         output = subprocess.check_output(cmd, cwd=REPO_PATH).decode().strip()

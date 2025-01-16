@@ -2,7 +2,7 @@ import os
 import sys
 
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 REPO_PATH = Path(os.path.abspath(__file__)).parent.parent.parent
 SUBMODULE_PATH = REPO_PATH.joinpath("submodules")
@@ -44,12 +44,14 @@ def _find_param_loc(params, key: str) -> int:
     except ValueError:
         return -1
 
+
 def _param_has_argument(params, index: str) -> bool:
     if index == -1 or index == len(params) - 1:
         return False
-    if params[index+1].startswith("-"):
+    if params[index + 1].startswith("-"):
         return False
     return True
+
 
 def _remove_params(params, loc):
     if loc == -1:
@@ -73,10 +75,11 @@ def remove_cmd_parameter(args: List[str], name: str) -> List[str]:
     loc = _find_param_loc(args, name)
     return _remove_params(args, loc)
 
+
 def get_cmd_parameter(args: List[str], name: str) -> Optional[Union[str, bool]]:
     loc = _find_param_loc(args, name)
     if loc == -1:
         return None
     if _param_has_argument(args, loc):
-        return args[loc+1]
+        return args[loc + 1]
     return True

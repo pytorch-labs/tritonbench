@@ -1,14 +1,16 @@
 """
 Tritonbench nightly run
 """
-import os
+
 import json
 import logging
+import os
 import sys
 from os.path import abspath, exists
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
 
 def setup_tritonbench_cwd():
     original_dir = abspath(os.getcwd())
@@ -25,6 +27,7 @@ def setup_tritonbench_cwd():
         os.chdir(tritonbench_dir)
         sys.path.append(tritonbench_dir)
     return original_dir
+
 
 OPERATOR_BENCHMARKS = {
     "launch_latency": [
@@ -59,9 +62,13 @@ OPERATOR_BENCHMARKS = {
 def reduce(output_dir, output_files):
     """aggregate all op benchmark csvs into json file"""
     from tritonbench.utils.run_utils import get_run_env
-    aggregated_obj = { "env": get_run_env(), "metrics": {} }
+
+    aggregated_obj = {"env": get_run_env(), "metrics": {}}
     for result_json_file in output_files:
-        with open(result_json_file, "r",) as fp:
+        with open(
+            result_json_file,
+            "r",
+        ) as fp:
             result_obj = json.load(fp)
             aggregated_obj["metrics"].update(result_obj)
     result_json_path = os.path.join(output_dir, "result.json")
@@ -72,6 +79,7 @@ def reduce(output_dir, output_files):
 def run():
     setup_tritonbench_cwd()
     from tritonbench.utils.run_utils import run_in_task, setup_output_dir
+
     output_dir = setup_output_dir("nightly")
     # Run each operator
     output_files = []

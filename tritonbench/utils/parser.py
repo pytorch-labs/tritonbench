@@ -71,10 +71,7 @@ def get_parser(args=None):
         help="Output result csv to file.",
     )
     parser.add_argument(
-        "--output-json",
-        type=str,
-        default=None,
-        help="Output result json to file."
+        "--output-json", type=str, default=None, help="Output result json to file."
     )
     parser.add_argument(
         "--skip-print",

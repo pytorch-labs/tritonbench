@@ -25,11 +25,7 @@ import triton
 
 from tritonbench.components.do_bench import do_bench_wrapper
 from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
-from tritonbench.utils.env_utils import (
-    apply_precision,
-    set_env,
-    set_random_seed,
-)
+from tritonbench.utils.env_utils import apply_precision, set_env, set_random_seed
 from tritonbench.utils.input import input_cast
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
 
@@ -382,6 +378,7 @@ class BenchmarkOperatorResult:
 
     def write_json_to_file(self, fileobj):
         import json
+
         json.dump(self.userbenchmark_dict, fileobj, indent=4)
 
     @property
