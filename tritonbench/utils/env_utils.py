@@ -6,6 +6,7 @@ Requires PyTorch
 import logging
 import os
 import shutil
+import subprocess
 from contextlib import contextmanager, ExitStack
 from typing import Optional
 
@@ -40,6 +41,15 @@ def is_cuda() -> bool:
 
 def is_hip() -> bool:
     return torch.version.hip is not None
+
+def get_current_hash() -> str:
+    """Get the hash of Tritonbench repo """
+    try:
+        cmd = ["git", "rev-parse", "--verify", "HEAD"]
+        output = subprocess.check_output(cmd, cwd=REPO_PATH).decode().strip()
+        return output
+    except subprocess.SubprocessError:
+        return "unknown"
 
 
 def is_hip_mi200():

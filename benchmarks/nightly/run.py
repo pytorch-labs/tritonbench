@@ -58,7 +58,8 @@ OPERATOR_BENCHMARKS = {
 
 def reduce(output_dir, output_files):
     """aggregate all op benchmark csvs into json file"""
-    aggregated_obj = { "metrics": {} }
+    from tritonbench.utils.run_utils import get_run_env
+    aggregated_obj = { "env": get_run_env(), "metrics": {} }
     for result_json_file in output_files:
         with open(result_json_file, "r",) as fp:
             result_obj = json.load(fp)
