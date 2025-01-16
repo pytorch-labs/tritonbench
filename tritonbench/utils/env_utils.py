@@ -43,6 +43,11 @@ def is_hip_mi200():
     return is_hip() and target.arch == "gfx90a"
 
 
+def is_hip_mi300():
+    target = triton.runtime.driver.active.get_current_target()
+    return is_hip() and target.arch == "gfx942"
+
+
 def supports_tma():
     return is_cuda() and torch.cuda.get_device_capability()[0] >= 9
 

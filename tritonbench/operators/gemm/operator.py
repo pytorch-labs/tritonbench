@@ -9,7 +9,7 @@ import triton
 
 from tritonbench.operators.gemm.kernels import matmul as kernels
 from tritonbench.operators.gemm.partition_k import matmul_partition_k
-
+from tritonbench.operators.gemm.stream_k import streamk_matmul
 from tritonbench.utils.data_utils import get_production_shapes
 from tritonbench.utils.env_utils import is_cuda
 
@@ -167,7 +167,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def triton_tutorial_matmul(self, a, b, bias) -> Callable:
-        if not bias == None:
+        if bias is not None:
             return lambda: triton_tutorial_matmul(a, b) + bias
         else:
             return lambda: triton_tutorial_matmul(a, b)
@@ -175,14 +175,14 @@ class Operator(BenchmarkOperator):
     @register_benchmark()
     def matmul_partition_k(self, a, b, bias) -> Callable:
         bt = b.contiguous()
-        if not bias == None:
+        if bias is not None:
             return lambda: matmul_partition_k(a, bt) + bias
         else:
             return lambda: matmul_partition_k(a, bt)
 
     @register_benchmark(enabled=HAS_PERSISTENT)
     def triton_persistent_matmul(self, a, b, bias) -> Callable:
-        if not bias == None:
+        if bias is not None:
             return lambda: matmul_persistent(a, b) + bias
         else:
             return lambda: matmul_persistent(a, b)
@@ -190,7 +190,7 @@ class Operator(BenchmarkOperator):
     @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT)
     def triton_tma_persistent_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
-        if not bias == None:
+        if bias is not None:
             return lambda: matmul_tma_persistent(a, b) + bias
         else:
             return lambda: matmul_tma_persistent(a, b)
@@ -198,7 +198,7 @@ class Operator(BenchmarkOperator):
     @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT)
     def triton_tma_persistent_cached_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
-        if not bias == None:
+        if bias is not None:
             return lambda: matmul_tma_persistent_cached(a, b) + bias
         else:
             return lambda: matmul_tma_persistent_cached(a, b)
@@ -211,7 +211,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(baseline=True)
     def aten_matmul(self, a, b, bias) -> Callable:
-        if not bias == None:
+        if bias is not None:
             return lambda: torch.matmul(a, b) + bias
         else:
             return lambda: torch.matmul(a, b)
@@ -237,7 +237,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(enabled=HAS_HAMMER)
     def hstu_triton_matmul(self, a, b, bias) -> Callable:
-        if not bias == None:
+        if bias is not None:
             return lambda: hstu_triton_matmul_kernel(a, b) + bias
         else:
             return lambda: hstu_triton_matmul_kernel(a, b)
@@ -245,7 +245,7 @@ class Operator(BenchmarkOperator):
     @register_benchmark(enabled=bool(colfax_gemm) and torch.version.cuda != "12.4")
     def colfax_cutlass_matmul(self, a, b, bias) -> Callable:
         assert colfax_gemm, f"colfax_gemm operator is not available."
-        if not bias == None:
+        if bias is not None:
             return lambda: colfax_gemm(a, b, alpha=1.0, beta=1.0) + bias
         else:
             return lambda: colfax_gemm(a, b, alpha=1.0, beta=1.0)
@@ -266,6 +266,13 @@ class Operator(BenchmarkOperator):
             compiled(a, b)
 
         return lambda: compiled(a, b)
+
+    @register_benchmark()
+    def streamk_matmul(self, a, b, bias) -> Callable:
+        if bias is not None:
+            return lambda: streamk_matmul(a, b) + bias
+        else:
+            return lambda: streamk_matmul(a, b)
 
     @register_benchmark(enabled=is_cuda())
     def pt2_cutlass_matmul(self, a, b, bias) -> Callable:
@@ -358,7 +365,9 @@ class Operator(BenchmarkOperator):
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
         output = fn()
         baseline_output = baseline_fn()
-        return torch.allclose(output, baseline_output)
+        # Float atomics introduce non-determinism for some GEMMs (e.g., Stream-K)
+        # So we use a slightly larger tolerance here.
+        return torch.allclose(output, baseline_output, atol=1e-5, rtol=1e-5)
 
     def plot(self):
         @triton.testing.perf_report(
