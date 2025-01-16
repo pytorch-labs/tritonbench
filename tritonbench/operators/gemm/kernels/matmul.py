@@ -262,7 +262,7 @@ def _kernel(
     if SPLIT_K == 1:
         tl.store(C, acc, mask=mask)
     else:
-        tl.atomic_add(C, acc, mask=mask)
+        tl.atomic_add(C, acc, mask=mask, sem="relaxed")
 
 
 class _matmul(torch.autograd.Function):
