@@ -6,8 +6,6 @@ import json
 import logging
 import sys
 from os.path import abspath, exists
-from benchmarks.utils import setup_output_dir
-from tritonbench.utils.run_utils import run_in_task
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -72,7 +70,7 @@ def reduce(output_dir, output_files):
 
 def run():
     setup_tritonbench_cwd()
-    from tritonbench.operators.op_task import OpTask
+    from tritonbench.utils.run_utils import run_in_task, setup_output_dir
     output_dir = setup_output_dir("nightly")
     # Run each operator
     output_files = []
