@@ -34,7 +34,7 @@ def get_pkg_versions(packages: List[str]) -> Dict[str, str]:
 
 def generate_build_constraints(package_versions: Dict[str, str]):
     """
-    Generate package versions dict and save them to {REPO_ROOT}/build/constraints.txt
+    Generate package versions dict and save them to REPO_DIR/build/constraints.txt
     """
     output_dir = REPO_DIR.joinpath("build")
     output_dir.mkdir(exist_ok=True)
