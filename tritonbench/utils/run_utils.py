@@ -10,22 +10,29 @@ from pathlib import Path
 
 from typing import Dict, List, Optional
 
-from tritonbench.utils.env_utils import get_current_hash, is_fbcode
+from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.path_utils import (
     add_cmd_parameter,
     remove_cmd_parameter,
     REPO_PATH,
 )
+from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
 
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
+REPO_URLS = {
+    "pytorch": "https://github.com/pytorch/pytorch.git",
+    "triton": "https://github.com/triton-lang/triton.git",
+    "tritonbench": "https://github.com/pytorch-labs/tritonbench.git",
+}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_run_env() -> Dict[str, str]:
+def get_run_env(repo_locs: Optional[Dict[str]]=None) -> Dict[str, str]:
     """
-    Gather envrionment of the benchmark.
+    Gather environment of the benchmark.
+    repo_locs: Git repository dict of the repositories.
     """
     import torch
 
@@ -38,8 +45,36 @@ def get_run_env() -> Dict[str, str]:
     run_env["pytorch_commit"] = torch.version.git_version
     # we assume Tritonbench CI will properly set Triton commit hash in env
     run_env["triton_commit"] = os.environ.get("TRITONBENCH_TRITON_MAIN_COMMIT", "unknown")
-    run_env["tritonbench_commit"] = get_current_hash()
+    run_env["tritonbench_commit"] = get_current_hash(REPO_PATH)
+    for repo in ["triton", "pytorch", "tritonbench"]:
+        if run_env[f"{repo}_commit"] == "unknown":
+            run_env[f"{repo}_branch"] = "unknown"
+            run_env[f"{repo}_commit_time"] = "unknown"
+        else:
+            repo_loc = repo_locs.get(repo, REPO_URLS[repo])
+            run_env[f"{repo}_branch"] = get_branch(repo_loc, run_env[f"{repo}_commit"])
+            run_env[f"{repo}_commit_time"] = get_commit_time(repo_loc, run_env[f"{repo}_commit"])
     return run_env
+
+def get_github_env() -> Dict[str, str]:
+    assert "GITHUB_RUN_ID" in os.environ, "GITHUB_RUN_ID environ must exist to obtain GitHub env"
+    out = {}
+    out["GITHUB_ACTION"] = os.environ["GITHUB_ACTION"]
+    out["GITHUB_ACTOR"] = os.environ["GITHUB_ACTOR"]
+    out["GITHUB_BASE_REF"] = os.environ["GITHUB_BASE_REF"]
+    out["GITHUB_REF"] = os.environ["GITHUB_REF"]
+    out["GITHUB_REF_PROTECTED"] = os.environ["GITHUB_REF_PROTECTED"]
+    out["GITHUB_REPOSITORY"] = os.environ["GITHUB_REPOSITORY"]
+    out["GITHUB_RUN_ATTEMPT"] = os.environ["GITHUB_RUN_ATTEMPT"]
+    out["GITHUB_RUN_ID"] = os.environ["GITHUB_RUN_ID"]
+    out["GITHUB_RUN_NUMBER"] = os.environ["GITHUB_RUN_NUMBER"]
+    out["GITHUB_WORKFLOW_REF"] = os.environ["GITHUB_WORKFLOW_REF"]
+    out["GITHUB_WORKFLOW_SHA"] = os.environ["GITHUB_WORKFLOW_SHA"]
+    out["JOB_NAME"] = os.environ["JOB_NAME"]
+    out["RUNNER_ARCH"] = os.environ["RUNNER_ARCH"]
+    out["RUNNER_NAME"] = os.environ["RUNNER_NAME"]
+    out["RUNNER_OS"] = os.environ["RUNNER_OS"]
+    return out
 
 
 def run_in_task(op: str, op_args: Optional[List[str]] = None) -> None:
@@ -53,6 +88,9 @@ def run_in_task(op: str, op_args: Optional[List[str]] = None) -> None:
         op_task_cmd.extend(copy_sys_argv)
     else:
         op_task_cmd.extend(op_args)
+    # In OSS, we assume always using the run.py benchmark driver
+    if not is_fbcode() and not op_task_cmd[0] == "run.py":
+        op_task_cmd.insert(0, "run.py")
     try:
         logger.info("[tritonbench] Running benchmark: " + " ".join(op_task_cmd))
         subprocess.check_call(

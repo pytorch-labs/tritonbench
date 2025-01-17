@@ -8,4 +8,4 @@ fi
 
 . "${SETUP_SCRIPT}"
 
-python benchmarks/nightly/run.py
+python benchmarks/nightly/run.py --ci
