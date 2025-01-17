@@ -32,6 +32,7 @@ except (ImportError, IOError, AttributeError):
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=4, help="Batch size")
+    parser.add_argument("--seq-len", type=int, default=None, help="Sequence length")
     parser.add_argument(
         "--embedding-dim",
         type=int,
@@ -53,6 +54,7 @@ class Operator(BenchmarkOperator):
         super().__init__(tb_args, extra_args=extra_args)
         args = parse_op_args(self.extra_args)
         self.BATCH = args.batch
+        self.SEQ_LEN = args.seq_len
         self.embedding_dim = args.embedding_dim
         self.D_HEAD = args.d_head
         self.causal = args.causal
@@ -121,12 +123,26 @@ class Operator(BenchmarkOperator):
     def get_input_iter(self) -> Generator:
         # The non-fp8 FA varies N_CTX and fixes other variables. Let's do the same for fp8.
         # The autotune config only depends on N_CTX in OSS Triton tutorial.
-        head_dims = [64, 128, 256]
+
         BATCH = self.BATCH
         D_HEAD = self.D_HEAD
-        for N_CTX in [2**i for i in range(7, 15)]:
-            self.N_CTX = N_CTX
+        SEQ_LEN_LOG2 = 7
+
+        def get_ctx_vals():
             H = self.embedding_dim // D_HEAD
+            if self.SEQ_LEN:
+                yield (BATCH, H, self.SEQ_LEN, self.D_HEAD)
+                return
+            for i in range(SEQ_LEN_LOG2, 15):
+                N_CTX = 2**i
+                yield (BATCH, H, N_CTX, D_HEAD)
+
+        shapes = get_ctx_vals()
+
+        for shape in shapes:
+            BATCH, H, N_CTX, D_HEAD = shape
+
+            self.N_CTX = N_CTX
 
             # colfax expects q,k: BATCH, N_CTX, H, D_HEAD and v: BATCH, D_HEAD, H, N_CTX
             q = torch.randn(
