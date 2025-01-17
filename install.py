@@ -7,7 +7,12 @@ from pathlib import Path
 
 from tools.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from tools.git_utils import checkout_submodules
-from tools.python_utils import pip_install_requirements, get_pkg_versions, generate_build_constraints
+from tools.python_utils import (
+    generate_build_constraints,
+    get_pkg_versions,
+    has_pkg,
+    pip_install_requirements,
+)
 
 from tritonbench.utils.env_utils import is_hip
 
@@ -115,7 +120,7 @@ if __name__ == "__main__":
     if args.all and is_hip():
         setup_hip(args)
 
-    if args.numpy:
+    if args.numpy or not has_pkg("numpy"):
         pip_install_requirements("requirements-numpy.txt")
 
     # generate build constraints before installing anything
