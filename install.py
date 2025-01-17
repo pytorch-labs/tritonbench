@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tools.cuda_utils import CUDA_VERSION_MAP, DEFAULT_CUDA_VERSION
 from tools.git_utils import checkout_submodules
-from tools.python_utils import pip_install_requirements
+from tools.python_utils import pip_install_requirements, get_pkg_versions, generate_build_constraints
 
 from tritonbench.utils.env_utils import is_hip
 
@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 REPO_PATH = Path(os.path.abspath(__file__)).parent
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
+
+# Packages we assume to have installed before running this script
+# We will use build constraints to assume the version is not changed across the install
+TRITONBENCH_DEPS = ["torch", "numpy"]
 
 
 def install_jax(cuda_version=DEFAULT_CUDA_VERSION):
@@ -82,6 +86,7 @@ def setup_hip(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(allow_abbrev=False)
+    parser.add_argument("--numpy", action="store_true", help="Install suggested numpy")
     parser.add_argument("--fbgemm", action="store_true", help="Install FBGEMM GPU")
     parser.add_argument(
         "--colfax", action="store_true", help="Install optional Colfax CUTLASS kernels"
@@ -109,6 +114,13 @@ if __name__ == "__main__":
 
     if args.all and is_hip():
         setup_hip(args)
+
+    if args.numpy:
+        pip_install_requirements("requirements-numpy.txt")
+
+    # generate build constraints before installing anything
+    deps = get_pkg_versions(TRITONBENCH_DEPS)
+    generate_build_constraints(deps)
 
     # install framework dependencies
     pip_install_requirements("requirements.txt")

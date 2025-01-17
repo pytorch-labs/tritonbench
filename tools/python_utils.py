@@ -1,7 +1,8 @@
 import subprocess
+import sys
 from pathlib import Path
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 DEFAULT_PYTHON_VERSION = "3.11"
 
@@ -23,6 +24,23 @@ def create_conda_env(pyver: str, name: str):
     command = ["conda", "create", "-n", name, "-y", f"python={pyver}"]
     subprocess.check_call(command)
 
+def get_pkg_versions(packages: List[str]) -> Dict[str, str]:
+    versions = {}
+    for module in packages:
+        cmd = [sys.executable, "-c", f"import {module}; print({module}.__version__)"]
+        version = subprocess.check_output(cmd).decode().strip()
+        versions[module] = version
+    return versions
+
+def generate_build_constraints(package_versions: Dict[str, str]):
+    """
+    Generate package versions dict and save them to {REPO_ROOT}/build/constraints.txt
+    """
+    output_dir = REPO_DIR.joinpath("build")
+    output_dir.mkdir(exist_ok=True)
+    with open(output_dir.joinpath("constraints.txt"), "w") as fp:
+        for k, v in package_versions.items():
+            fp.write(f"{k}=={v}\n")
 
 def pip_install_requirements(
     requirements_txt="requirements.txt",
