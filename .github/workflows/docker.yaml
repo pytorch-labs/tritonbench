@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/docker.yaml
       - docker/tritonbench-nightly.dockerfile
+      - install.py
   workflow_dispatch:
     inputs:
       nightly_date:
