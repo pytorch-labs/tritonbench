@@ -1,20 +1,388 @@
 {
   "metadata": {
     "version": "1.0",
-    "last_updated": 1736797112.89125
+    "last_updated": "2025-01-16T15:07:47.961054"
   },
   "configs": {
     "1_4": {
       "config": {
         "BLOCK_SIZE_RAGGED": 8,
         "BLOCK_SIZE_M": 64,
-        "num_warps": 4,
-        "num_ctas": 1,
-        "num_stages": 4,
-        "maxnreg": null
+        "num_warps": 8,
+        "num_stages": 2
       },
-      "perf": 0.0,
-      "timestamp": 1736797112.8912494
+      "perf": 0.003413333324715495,
+      "timestamp": "2025-01-16T12:19:42.267861"
+    },
+    "16_4": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 8,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.003530666930601001,
+      "timestamp": "2025-01-16T12:35:28.311305"
+    },
+    "16_8": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 8,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.00342399999499321,
+      "timestamp": "2025-01-16T12:35:41.566932"
+    },
+    "16_16": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.0034879997838288546,
+      "timestamp": "2025-01-16T12:37:01.069867"
+    },
+    "16_32": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.0037226667627692223,
+      "timestamp": "2025-01-16T12:37:12.607376"
+    },
+    "16_64": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.0037546667736023664,
+      "timestamp": "2025-01-16T12:37:24.191468"
+    },
+    "16_128": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.004714666400104761,
+      "timestamp": "2025-01-16T12:37:35.750127"
+    },
+    "16_256": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.005770666524767876,
+      "timestamp": "2025-01-16T12:37:47.296970"
+    },
+    "16_512": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.00789333414286375,
+      "timestamp": "2025-01-16T12:37:58.815351"
+    },
+    "16_1024": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.011946666985750198,
+      "timestamp": "2025-01-16T12:38:10.360450"
+    },
+    "32_4": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 8,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.0036906665191054344,
+      "timestamp": "2025-01-16T12:38:21.931860"
+    },
+    "32_8": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.0037333332002162933,
+      "timestamp": "2025-01-16T12:38:34.234185"
+    },
+    "32_16": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.004095999989658594,
+      "timestamp": "2025-01-16T12:38:45.789865"
+    },
+    "32_32": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.004095999989658594,
+      "timestamp": "2025-01-16T12:38:57.346605"
+    },
+    "32_64": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.004095999989658594,
+      "timestamp": "2025-01-16T12:39:08.901156"
+    },
+    "32_128": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.00514133321121335,
+      "timestamp": "2025-01-16T12:39:20.494938"
+    },
+    "32_256": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.0071680000983178616,
+      "timestamp": "2025-01-16T12:39:32.043230"
+    },
+    "32_512": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.010581333190202713,
+      "timestamp": "2025-01-16T12:39:43.583349"
+    },
+    "32_1024": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.017365334555506706,
+      "timestamp": "2025-01-16T12:39:55.058077"
+    },
+    "64_4": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 8,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.0037546667736023664,
+      "timestamp": "2025-01-16T12:40:06.540380"
+    },
+    "64_8": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.0037546667736023664,
+      "timestamp": "2025-01-16T12:40:18.961868"
+    },
+    "64_16": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.004095999989658594,
+      "timestamp": "2025-01-16T12:40:30.483116"
+    },
+    "64_32": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.0041600000113248825,
+      "timestamp": "2025-01-16T12:40:42.009560"
+    },
+    "64_64": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.0047786664217710495,
+      "timestamp": "2025-01-16T12:40:53.566719"
+    },
+    "64_128": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.006144000217318535,
+      "timestamp": "2025-01-16T12:41:05.161023"
+    },
+    "64_256": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4
+      },
+      "perf": 0.008874666877090931,
+      "timestamp": "2025-01-16T12:41:16.745278"
+    },
+    "64_512": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.013311999849975109,
+      "timestamp": "2025-01-16T12:41:28.337743"
+    },
+    "64_1024": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.023893333971500397,
+      "timestamp": "2025-01-16T12:41:39.916496"
+    },
+    "128_4": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.0037546667736023664,
+      "timestamp": "2025-01-16T12:41:51.519934"
+    },
+    "128_8": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 8,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.003818666562438011,
+      "timestamp": "2025-01-16T12:42:04.024714"
+    },
+    "128_16": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 4,
+        "num_stages": 2
+      },
+      "perf": 0.00437333295121789,
+      "timestamp": "2025-01-16T12:42:15.600755"
+    },
+    "128_32": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.0047786664217710495,
+      "timestamp": "2025-01-16T12:42:27.178553"
+    },
+    "128_64": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.005119999870657921,
+      "timestamp": "2025-01-16T12:42:38.739601"
+    },
+    "128_128": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.0068266671150922775,
+      "timestamp": "2025-01-16T12:42:50.324414"
+    },
+    "128_256": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.010239999741315842,
+      "timestamp": "2025-01-16T12:43:01.906150"
+    },
+    "128_512": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 64,
+        "num_warps": 8,
+        "num_stages": 2
+      },
+      "perf": 0.015701333060860634,
+      "timestamp": "2025-01-16T12:43:13.515826"
+    },
+    "128_1024": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.025258667767047882,
+      "timestamp": "2025-01-16T12:43:25.128339"
+    },
+    "100_1024": {
+      "config": {
+        "BLOCK_SIZE_RAGGED": 64,
+        "BLOCK_SIZE_M": 8,
+        "num_warps": 8,
+        "num_stages": 4
+      },
+      "perf": 0.010922666639089584,
+      "timestamp": "2025-01-16T15:07:47.961049"
     }
   }
 }

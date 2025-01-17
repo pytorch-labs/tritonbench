@@ -12,6 +12,8 @@ import torch
 import triton
 
 from .cache_utils import jagged_cache
+# from triton.runtime import Autotuner
+from triton.testing import do_bench
 
 from tritonbench.utils.jagged_utils import (
     ABSOLUTE_TOLERANCE,
@@ -40,6 +42,7 @@ from .kernels import (
     triton_jagged_sum_kernel_variable_length_loop_buffer_then_sum,
     triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer,
     triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune,
+    triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer_no_autotune,
 )
 
     
@@ -50,40 +53,107 @@ def parse_op_args(args: List[str]):
     return parser.parse_args(args)
 
 
-def get_best_config_from_output(output_str):
-    # Split multiple kernel outputs
-    for line in output_str.split('\n'):
-        if "best config selected:" in line:
-            config_str = line.split("best config selected:")[1].strip(";").strip()
-            config_dict = {}
-            for pair in config_str.split(","):
-                key, value = pair.split(":")
-                key = key.strip()
-                value = value.strip()
-                # Handle None value specifically
-                if value == "None":
-                    config_dict[key] = None
-                else:
-                    try:
-                        config_dict[key] = int(value)
-                    except ValueError:
-                        config_dict[key] = value
-            return config_dict
-    return None
+# def get_best_config_from_output(output_str):
+#     # Split multiple kernel outputs
+#     for line in output_str.split('\n'):
+#         if "best config selected:" in line:
+#             config_str = line.split("best config selected:")[1].strip(";").strip()
+#             config_dict = {}
+#             for pair in config_str.split(","):
+#                 key, value = pair.split(":")
+#                 key = key.strip()
+#                 value = value.strip()
+#                 # Handle None value specifically
+#                 if value == "None":
+#                     config_dict[key] = None
+#                 else:
+#                     try:
+#                         config_dict[key] = int(value)
+#                     except ValueError:
+#                         config_dict[key] = value
+#             return config_dict
+#     return None
+
+def autotune_jagged_sum(kernel_fn, x, kernel_output, M, max_seqlen, grid_fn):
+    # Setup configurations
+    BLOCK_SIZES = [2**n for n in range(3, 7, 3)]  # [8, 64]
+    NUM_WARPS = [4, 8]
+    NUM_STAGES = [2, 4]
+    
+    best_ms = float('inf')
+    best_config = None
+    debug = True  # Set to True to see debugging info
+
+    grid_fn = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
+    # Try all configurations
+    for b_r, b_m, w, s in itertools.product(BLOCK_SIZES, BLOCK_SIZES, NUM_WARPS, NUM_STAGES):
+        config = {
+            "BLOCK_SIZE_RAGGED": b_r,
+            "BLOCK_SIZE_M": b_m,
+            "num_warps": w,
+            "num_stages": s
+        }
+        
+        try:
+            def bench_fn():
+                grid = grid_fn({"BLOCK_SIZE_M": b_m})
+                return kernel_fn[grid](
+                    x.values(),
+                    x.offsets(),
+                    kernel_output,
+                    M=M,
+                    MAX_SEQLEN=max_seqlen,
+                    BLOCK_SIZE_RAGGED=b_r,
+                    BLOCK_SIZE_M=b_m,
+                    num_warps=w,
+                    num_stages=s
+                )
+
+            # Warmup run
+            bench_fn()
+            
+            # Actual benchmark
+            ms = triton.testing.do_bench(bench_fn, warmup=1, rep=1)
+            
+            # if debug:
+            #     print(f"Config: BLOCK_SIZE_RAGGED={b_r}, BLOCK_SIZE_M={b_m}, "
+            #           f"num_warps={w}, num_stages={s}, ms={ms}")
+            
+            if ms < best_ms:
+                best_ms = ms
+                best_config = config
+
+        except triton.runtime.OutOfResources:
+            if debug:
+                print(f'Config failed (out of resources): BLOCK_SIZE_RAGGED={b_r}, '
+                      f'BLOCK_SIZE_M={b_m}, num_warps={w}, num_stages={s}')
+            continue
+
+    # if debug and best_config:
+    #     print("\nBest configuration found:")
+    #     for key, value in best_config.items():
+    #         print(f"{key}: {value}")
+    #     print(f"Best latency: {best_ms:.3f} ms")
+
+    return best_ms, best_config, kernel_fn
 
 def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
+    print(x)
     B, M = x.shape[0], x.shape[2]
-    cached_config = jagged_cache.get_config(M)
+    # print(f"B {B}, M ={M}")
+    # print(f"Length of x.offsets() {len(x.offsets())}")
+    cached_config = jagged_cache.get_config(M, max_seqlen)
     grid = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     kernel_output = torch.zeros((B, M), device=x.device)
 
-    os.environ["TRITON_PRINT_AUTOTUNING"] = "1"
+    # os.environ["TRITON_PRINT_AUTOTUNING"] = "1"
 
-    old_stdout = sys.stdout
-    sys.stdout = mystdout = StringIO()
+    # old_stdout = sys.stdout
+    # sys.stdout = mystdout = StringIO()
 
     if cached_config:
         config = cached_config['config']
+        # print("Using cached config:", config)
         if sum_then_buffer:
             triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune[grid](
                 x.values(),
@@ -109,14 +179,44 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
                 num_stages=config['num_stages']
         )
     else:
+        # print("No cached config found for M:", M)
         if sum_then_buffer:
-           kernel = triton_jagged_sum_kernel_simple_fused_sum_then_buffer[grid](
-                x.values(),
-                x.offsets(),
-                kernel_output,
-                M=M,
-                MAX_SEQLEN=max_seqlen,
+            best_ms, best_config, kernel = autotune_jagged_sum(
+                triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune,
+                x, kernel_output, M, max_seqlen, grid
             )
+
+            # Use the best configuration
+            if best_config:
+                grid = grid({"BLOCK_SIZE_M": best_config["BLOCK_SIZE_M"]})
+                kernel[grid](
+                    x.values(),
+                    x.offsets(),
+                    kernel_output,
+                    M=M,
+                    MAX_SEQLEN=max_seqlen,
+                    **best_config
+                )
+            jagged_cache.store_config(M, max_seqlen, best_config, best_ms)
+            # triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune[grid](
+            #     x.values(),
+            #     x.offsets(),
+            #     kernel_output,
+            #     M=M,
+            #     MAX_SEQLEN=max_seqlen,
+            #     BLOCK_SIZE_RAGGED=best_config['BLOCK_SIZE_RAGGED'],
+            #     BLOCK_SIZE_M=best_config['BLOCK_SIZE_M'],
+            #     num_warps=best_config['num_warps'],
+            #     num_stages=best_config['num_stages']
+            # )
+        # if sum_then_buffer:
+        #    kernel = triton_jagged_sum_kernel_simple_fused_sum_then_buffer[grid](
+        #         x.values(),
+        #         x.offsets(),
+        #         kernel_output,
+        #         M=M,
+        #         MAX_SEQLEN=max_seqlen,
+        #     )
         else:
             triton_jagged_sum_kernel_simple_fused_buffer_then_sum[grid](
                 x.values(),
@@ -125,21 +225,47 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
                 M=M,
                 MAX_SEQLEN=max_seqlen,
             )
-        sys.stdout = old_stdout
-        output = mystdout.getvalue()
+        # sys.stdout = old_stdout
+        # output = mystdout.getvalue()
         
-        config = get_best_config_from_output(output)
-        if config:
-            print("Parsed config:", config)
-            jagged_cache.store_config(M, config)
+        # config = get_best_config_from_output(output)
+        # if config:
+        #     print("Parsed config:", config)
+        #     jagged_cache.store_config(M, config)
     return kernel_output
 
 
 def execute_kernel_variable_length_loop(x, sum_then_buffer):
     B, M = x.shape[0], x.shape[2]
+    # cached_config = jagged_cache.get_config(M)
     grid = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     kernel_output = torch.zeros((B, M), device=x.device)
 
+    # if cached_config:
+    #     config = cached_config['config']
+    #     if sum_then_buffer:
+    #         triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer_no_autotune[grid](
+    #             x.values(),
+    #             x.offsets(),
+    #             kernel_output,
+    #             M=M,
+    #             BLOCK_SIZE_RAGGED=config['BLOCK_SIZE_RAGGED'],
+    #             BLOCK_SIZE_M=config['BLOCK_SIZE_M'],
+    #             num_warps=config['num_warps'],
+    #             num_stages=config['num_stages']
+    #         )
+    #     else:
+    #         triton_jagged_sum_kernel_variable_length_loop_buffer_then_sum[grid](
+    #             x.values(),
+    #             x.offsets(),
+    #             kernel_output,
+    #             M=M,
+    #             BLOCK_SIZE_RAGGED=config['BLOCK_SIZE_RAGGED'],
+    #             BLOCK_SIZE_M=config['BLOCK_SIZE_M'],
+    #             num_warps=config['num_warps'],
+    #             num_stages=config['num_stages']
+    #         )
+    # else:
     if sum_then_buffer:
         triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer[grid](
             x.values(),
@@ -166,6 +292,7 @@ class Operator(BenchmarkOperator):
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
+        # sizes = [2, 6, 10, 12, 15, 18, 21]
         self.sizes = (
             list(range(2, 12, 4)) + list(range(12, 23, 3))
         )  # bias towards larger sizes, which are more representative of real-world shapes

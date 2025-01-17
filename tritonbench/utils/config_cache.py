@@ -1,6 +1,6 @@
 import json
 import os
-import time
+import datetime
 from pathlib import Path
 
 class AutotuneCache:
@@ -20,7 +20,7 @@ class AutotuneCache:
             self.cache = {
                 "metadata": {
                     "version": "1.0",
-                    "last_updated": time.time(),
+                    "last_updated": datetime.datetime.now().isoformat(),
                 },
                 "configs": {}
             }
@@ -30,15 +30,17 @@ class AutotuneCache:
         with open(self.cache_file, 'w') as f:
             json.dump(self.cache, f, indent=2)
 
-    def get_key(self, M):
-        return f"{M}"
+    def get_key(self, M, MAX_SEQLEN):
+        return f"{M}_{MAX_SEQLEN}"
 
-    def get_config(self, M):
-        key = self.get_key(M)
+    def get_config(self, M, MAX_SEQLEN):
+        key = self.get_key(M, MAX_SEQLEN)
         return self.cache["configs"].get(key)
 
-    def store_config(self, M, config, perf = 0.0):
-        key = self.get_key(M)
+    #ignore storing_config
+    #TODO: Implement storing config
+    def store_config(self, M, MAX_SEQLEN, config, perf = 0.0):
+        key = self.get_key(M, MAX_SEQLEN)
         current = self.cache["configs"].get(key)
         
         # print(f"Storing config for key {key}")  # Debug print
@@ -46,8 +48,8 @@ class AutotuneCache:
         if current is None or perf < current["perf"]:
             self.cache["configs"][key] = {
                 "config": config,
-                "perf": 0.0,
-                "timestamp": time.time()
+                "perf": perf,
+                "timestamp": datetime.datetime.now().isoformat()
             }
-            self.cache["metadata"]["last_updated"] = time.time()
+            self.cache["metadata"]["last_updated"] = datetime.datetime.now().isoformat()
             self._save_cache()
