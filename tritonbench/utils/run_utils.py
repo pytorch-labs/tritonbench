@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_run_env(repo_locs: Optional[Dict[str]]=None) -> Dict[str, str]:
+def get_run_env(run_timestamp: str, repo_locs: Optional[Dict[str]]=None) -> Dict[str, str]:
     """
     Gather environment of the benchmark.
     repo_locs: Git repository dict of the repositories.
@@ -37,11 +37,13 @@ def get_run_env(repo_locs: Optional[Dict[str]]=None) -> Dict[str, str]:
     import torch
 
     run_env = {}
+    run_env["benchmark_date"] = run_timestamp
     run_env["cuda_version"] = torch.version.cuda if torch.version.cuda else "unknown"
     try:
         run_env["device"] = torch.cuda.get_device_name()
     except AssertionError:
         run_env["device"] = "unknown"
+    run_env["conda_env"] = os.environ.get("CONDA_ENV", "unknown")
     run_env["pytorch_commit"] = torch.version.git_version
     # we assume Tritonbench CI will properly set Triton commit hash in env
     run_env["triton_commit"] = os.environ.get("TRITONBENCH_TRITON_MAIN_COMMIT", "unknown")
@@ -108,4 +110,4 @@ def setup_output_dir(bm_name: str):
     current_timestamp = datetime.fromtimestamp(time.time()).strftime("%Y%m%d%H%M%S")
     output_dir = BENCHMARKS_OUTPUT_DIR.joinpath(bm_name, f"run-{current_timestamp}")
     Path.mkdir(output_dir, parents=True, exist_ok=True)
-    return output_dir.absolute()
+    return current_timestamp, output_dir.absolute()

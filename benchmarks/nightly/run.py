@@ -59,11 +59,16 @@ OPERATOR_BENCHMARKS = {
 }
 
 
-def reduce(output_dir, output_files, args):
+def reduce(run_timestamp, output_dir, output_files, args):
     """aggregate all op benchmark csvs into json file"""
+    from tritonbench.utils.path_utils import REPO_PATH
     from tritonbench.utils.run_utils import get_run_env, get_github_env
-
-    aggregated_obj = {"env": get_run_env(), "metrics": {}}
+    repo_locs = {
+        "tritonbench": REPO_PATH
+    }
+    if args.ci and "TRITONBENCH_TRITON_REPO_PATH" in os.environ:
+        repo_locs["triton"] = os.environ["TRITONBENCH_TRITON_REPO_PATH"]
+    aggregated_obj = {"env": get_run_env(run_timestamp, repo_locs), "metrics": {}}
     # Collecting GitHub environment variables when running in CI environment
     if args.ci:
         aggregated_obj["github"] = get_github_env()
@@ -86,7 +91,7 @@ def run():
     setup_tritonbench_cwd()
     from tritonbench.utils.run_utils import run_in_task, setup_output_dir
 
-    output_dir = setup_output_dir("nightly")
+    run_timestamp, output_dir = setup_output_dir("nightly")
     # Run each operator
     output_files = []
     for op_bench in OPERATOR_BENCHMARKS:
@@ -97,7 +102,7 @@ def run():
         run_in_task(op=op_bench, op_args=op_args)
         output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
-    result_json_file = reduce(output_dir, output_files, args)
+    result_json_file = reduce(run_timestamp, output_dir, output_files, args)
     logger.info(f"[nightly] logging result json file to {result_json_file}.")
 
 

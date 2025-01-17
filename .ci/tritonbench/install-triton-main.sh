@@ -40,9 +40,11 @@ rm -rf "${TRITON_PKG_DIR}"
 pip install ninja cmake wheel pybind11; # build-time dependencies
 pip install -e python
 
-# export the main branch commit to env
+# setup Triton repo related envs
+# these envs will be used in nightly runs and other benchmarks
 TRITONBENCH_TRITON_MAIN_COMMIT=$(git rev-parse --verify HEAD)
 echo "export TRITONBENCH_TRITON_MAIN_COMMIT=${TRITONBENCH_TRITON_MAIN_COMMIT}" >> /workspace/setup_instance.sh
+echo "export TRITONBENCH_TRITON_REPO_PATH=/workspace/triton" >> /workspace/setup_instance.sh
 
 # test main branch installation with importing experimental descriptor
 python -c "import triton.tools.experimental_descriptor"
