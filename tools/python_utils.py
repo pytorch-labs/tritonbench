@@ -42,7 +42,7 @@ def has_pkg(pkg: str):
         cmd = [sys.executable, "-c", f"import {pkg}; print({pkg}.__version__)"]
         subprocess.check_call(cmd)
         return True
-    except subprocess.SubprocessError:
+    except subprocess.CalledProcessError:
         return False
 
 
