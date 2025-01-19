@@ -61,23 +61,26 @@ def pip_install_requirements(
     requirements_txt="requirements.txt",
     continue_on_fail=False,
     no_build_isolation=False,
+    add_build_constraints=True,
     extra_args: Optional[List[str]] = None,
 ):
     import sys
 
     constraints_file = REPO_DIR.joinpath("build", "constraints.txt")
-    if not constraints_file.exists():
-        print(
-            "The build/constrants.txt file is not found. "
-            "Please consider rerunning the install.py script to generate it."
-            "It is recommended to install with the build/constrants.txt file "
-            "to prevent unexpected version change of numpy or torch."
-        )
-        # Test: to remove this
-        raise Exception("build/constraints.txt file is required")
-        constraints_parameters = []
+    if add_build_constraints:
+        if not constraints_file.exists():
+            print(
+                "The build/constrants.txt file is not found. "
+                "Please consider rerunning the install.py script to generate it."
+                "It is recommended to install with the build/constrants.txt file "
+                "to prevent unexpected version change of numpy or torch."
+            )
+            constraints_parameters = []
+        else:
+            constraints_parameters = ["-c", str(constraints_file.resolve())]
     else:
-        constraints_parameters = ["-c", str(constraints_file.resolve())]
+        constraints_parameters = []
+
     if no_build_isolation:
         constraints_parameters.append("--no-build-isolation")
     if extra_args and isinstance(extra_args, list):
