@@ -39,7 +39,7 @@ def has_pkg(pkg: str):
     Check if a package is installed
     """
     try:
-        cmd = [sys.executable, "-c", f"import {pkg}; print({pkg}.__version__)"]
+        cmd = [sys.executable, "-c", f"import {pkg}; {pkg}.__version__"]
         subprocess.check_call(cmd)
         return True
     except subprocess.CalledProcessError:
@@ -73,6 +73,8 @@ def pip_install_requirements(
             "It is recommended to install with the build/constrants.txt file "
             "to prevent unexpected version change of numpy or torch."
         )
+        # Test: to remove this
+        raise Exception("build/constraints.txt file is required")
         constraints_parameters = []
     else:
         constraints_parameters = ["-c", str(constraints_file.resolve())]
