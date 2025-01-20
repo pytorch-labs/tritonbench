@@ -40,7 +40,7 @@ def run():
         "--precision",
         "fp16",
         "--only",
-        "triton_tutorial_matmul",
+        "triton_tma_persistent_matmul",
         "--metrics",
         "tflops",
     ]
