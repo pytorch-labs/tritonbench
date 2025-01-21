@@ -43,11 +43,9 @@ jobs:
         run: |
           cd /workspace/tritonbench
           bash ./.ci/tritonbench/test-nightly.sh
-      - name: Upload metrics to Scribe
-        run: |
-          latest_run_dir=$(find -name "run-*" .benchmarks/nightly | tail -n 1)
-          latest_run_result_json="${latest_run_dir}/result.json"
-          if [ ! -f "${latest_run_result_json}" ]; then
-            echo "Result json not found at ${latest_run_result_json}."
-          fi
-          bash ./.ci/scuba/upload.py ${latest_run_result_json}
+          cp -r ./.benchmark/nightly benchmark-output
+      - name: Upload result to GH Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TorchBench V3 result
+          path: benchmark-output/
