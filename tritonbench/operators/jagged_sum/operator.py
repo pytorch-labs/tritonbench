@@ -138,18 +138,20 @@ def autotune_jagged_sum(kernel_fn, x, kernel_output, M, max_seqlen, grid_fn):
     return best_ms, best_config, kernel_fn
 
 def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
-    print(x)
+    # print(x)
     B, M = x.shape[0], x.shape[2]
+    seq_lengths = [x.offsets()[i+1].item() - x.offsets()[i].item() for i in range(len(x.offsets())-1)]
     # print(f"B {B}, M ={M}")
     # print(f"Length of x.offsets() {len(x.offsets())}")
-    cached_config = jagged_cache.get_config(M, max_seqlen)
+    cached_config = jagged_cache.get_config(B, M, seq_lengths, max_seqlen)
     grid = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     kernel_output = torch.zeros((B, M), device=x.device)
 
-    # os.environ["TRITON_PRINT_AUTOTUNING"] = "1"
-
-    # old_stdout = sys.stdout
-    # sys.stdout = mystdout = StringIO()
+    # lengths of each sequence
+    # lengths = x.offsets()
+    # # print(lengths)
+    seq_lengths = [x.offsets()[i+1].item() - x.offsets()[i].item() for i in range(len(x.offsets())-1)]
+    # print(seq_lengths)
 
     if cached_config:
         config = cached_config['config']
@@ -197,7 +199,8 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
                     MAX_SEQLEN=max_seqlen,
                     **best_config
                 )
-            jagged_cache.store_config(M, max_seqlen, best_config, best_ms)
+            jagged_cache.store_config(B, M, seq_lengths, max_seqlen, best_config, best_ms)
+
         else:
             triton_jagged_sum_kernel_simple_fused_buffer_then_sum[grid](
                 x.values(),
