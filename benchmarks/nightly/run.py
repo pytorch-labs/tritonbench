@@ -10,8 +10,7 @@ import sys
 from os.path import abspath, exists
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
+logging.basicConfig(level=logging.INFO)
 
 def setup_tritonbench_cwd():
     original_dir = abspath(os.getcwd())
@@ -87,6 +86,7 @@ def reduce(run_timestamp, output_dir, output_files, args):
     result_json_path = os.path.join(output_dir, "result.json")
     with open(result_json_path, "w") as fp:
         json.dump(aggregated_obj, fp, indent=4)
+    return result_json_path
 
 
 def run():
@@ -102,7 +102,6 @@ def run():
     # Run each operator
     output_files = []
     for op_bench in OPERATOR_BENCHMARKS:
-        logger.info(f"[nightly] running operator benchmark: {op_bench}")
         op_args = OPERATOR_BENCHMARKS[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.json")
         op_args.extend(["--output-json", str(output_file.absolute())])

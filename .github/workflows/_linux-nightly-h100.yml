@@ -43,7 +43,7 @@ jobs:
         run: |
           cd /workspace/tritonbench
           bash ./.ci/tritonbench/test-nightly.sh
-          cp -r ./.benchmark/nightly benchmark-output
+          cp -r ./.benchmarks/nightly benchmark-output
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
