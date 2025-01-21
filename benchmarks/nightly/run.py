@@ -10,7 +10,7 @@ import sys
 from os.path import abspath, exists
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 def setup_tritonbench_cwd():

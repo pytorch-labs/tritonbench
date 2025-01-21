@@ -21,7 +21,7 @@ from tritonbench.utils.path_utils import (
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 def get_run_env(
