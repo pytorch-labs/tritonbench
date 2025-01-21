@@ -87,7 +87,7 @@ def run_in_task(op: str, op_args: Optional[List[str]] = None) -> None:
         op_task_cmd.extend(op_args)
     # In OSS, we assume always using the run.py benchmark driver
     if not is_fbcode() and not op_task_cmd[0] == "run.py":
-        op_task_cmd.insert(0, "run.py")
+        op_task_cmd.insert(1, "run.py")
     try:
         logger.info("[tritonbench] Running benchmark: " + " ".join(op_task_cmd))
         subprocess.check_call(
