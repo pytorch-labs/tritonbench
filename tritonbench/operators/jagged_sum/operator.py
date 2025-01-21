@@ -198,25 +198,6 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
                     **best_config
                 )
             jagged_cache.store_config(M, max_seqlen, best_config, best_ms)
-            # triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune[grid](
-            #     x.values(),
-            #     x.offsets(),
-            #     kernel_output,
-            #     M=M,
-            #     MAX_SEQLEN=max_seqlen,
-            #     BLOCK_SIZE_RAGGED=best_config['BLOCK_SIZE_RAGGED'],
-            #     BLOCK_SIZE_M=best_config['BLOCK_SIZE_M'],
-            #     num_warps=best_config['num_warps'],
-            #     num_stages=best_config['num_stages']
-            # )
-        # if sum_then_buffer:
-        #    kernel = triton_jagged_sum_kernel_simple_fused_sum_then_buffer[grid](
-        #         x.values(),
-        #         x.offsets(),
-        #         kernel_output,
-        #         M=M,
-        #         MAX_SEQLEN=max_seqlen,
-        #     )
         else:
             triton_jagged_sum_kernel_simple_fused_buffer_then_sum[grid](
                 x.values(),
