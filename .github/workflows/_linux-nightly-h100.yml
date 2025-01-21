@@ -2,6 +2,11 @@ name: linux-nightly-h100
 on:
   workflow_call:
     inputs:
+      job_name:
+        required: True
+        type: string
+        description: |
+          Job Name
       conda_env:
         required: True
         type: string
@@ -17,6 +22,7 @@ jobs:
     env:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
       CONDA_ENV: ${{ inputs.conda_env }}
+      JOB_NAME: ${{ inputs.job_name }}
     steps:
       - name: Checkout Tritonbench if running on pull_request
         if: github.event_name == 'pull_request'

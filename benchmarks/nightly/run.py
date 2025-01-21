@@ -34,6 +34,8 @@ OPERATOR_BENCHMARKS = {
     "launch_latency": [
         "--op",
         "launch_latency",
+        "--skip",
+        "nop_inductor_kernel",
         "--metrics",
         "latency,walltime",
     ],
