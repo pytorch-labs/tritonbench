@@ -10,7 +10,7 @@ from tritonbench.utils.triton_op import (
     register_metric,
 )
 
-from .kernels import nop_kernel, nop_with_args_kernel, get_trivial_add_kernel
+from .kernels import get_trivial_add_kernel, nop_kernel, nop_with_args_kernel
 
 
 class Operator(BenchmarkOperator):

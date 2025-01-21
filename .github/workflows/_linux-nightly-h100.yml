@@ -38,6 +38,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           bash ./.ci/tritonbench/test-nightly.sh
+          cp -r ./.benchmarks/nightly benchmark-output
       - name: Nightly benchmarking (if not on pull_request)
         if: github.event_name != 'pull_request'
         run: |

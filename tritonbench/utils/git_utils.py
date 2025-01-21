@@ -3,6 +3,7 @@ import subprocess
 from datetime import datetime
 from typing import Optional
 
+
 def get_branch(repo: str, commit: str) -> str:
     """Get branch name with a given commit in a git repo.
     repo: local git repo path

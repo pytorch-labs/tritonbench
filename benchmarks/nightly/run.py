@@ -12,6 +12,7 @@ from os.path import abspath, exists
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
 def setup_tritonbench_cwd():
     original_dir = abspath(os.getcwd())
 
