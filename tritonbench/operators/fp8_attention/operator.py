@@ -113,7 +113,7 @@ class Operator(BenchmarkOperator):
         triton_q, triton_k, triton_v = self.triton_preprocess(q, k, v)
         # full fp8 will be enabled if type of q,k,v is fp8
         return lambda: triton_attention(
-            triton_q, triton_k, triton_v, False, self.sm_scale, "base"
+            triton_q, triton_k, triton_v, False, self.sm_scale, "base", "base"
         )
 
     def get_x_val(self, _example_inputs) -> Tuple[int, int, int, int]:
