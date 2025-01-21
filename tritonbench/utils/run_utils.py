@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_run_env(run_timestamp: str, repo_locs: Optional[Dict[str]]=None) -> Dict[str, str]:
+def get_run_env(run_timestamp: str, repo_locs: Optional[Dict[str, str]]=None) -> Dict[str, str]:
     """
     Gather environment of the benchmark.
     repo_locs: Git repository dict of the repositories.
