@@ -48,5 +48,5 @@ jobs:
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TorchBench V3 result
+          name: ${{ inputs.job_name }}
           path: benchmark-output/

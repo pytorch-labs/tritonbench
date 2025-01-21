@@ -13,7 +13,7 @@ jobs:
     uses: ./.github/workflows/_linux-nightly-h100.yml
     with:
       conda_env: "triton-main"
-      job_name: "h100-triton-main-nightly"
+      job_name: "tritonbench-h100-triton-main-nightly"
 
 
 concurrency:
