@@ -18,6 +18,10 @@ jobs:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
       CONDA_ENV: ${{ inputs.conda_env }}
     steps:
+      - name: Checkout Tritonbench
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Tune Nvidia GPU
         run: |
           sudo nvidia-smi -pm 1
@@ -25,7 +29,6 @@ jobs:
           nvidia-smi
       - name: Nightly benchmarking
         run: |
-          cd /workspace/tritonbench
           bash ./.ci/tritonbench/test-nightly.sh
       - name: Upload metrics to Scribe
         run: |
