@@ -60,10 +60,13 @@ POWER_LIMIT = {
     "NVIDIA A100": "330",
     "NVIDIA H100": "650",
 }
-FREQ_LIMIT = {
+GRAPHIC_FREQ_LIMIT = {
     "NVIDIA PG509-210": "1410",
     "NVIDIA A100": "1410",
     "NVIDIA H100": "1980",
+}
+MEMORY_FREQ_LIMIT = {
+    "NVIDIA H100": "1593",
 }
 
 
@@ -92,9 +95,20 @@ def _set_clock(gpu_info: str):
         "-i",
         CUDA_VISIBLE_DEVICES,
         "-lgc",
-        FREQ_LIMIT[gpu_info],
+        GRAPHIC_FREQ_LIMIT[gpu_info],
     ]
     subprocess.check_call(command)
+    # lmc: lock memory clocks
+    if gpu_info in MEMORY_FREQ_LIMIT:
+        command = [
+            "sudo",
+            "nvidia-smi",
+            "-i",
+            CUDA_VISIBLE_DEVICES,
+            "-lmc",
+            MEMORY_FREQ_LIMIT[gpu_info],
+        ]
+        subprocess.check_call(command)
 
 
 def _reset_clock(gpu_info: str):
@@ -109,7 +123,7 @@ def _get_gpu_name() -> str:
     pynvml.nvmlInit()
     gpu_id = CUDA_VISIBLE_DEVICES.split(",")[0]
     handle = pynvml.nvmlDeviceGetHandleByIndex(int(gpu_id))
-    return pynvml.nvmlDeviceGetName(handle).decode("utf-8")
+    return pynvml.nvmlDeviceGetName(handle)
 
 
 @contextmanager
@@ -125,4 +139,5 @@ def gpu_lockdown(enabled=True):
         yield
     finally:
         if enabled:
+            gpu_name = _get_gpu_name()
             _reset_clock(gpu_name)
