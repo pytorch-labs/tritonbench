@@ -11,10 +11,12 @@ def get_branch(repo: str, commit: str) -> str:
     If a commit belongs to many branches, return the very first branch.
     """
     assert os.path.exists(repo), f"{repo} path does not exist."
-    cmd = ["git", "branch", "-a", "--contains", commit]
+    cmd = ["git", "branch", "-a", "--contains", commit, "--no-color"]
     branch_names = subprocess.check_output(cmd, cwd=repo).decode().strip().splitlines()
     if not len(branch_names):
         return "unknown"
+    if branch_names[0].startswith("* "):
+        return branch_names[0][2:]
     return branch_names[0]
 
 
