@@ -1,10 +1,9 @@
 import os
 import subprocess
 from datetime import datetime
-from tritonbench.utils.path_utils import REPO_PATH
+from typing import Optional
 
-
-def get_branch(repo, commit) -> str:
+def get_branch(repo: str, commit: str) -> str:
     """Get branch name with a given commit in a git repo.
     repo: local git repo path
     commit: hash of a commit
@@ -18,11 +17,12 @@ def get_branch(repo, commit) -> str:
         return "unknown"
     return branch_names[0]
 
-def get_commit_time(repo, commit) -> str:
+
+def get_commit_time(repo: str, commit: str) -> str:
     """Get commit time in a git repo.
     repo: URL or local git repo path
     commit: hash of a commit
-    If a commit does not exist, return "unknown" 
+    If a commit does not exist, return "unknown"
     """
     assert os.path.exists(repo), f"{repo} path does not exist."
     git_date_cmd = ["git", "show", "--no-patch", "--format=%ci", commit]
@@ -32,6 +32,7 @@ def get_commit_time(repo, commit) -> str:
     date_format = "%Y-%m-%d %H:%M:%S %z"
     parsed_date = datetime.strptime(git_date, date_format)
     return datetime.strftime(parsed_date, "%Y%m%d%H%M%S")
+
 
 def get_current_hash(repo: str) -> str:
     """Get the HEAD hash of a git repo.

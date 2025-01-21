@@ -11,12 +11,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from tritonbench.utils.env_utils import is_fbcode
+from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
 from tritonbench.utils.path_utils import (
     add_cmd_parameter,
     remove_cmd_parameter,
     REPO_PATH,
 )
-from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
 
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
 
@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_run_env(run_timestamp: str, repo_locs: Optional[Dict[str, str]]=None) -> Dict[str, str]:
+def get_run_env(
+    run_timestamp: str, repo_locs: Optional[Dict[str, str]] = None
+) -> Dict[str, str]:
     """
     Gather environment of the benchmark.
     repo_locs: Git repository dict of the repositories.
@@ -41,20 +43,27 @@ def get_run_env(run_timestamp: str, repo_locs: Optional[Dict[str, str]]=None) ->
     run_env["conda_env"] = os.environ.get("CONDA_ENV", "unknown")
     run_env["pytorch_commit"] = torch.version.git_version
     # we assume Tritonbench CI will properly set Triton commit hash in env
-    run_env["triton_commit"] = os.environ.get("TRITONBENCH_TRITON_MAIN_COMMIT", "unknown")
+    run_env["triton_commit"] = os.environ.get(
+        "TRITONBENCH_TRITON_MAIN_COMMIT", "unknown"
+    )
     run_env["tritonbench_commit"] = get_current_hash(REPO_PATH)
     for repo in ["triton", "pytorch", "tritonbench"]:
-        if run_env[f"{repo}_commit"] == "unknown":
+        repo_loc = repo_locs.get(repo, None)
+        if not run_env[f"{repo}_commit"] == "unknown" and repo_loc:
+            run_env[f"{repo}_branch"] = get_branch(repo_loc, run_env[f"{repo}_commit"])
+            run_env[f"{repo}_commit_time"] = get_commit_time(
+                repo_loc, run_env[f"{repo}_commit"]
+            )
+        else:
             run_env[f"{repo}_branch"] = "unknown"
             run_env[f"{repo}_commit_time"] = "unknown"
-        else:
-            repo_loc = repo_locs.get(repo)
-            run_env[f"{repo}_branch"] = get_branch(repo_loc, run_env[f"{repo}_commit"])
-            run_env[f"{repo}_commit_time"] = get_commit_time(repo_loc, run_env[f"{repo}_commit"])
     return run_env
 
+
 def get_github_env() -> Dict[str, str]:
-    assert "GITHUB_RUN_ID" in os.environ, "GITHUB_RUN_ID environ must exist to obtain GitHub env"
+    assert (
+        "GITHUB_RUN_ID" in os.environ
+    ), "GITHUB_RUN_ID environ must exist to obtain GitHub env"
     out = {}
     out["GITHUB_ACTION"] = os.environ["GITHUB_ACTION"]
     out["GITHUB_ACTOR"] = os.environ["GITHUB_ACTOR"]

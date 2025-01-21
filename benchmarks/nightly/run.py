@@ -1,6 +1,7 @@
 """
 Tritonbench nightly run
 """
+
 import argparse
 import json
 import logging
@@ -62,13 +63,14 @@ OPERATOR_BENCHMARKS = {
 def reduce(run_timestamp, output_dir, output_files, args):
     """aggregate all op benchmark csvs into json file"""
     from tritonbench.utils.path_utils import REPO_PATH
-    from tritonbench.utils.run_utils import get_run_env, get_github_env
+    from tritonbench.utils.run_utils import get_github_env, get_run_env
+
     repo_locs = {
         "tritonbench": REPO_PATH,
     }
     if args.ci and "TRITONBENCH_TRITON_REPO_PATH" in os.environ:
-        repo_locs["triton"] = os.environ["TRITONBENCH_TRITON_REPO_PATH"]
-        repo_locs["pytorch"] = os.environ["TRITONBENCH_PYTORCH_REPO_PATH"]
+        repo_locs["triton"] = os.environ.get("TRITONBENCH_TRITON_REPO_PATH", None)
+        repo_locs["pytorch"] = os.environ.get("TRITONBENCH_PYTORCH_REPO_PATH", None)
     aggregated_obj = {"env": get_run_env(run_timestamp, repo_locs), "metrics": {}}
     # Collecting GitHub environment variables when running in CI environment
     if args.ci:
@@ -87,7 +89,9 @@ def reduce(run_timestamp, output_dir, output_files, args):
 
 def run():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ci", action="store_true", help="Running in GitHub Actions CI mode.")
+    parser.add_argument(
+        "--ci", action="store_true", help="Running in GitHub Actions CI mode."
+    )
     args = parser.parse_args()
     setup_tritonbench_cwd()
     from tritonbench.utils.run_utils import run_in_task, setup_output_dir
