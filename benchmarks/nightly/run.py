@@ -64,10 +64,11 @@ def reduce(run_timestamp, output_dir, output_files, args):
     from tritonbench.utils.path_utils import REPO_PATH
     from tritonbench.utils.run_utils import get_run_env, get_github_env
     repo_locs = {
-        "tritonbench": REPO_PATH
+        "tritonbench": REPO_PATH,
     }
     if args.ci and "TRITONBENCH_TRITON_REPO_PATH" in os.environ:
         repo_locs["triton"] = os.environ["TRITONBENCH_TRITON_REPO_PATH"]
+        repo_locs["pytorch"] = os.environ["TRITONBENCH_PYTORCH_REPO_PATH"]
     aggregated_obj = {"env": get_run_env(run_timestamp, repo_locs), "metrics": {}}
     # Collecting GitHub environment variables when running in CI environment
     if args.ci:

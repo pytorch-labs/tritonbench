@@ -19,11 +19,6 @@ from tritonbench.utils.path_utils import (
 from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
 
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
-REPO_URLS = {
-    "pytorch": "https://github.com/pytorch/pytorch.git",
-    "triton": "https://github.com/triton-lang/triton.git",
-    "tritonbench": "https://github.com/pytorch-labs/tritonbench.git",
-}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -53,7 +48,7 @@ def get_run_env(run_timestamp: str, repo_locs: Optional[Dict[str]]=None) -> Dict
             run_env[f"{repo}_branch"] = "unknown"
             run_env[f"{repo}_commit_time"] = "unknown"
         else:
-            repo_loc = repo_locs.get(repo, REPO_URLS[repo])
+            repo_loc = repo_locs.get(repo)
             run_env[f"{repo}_branch"] = get_branch(repo_loc, run_env[f"{repo}_commit"])
             run_env[f"{repo}_commit_time"] = get_commit_time(repo_loc, run_env[f"{repo}_commit"])
     return run_env
