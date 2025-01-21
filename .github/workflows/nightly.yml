@@ -4,6 +4,8 @@ on:
     # Test nightly docker daily at 4 PM UTC
     - cron: '0 16 * * *'
   workflow_dispatch:
+  # TODO: remove this before commit!
+  pull_request:
 
 
 jobs:
