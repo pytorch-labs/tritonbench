@@ -1,4 +1,4 @@
-name: linux-nightly-h100
+name: linux-benchmark-h100
 on:
   workflow_call:
     secrets:
@@ -7,11 +7,11 @@ on:
         description: |
           Tritonbench Scribe Graph Access Token
     inputs:
-      job_name:
+      benchmark_name:
         required: True
         type: string
         description: |
-          Job Name
+          Benchmark name
       conda_env:
         required: True
         type: string
@@ -19,7 +19,7 @@ on:
           Conda environment to activate when testing Triton
 
 jobs:
-  linux-test-h100:
+  linux-benchmark-h100:
     if: github.repository_owner == 'pytorch-labs'
     runs-on: [gcp-h100-runner]
     timeout-minutes: 240
@@ -27,7 +27,7 @@ jobs:
     env:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
       CONDA_ENV: ${{ inputs.conda_env }}
-      JOB_NAME: ${{ inputs.job_name }}
+      JOB_NAME: tritonbench-h100-${{ inputs.conda_env }}-${{ inputs.benchmark_name }}
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
     steps:
       - name: Checkout Tritonbench (if on pull_request)
@@ -40,17 +40,17 @@ jobs:
           sudo nvidia-smi -pm 1
           sudo ldconfig
           nvidia-smi
-      - name: Nightly benchmarking
+      - name: Benchmarking
         run: |
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
             cd /workspace/tritonbench
           fi
-          bash ./.ci/tritonbench/test-nightly.sh
-          cp -r ./.benchmarks/nightly benchmark-output
+          bash ./.ci/tritonbench/test.sh ${{ inputs.benchmark_name }}
+          cp -r ./.benchmarks/${{ inputs.benchmark_name }} benchmark-output
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.job_name }}
+          name: ${{ env.JOB_NAME }}
           path: benchmark-output/
       - name: Upload result to Scribe
         run: |
@@ -58,4 +58,4 @@ jobs:
             cd /workspace/tritonbench
           fi
           latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
-          bash ./.ci/scribe/upload.py --json ${latest_result_json}
+          bash ./.ci/upload/scribe.py --json ${latest_result_json}

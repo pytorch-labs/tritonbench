@@ -7,15 +7,15 @@ on:
   pull_request:
     paths:
       - benchmarks/nightly/**
-      - .github/workflows/_linux-nightly-h100.yml
+      - .github/workflows/_linux-benchmark-h100.yml
       - .github/workflows/nightly.yml
 
 jobs:
   h100-triton-main-nightly-test:
-    uses: ./.github/workflows/_linux-nightly-h100.yml
+    uses: ./.github/workflows/_linux-benchmark-h100.yml
     with:
       conda_env: "triton-main"
-      job_name: "tritonbench-h100-triton-main-nightly"
+      benchmark_name: "nightly"
     secrets:
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
 
