@@ -120,6 +120,19 @@ class Operator(BenchmarkOperator):
             triton_q, triton_k, triton_v, self.causal, self.sm_scale, "base"
         )
 
+    @register_benchmark()
+    def triton_flash_v2_tma(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        triton_q, triton_k, triton_v = self.triton_preprocess(q, k, v)
+        # full fp8 will be enabled if type of q,k,v is fp8
+        return lambda: triton_attention(
+            triton_q, triton_k, triton_v, self.causal, self.sm_scale, "tma"
+        )
+
     def get_x_val(self, _example_inputs) -> Tuple[int, int, int, int]:
         H = self.embedding_dim // self.D_HEAD
         return (self.BATCH, self.N_CTX, H, self.D_HEAD)
