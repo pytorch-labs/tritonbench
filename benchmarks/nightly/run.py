@@ -73,10 +73,15 @@ def reduce(run_timestamp, output_dir, output_files, args):
     if args.ci and "TRITONBENCH_TRITON_REPO_PATH" in os.environ:
         repo_locs["triton"] = os.environ.get("TRITONBENCH_TRITON_REPO_PATH", None)
         repo_locs["pytorch"] = os.environ.get("TRITONBENCH_PYTORCH_REPO_PATH", None)
-    aggregated_obj = {"env": get_run_env(run_timestamp, repo_locs), "metrics": {}}
+    aggregated_obj = {
+        "name": "nightly",
+        "env": get_run_env(run_timestamp, repo_locs),
+        "metrics": {},
+    }
     # Collecting GitHub environment variables when running in CI environment
     if args.ci:
         aggregated_obj["github"] = get_github_env()
+
     for result_json_file in output_files:
         with open(
             result_json_file,
