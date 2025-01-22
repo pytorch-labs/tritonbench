@@ -76,7 +76,7 @@ class ScribeUploader:
 
     def _upload(self, messages: list):
         access_token = os.environ.get(
-            "TORCHBENCH_USERBENCHMARK_SCRIBE_GRAPHQL_ACCESS_TOKEN"
+            "TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN"
         )
         if not access_token:
             raise ValueError("Can't find access token from environment variable")

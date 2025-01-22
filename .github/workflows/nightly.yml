@@ -4,9 +4,11 @@ on:
     # Test nightly docker daily at 4 PM UTC
     - cron: '0 16 * * *'
   workflow_dispatch:
-  # TODO: remove this before commit!
   pull_request:
-
+    paths:
+      - benchmarks/nightly/**
+      - .github/workflows/_linux-nightly-h100.yml
+      - .github/workflows/nightly.yml
 
 jobs:
   h100-triton-main-nightly-test:
@@ -14,6 +16,8 @@ jobs:
     with:
       conda_env: "triton-main"
       job_name: "tritonbench-h100-triton-main-nightly"
+    secrets:
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
 
 
 concurrency:

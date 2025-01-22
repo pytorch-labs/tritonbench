@@ -1,6 +1,11 @@
 name: linux-nightly-h100
 on:
   workflow_call:
+    secrets:
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN:
+        required: True
+        description: |
+          Tritonbench Scribe Graph Access Token
     inputs:
       job_name:
         required: True
@@ -23,8 +28,9 @@ jobs:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
       CONDA_ENV: ${{ inputs.conda_env }}
       JOB_NAME: ${{ inputs.job_name }}
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
     steps:
-      - name: Checkout Tritonbench if running on pull_request
+      - name: Checkout Tritonbench (if on pull_request)
         if: github.event_name == 'pull_request'
         uses: actions/checkout@v3
         with:
@@ -34,15 +40,11 @@ jobs:
           sudo nvidia-smi -pm 1
           sudo ldconfig
           nvidia-smi
-      - name: Nightly benchmarking (if on pull_request)
-        if: github.event_name == 'pull_request'
+      - name: Nightly benchmarking
         run: |
-          bash ./.ci/tritonbench/test-nightly.sh
-          cp -r ./.benchmarks/nightly benchmark-output
-      - name: Nightly benchmarking (if not on pull_request)
-        if: github.event_name != 'pull_request'
-        run: |
-          cd /workspace/tritonbench
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            cd /workspace/tritonbench
+          fi
           bash ./.ci/tritonbench/test-nightly.sh
           cp -r ./.benchmarks/nightly benchmark-output
       - name: Upload result to GH Actions Artifact
@@ -50,3 +52,10 @@ jobs:
         with:
           name: ${{ inputs.job_name }}
           path: benchmark-output/
+      - name: Upload result to Scribe
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            cd /workspace/tritonbench
+          fi
+          latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
+          bash ./.ci/scribe/upload.py --json ${latest_result_json}
