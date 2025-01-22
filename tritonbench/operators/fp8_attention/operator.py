@@ -58,6 +58,10 @@ class Operator(BenchmarkOperator):
         self.embedding_dim = args.embedding_dim
         self.D_HEAD = args.d_head
         self.causal = args.causal
+        # We always turn on causal for backward
+        # Because Triton-Flash-V2 does not support backward with non-causal
+        if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
+            self.causal = True
         self.requires_grad = not self.tb_args.mode == "fwd_no_grad"
         self.sm_scale = 1.3
 
@@ -113,7 +117,7 @@ class Operator(BenchmarkOperator):
         triton_q, triton_k, triton_v = self.triton_preprocess(q, k, v)
         # full fp8 will be enabled if type of q,k,v is fp8
         return lambda: triton_attention(
-            triton_q, triton_k, triton_v, False, self.sm_scale, "base"
+            triton_q, triton_k, triton_v, self.causal, self.sm_scale, "base"
         )
 
     def get_x_val(self, _example_inputs) -> Tuple[int, int, int, int]:
