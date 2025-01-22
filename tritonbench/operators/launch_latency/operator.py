@@ -10,7 +10,7 @@ from tritonbench.utils.triton_op import (
     register_metric,
 )
 
-from .kernels import nop_kernel, nop_with_args_kernel, trivial_add_kernel
+from .kernels import get_trivial_add_kernel, nop_kernel, nop_with_args_kernel
 
 
 class Operator(BenchmarkOperator):
@@ -55,6 +55,7 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def nop_inductor_kernel(self, *args):
+        trivial_add_kernel = get_trivial_add_kernel()
         return lambda: trivial_add_kernel(*args)
 
     @register_benchmark(baseline=True)

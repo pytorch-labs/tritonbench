@@ -2,6 +2,7 @@
 Tritonbench nightly run
 """
 
+import argparse
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ import sys
 from os.path import abspath, exists
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO)
 
 
 def setup_tritonbench_cwd():
@@ -33,6 +34,8 @@ OPERATOR_BENCHMARKS = {
     "launch_latency": [
         "--op",
         "launch_latency",
+        "--skip",
+        "nop_inductor_kernel",
         "--metrics",
         "latency,walltime",
     ],
@@ -59,11 +62,21 @@ OPERATOR_BENCHMARKS = {
 }
 
 
-def reduce(output_dir, output_files):
+def reduce(run_timestamp, output_dir, output_files, args):
     """aggregate all op benchmark csvs into json file"""
-    from tritonbench.utils.run_utils import get_run_env
+    from tritonbench.utils.path_utils import REPO_PATH
+    from tritonbench.utils.run_utils import get_github_env, get_run_env
 
-    aggregated_obj = {"env": get_run_env(), "metrics": {}}
+    repo_locs = {
+        "tritonbench": REPO_PATH,
+    }
+    if args.ci and "TRITONBENCH_TRITON_REPO_PATH" in os.environ:
+        repo_locs["triton"] = os.environ.get("TRITONBENCH_TRITON_REPO_PATH", None)
+        repo_locs["pytorch"] = os.environ.get("TRITONBENCH_PYTORCH_REPO_PATH", None)
+    aggregated_obj = {"env": get_run_env(run_timestamp, repo_locs), "metrics": {}}
+    # Collecting GitHub environment variables when running in CI environment
+    if args.ci:
+        aggregated_obj["github"] = get_github_env()
     for result_json_file in output_files:
         with open(
             result_json_file,
@@ -74,25 +87,29 @@ def reduce(output_dir, output_files):
     result_json_path = os.path.join(output_dir, "result.json")
     with open(result_json_path, "w") as fp:
         json.dump(aggregated_obj, fp, indent=4)
+    return result_json_path
 
 
 def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ci", action="store_true", help="Running in GitHub Actions CI mode."
+    )
+    args = parser.parse_args()
     setup_tritonbench_cwd()
     from tritonbench.utils.run_utils import run_in_task, setup_output_dir
 
-    output_dir = setup_output_dir("nightly")
+    run_timestamp, output_dir = setup_output_dir("nightly")
     # Run each operator
     output_files = []
     for op_bench in OPERATOR_BENCHMARKS:
-        logger.info(f"[nightly] running operator benchmark: {op_bench}")
         op_args = OPERATOR_BENCHMARKS[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.json")
-        op_args.insert(0, "run.py")
         op_args.extend(["--output-json", str(output_file.absolute())])
         run_in_task(op=op_bench, op_args=op_args)
         output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
-    result_json_file = reduce(output_dir, output_files)
+    result_json_file = reduce(run_timestamp, output_dir, output_files, args)
     logger.info(f"[nightly] logging result json file to {result_json_file}.")
 
 

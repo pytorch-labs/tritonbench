@@ -34,6 +34,9 @@ def nop_with_args_kernel(
     pass
 
 
-@torch.compile
-def trivial_add_kernel(*args):
-    return sum([torch.tensor(1.0, device="cuda"), *args])
+def get_trivial_add_kernel():
+    @torch.compile
+    def trivial_add_kernel(*args):
+        return sum([torch.tensor(1.0, device="cuda"), *args])
+
+    return trivial_add_kernel

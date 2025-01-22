@@ -1,0 +1,21 @@
+name: TritonBench Nightly
+on:
+  schedule:
+    # Test nightly docker daily at 4 PM UTC
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+  # TODO: remove this before commit!
+  pull_request:
+
+
+jobs:
+  h100-triton-main-nightly-test:
+    uses: ./.github/workflows/_linux-nightly-h100.yml
+    with:
+      conda_env: "triton-main"
+      job_name: "tritonbench-h100-triton-main-nightly"
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true
