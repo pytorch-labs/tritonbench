@@ -43,10 +43,12 @@ jobs:
       - name: Benchmarking
         run: |
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
-            cd /workspace/tritonbench
+            export repo_prefix=/workspace/tritonbench
+          else
+            export repo_prefix=$PWD
           fi
-          bash ./.ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }}
-          cp -r ./.benchmarks/${{ inputs.benchmark_name }} benchmark-output
+          bash "${repo_prefix}"/.ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }}
+          cp -r "${repo_prefix}"/.benchmarks/${{ inputs.benchmark_name }} benchmark-output
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -54,9 +56,11 @@ jobs:
           path: benchmark-output/
       - name: Upload result to Scribe
         run: |
-          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
-            cd /workspace/tritonbench
-          fi
           . "${SETUP_SCRIPT}"
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            export repo_prefix=/workspace/tritonbench
+          else
+            export repo_prefix=$PWD
+          fi
           latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
-          python ./.ci/upload/scribe.py --json ${latest_result_json}
+          python "${repo_prefix}"/.ci/upload/scribe.py --json ${latest_result_json}

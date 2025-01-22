@@ -15,4 +15,7 @@ fi
 
 BENCHMARK_NAME=$1
 
+tritonbench_dir=$(dirname "$(readlink -f "$0")")/../..
+cd ${tritonbench_dir}
+
 python "benchmarks/${BENCHMARK_NAME}/run.py" --ci
