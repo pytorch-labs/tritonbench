@@ -45,7 +45,7 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
             cd /workspace/tritonbench
           fi
-          bash ./.ci/tritonbench/test.sh ${{ inputs.benchmark_name }}
+          bash ./.ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }}
           cp -r ./.benchmarks/${{ inputs.benchmark_name }} benchmark-output
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
