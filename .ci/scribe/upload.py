@@ -4,6 +4,7 @@ Upload result json file to scribe.
 
 import argparse
 import json
+import os
 import requests
 import time
 
@@ -23,6 +24,8 @@ BENCHMARK_SCHEMA = {
         "triton_commit",
         "tritonbench_commit",
         "triton_branch",
+        "pytorch_branch",
+        "tritonbench_branch",
         "triton_commit_time",
         "pytorch_commit_time",
         "tritonbench_commit_time",
@@ -41,18 +44,21 @@ BENCHMARK_SCHEMA = {
         "runner_arch",
         "runner_name",
         "runner_os",
+        "metric_id",
     ],
     "float": ["metric_value"],
 }
 
 class ScribeUploader:
-    def __init__(self, category):
+    def __init__(self, category, schema):
         self.category = category
+        self.schema = schema
 
     def _format_message(self, field_dict):
         assert "time" in field_dict, "Missing required Scribe field 'time'"
         message = defaultdict(dict)
         for field, value in field_dict.items():
+            field = field.lower()
             if value is None:
                 continue
             if field in self.schema["normal"]:
@@ -101,9 +107,8 @@ class ScribeUploader:
         }
         base_message.update(bm_data["env"])
         base_message.update(bm_data["github"])
-        base_message["submission_group_id"] = f"tritonbench.{bm_data["name"]}"
+        base_message["submission_group_id"] = f"tritonbench.{bm_data['name']}"
         base_message["unix_user"] = "tritonbench_ci"
-        del base_message["name"]
         for metric in bm_data["metrics"]:
             msg = base_message.copy()
             msg["metric_id"] = metric
@@ -118,6 +123,6 @@ if __name__ == "__main__":
         "--json", required=True, type=argparse.FileType("r"), help="Userbenchmark json"
     )
     args = parser.parse_args()
-    uploader = ScribeUploader(category=CATEGORY_NAME)
+    uploader = ScribeUploader(category=CATEGORY_NAME, schema=BENCHMARK_SCHEMA)
     benchmark_data = json.load(args.json)
     uploader.post_benchmark_results(benchmark_data)
