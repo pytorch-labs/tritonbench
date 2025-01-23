@@ -56,7 +56,7 @@ try:
     cutlass_or_ck_fp8_row = torch.ops.fbgemm.f8f8bf16_rowwise
 
     HAS_CUTLASS_OR_CK = True
-except (ImportError, AttributeError):
+except (ImportError, ModuleNotFoundError, AttributeError):
     HAS_CUTLASS_OR_CK = False
 
 try:
@@ -65,7 +65,7 @@ try:
     from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import scale_fp8_row
 
     HAS_CUBLAS = True
-except (ImportError, IOError, AttributeError):
+except (ImportError, IOError, AttributeError, ModuleNotFoundError):
     HAS_CUBLAS = False
 
 
