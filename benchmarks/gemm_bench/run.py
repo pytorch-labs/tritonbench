@@ -1,12 +1,13 @@
 """
 Run gemm benchmark with a single input shape:
 
+Print tflops metrics
+"""
+
 M = 16384
 N = M
 K = M
 
-Print tflops metrics
-"""
 import os
 import sys
 from os.path import abspath, exists
