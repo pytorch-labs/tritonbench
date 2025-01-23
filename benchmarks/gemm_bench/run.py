@@ -1,9 +1,9 @@
 """
 Run gemm benchmark with a single input shape:
 
-M = 4096
-N = 4096
-K = 4096
+M = 16384
+N = M
+K = M
 
 Print tflops metrics
 """
@@ -32,11 +32,11 @@ def run():
     setup_tritonbench_cwd()
     args = [
         "--m",
-        "4096",
+        str(M),
         "--n",
-        "4096",
+        str(N),
         "--k",
-        "4096",
+        str(K),
         "--precision",
         "fp16",
         "--only",
