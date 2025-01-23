@@ -2,8 +2,6 @@ import argparse
 import os
 from typing import Any, Callable, Generator, List, Optional, Tuple
 
-import fbgemm_gpu.experimental.gen_ai  # noqa: F401
-
 import torch
 import triton
 
@@ -54,17 +52,25 @@ except (ImportError, AssertionError):
     HAS_TRITON = False
 
 try:
+    import fbgemm_gpu.experimental.gen_ai  # noqa: F401
+
     cutlass_or_ck_fp8_row = torch.ops.fbgemm.f8f8bf16_rowwise
     HAS_CUTLASS_OR_CK = True
-except ImportError:
+except (ImportError, AttributeError):
     HAS_CUTLASS_OR_CK = False
 
 try:
+    import fbgemm_gpu.experimental.gen_ai  # noqa: F401
+
     cublas_fp8_row = torch.ops.fbgemm.f8f8bf16_cublas
     from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import scale_fp8_row
 
     HAS_CUBLAS = True
-except (ImportError, IOError, AttributeError):
+except (
+    ImportError,
+    IOError,
+    AttributeError,
+):
     HAS_CUBLAS = False
 
 
