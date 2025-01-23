@@ -53,14 +53,15 @@ except (ImportError, AssertionError):
 
 try:
     import fbgemm_gpu.experimental.gen_ai  # noqa: F401
-    cutlass_or_ck_fp8_row = torch.ops.fbgemm.f8f8bf16_rowwise
 
+    cutlass_or_ck_fp8_row = torch.ops.fbgemm.f8f8bf16_rowwise
     HAS_CUTLASS_OR_CK = True
 except (ImportError, ModuleNotFoundError, AttributeError):
     HAS_CUTLASS_OR_CK = False
 
 try:
     import fbgemm_gpu.experimental.gen_ai  # noqa: F401
+
     cublas_fp8_row = torch.ops.fbgemm.f8f8bf16_cublas
     from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import scale_fp8_row
 
