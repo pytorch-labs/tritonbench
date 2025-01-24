@@ -46,6 +46,7 @@ OPERATOR_BENCHMARKS = {
         "latency,gbps",
         "--num-inputs",
         "6",
+        "--cudagraph",
     ],
     "bf16_gemm": [
         "--op",
@@ -58,6 +59,7 @@ OPERATOR_BENCHMARKS = {
         "latency,tflops",
         "--num-inputs",
         "4",
+        "--cudagraph",
     ],
 }
 

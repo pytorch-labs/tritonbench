@@ -36,7 +36,7 @@ jobs:
           submodules: recursive
       - name: Tune Nvidia GPU
         run: |
-          sudo nvidia-smi -pm 1
+          bash .ci/gpu/tune-gcp-h100.sh
           sudo ldconfig
           nvidia-smi
       - name: Benchmarking
@@ -52,4 +52,10 @@ jobs:
         run: |
           . "${SETUP_SCRIPT}"
           latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
-          python .ci/upload/scribe.py --json ${latest_result_json}
+          python ./.ci/upload/scribe.py --json ${latest_result_json}
+      - name: Restore Nvidia GPU
+        if: always()
+        run: |
+          bash .ci/gpu/reset-gcp-h100.sh
+          sudo ldconfig
+          nvidia-smi
