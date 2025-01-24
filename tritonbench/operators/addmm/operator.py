@@ -76,7 +76,7 @@ LARGE_K_SHAPES = list(itertools.product([13], [2**i for i in range(6, 26)], [2])
 
 class Operator(BenchmarkOperator):
     DEFAULT_METRICS = ["tflops", "best_config"]
-    DEFAULT_PRECISION = "bf16"
+    DEFAULT_PRECISION = "fp16"
 
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
