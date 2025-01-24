@@ -12,6 +12,7 @@ try:
 except ModuleNotFoundError:
     from .hstu import triton_addmm
 
+from tritonbench.operators.gemm.stream_k import streamk_matmul
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -94,6 +95,10 @@ class Operator(BenchmarkOperator):
     def triton_addmm(self, a, mat1, mat2) -> Callable:
         return lambda: triton_addmm(a, mat1, mat2)
 
+    @register_benchmark()
+    def streamk_addmm(self, a, mat1, mat2) -> Callable:
+        return lambda: streamk_matmul(mat1, mat2, bias=a)
+
     @register_benchmark(baseline=True)
     def aten_addmm(self, a, mat1, mat2) -> Callable:
         return lambda: torch.addmm(a, mat1, mat2)
@@ -132,7 +137,7 @@ class Operator(BenchmarkOperator):
         _, mat1, mat2 = example_inputs
         m, k = mat1.size()
         k, n = mat2.size()
-        flops = m * k * 2 * n
+        flops = (2 * m * k * n) + (m * n)
         return flops
 
     @register_x_val(label="(M, N, K)")
@@ -164,7 +169,7 @@ class Operator(BenchmarkOperator):
         baseline_output = baseline_fn()
         accuracy = True
         try:
-            torch.testing.assert_close(output, baseline_output, atol=1e-2, rtol=0.5)
+            torch.testing.assert_close(output, baseline_output, atol=1e-5, rtol=0.5)
         except Exception:
             accuracy = False
         finally:
