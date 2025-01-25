@@ -334,17 +334,15 @@ class BenchmarkOperatorResult:
 
     def _post_process_table(self, table, style="plain"):
         """
-            The "plain" style will use p50 for all List or Latency metrics.
-            The "with_variance" style will use "with_variance" str for Latency.
+        The "plain" style will use p50 for all List or Latency metrics.
+        The "with_variance" style will use "with_variance" str for Latency.
         """
+
         def _inner(table_cell):
             if isinstance(table_cell, list):
                 # Check if all elements are numbers before calculating median
                 if all(isinstance(x, Number) for x in table_cell):
                     return numpy.median(table_cell)
-                elif isinstance(table_cell, Latency):
-                    # print variance to latency metric
-                    return table_cell.to_str(mode=style) if style == "with_variance" else str(table_cell)
                 else:
                     # For non-numeric lists, convert to string representation
                     table_cell_str = str(table_cell)
@@ -353,6 +351,13 @@ class BenchmarkOperatorResult:
                             f"Metric value '{table_cell_str}' contains semicolon which may cause CSV parsing issues"
                         )
                     return table_cell_str
+            elif isinstance(table_cell, Latency):
+                # print variance to latency metric
+                return (
+                    table_cell.to_str(mode=style)
+                    if style == "with_variance"
+                    else str(table_cell)
+                )
             elif isinstance(table_cell, bool):
                 return 1.0 if table_cell else 0.0
             elif isinstance(table_cell, str):
@@ -363,9 +368,8 @@ class BenchmarkOperatorResult:
                 return table_cell
             else:
                 return table_cell
-        return [
-            [_inner(cell) for cell in row] for row in table
-        ]
+
+        return [[_inner(cell) for cell in row] for row in table]
 
     def write_csv_to_file(self, fileobj):
         import csv
