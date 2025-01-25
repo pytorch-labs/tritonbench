@@ -1,13 +1,14 @@
 import torch
 import triton
 import statistics
-from dataclasses import dataclass
 
 from typing import Optional, List
 
-@dataclass
 class Latency:
     times: List[float]
+
+    def __init__(self, times):
+        self.times = times
 
     def __str__(self):
         """By default, use p50"""
