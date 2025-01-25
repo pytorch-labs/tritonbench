@@ -16,7 +16,7 @@ def do_bench_wrapper(
             return triton.testing.do_bench_cudagraph(
                 fn,
                 rep=rep,
-                return_mode="median",
+                return_mode="all",
                 grad_to_none=grad_to_none,
             )
     else:
@@ -25,7 +25,7 @@ def do_bench_wrapper(
                 fn,
                 warmup=warmup,
                 rep=rep,
-                return_mode="median",
+                return_mode="all",
                 grad_to_none=grad_to_none,
             )
         except Exception as e:
