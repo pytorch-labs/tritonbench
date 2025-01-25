@@ -371,7 +371,7 @@ class BenchmarkOperatorResult:
         import csv
 
         headers, table = self._table()
-        table = self._post_process_table()
+        table = self._post_process_table(table)
         writer = csv.writer(fileobj, delimiter=";", quoting=csv.QUOTE_MINIMAL)
         writer.writerow(headers)
         writer.writerows(table)
@@ -406,7 +406,7 @@ class BenchmarkOperatorResult:
         # tritonbench_{op_name}_{op_mode}[{x_val}-{provider}-{metric}]
         userbenchmark_metrics_dict = {}
         headers, table = self._table()
-        table = self._post_process_table()
+        table = self._post_process_table(table)
         agg_data = {}
         for row in table:
             x_val = row[0]
@@ -458,7 +458,7 @@ class BenchmarkOperatorResult:
 
     def __str__(self):
         headers, table = self._table()
-        table = self._post_process_table(style="with_variance")
+        table = self._post_process_table(table, style="with_variance")
         table = tabulate.tabulate(table, headers=headers, stralign="right")
         return table
 
