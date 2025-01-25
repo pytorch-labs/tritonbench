@@ -23,18 +23,35 @@ class Latency:
     def __add__(self, other):
         return self.p50 + other.p50 if isinstance(other, Latency) else self.p50 + other
 
+    def __radd__(self, other):
+        return other.p50 + self.p50 if isinstance(other, Latency) else other + self.p50
+
     def __sub__(self, other):
         return self.p50 - other.p50 if isinstance(other, Latency) else self.p50 - other
+
+    def __rsub__(self, other):
+        return other.p50 - self.p50 if isinstance(other, Latency) else other - self.p50
 
     def __mul__(self, other):
         return self.p50 * other.p50 if isinstance(other, Latency) else self.p50 * other
 
+    def __rmul__(self, other):
+        return other.p50 * self.p50 if isinstance(other, Latency) else other * self.p50
+
     def __truediv__(self, other):
         return self.p50 / other.p50 if isinstance(other, Latency) else self.p50 / other
+
+    def __rtruediv__(self, other):
+        return other.p50 / self.p50 if isinstance(other, Latency) else other / self.p50
 
     def __floordiv__(self, other):
         return (
             self.p50 // other.p50 if isinstance(other, Latency) else self.p50 // other
+        )
+
+    def __rfloordiv__(self, other):
+        return (
+            other.p50 // self.p50 if isinstance(other, Latency) else other // self.p50
         )
 
     def __str__(self):
