@@ -23,7 +23,7 @@ import tabulate
 import torch
 import triton
 
-from tritonbench.components.do_bench import do_bench_wrapper
+from tritonbench.components.do_bench import do_bench_wrapper, Latency
 from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 from tritonbench.utils.env_utils import apply_precision, set_env, set_random_seed
 from tritonbench.utils.input import input_cast
@@ -185,8 +185,8 @@ def _find_op_name_from_module_path(module_path: str) -> str:
 
 @dataclass
 class BenchmarkOperatorMetrics:
-    # latency in ms
-    latency: Optional[float] = None
+    # latency in list
+    latency: Optional[Latency] = None
     # tflops
     tflops: Optional[float] = None
     # speedup over baseline
