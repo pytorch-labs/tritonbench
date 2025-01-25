@@ -328,38 +328,50 @@ class BenchmarkOperatorResult:
                         else metrics_dict
                     )
                     metric_val = _metrics_dict.get(metric, None)
-                    if isinstance(metric_val, list):
-                        # Check if all elements are numbers before calculating median
-                        if all(isinstance(x, Number) for x in metric_val):
-                            row.append(numpy.median(metric_val))
-                        elif isinstance(metric_val, Latency):
-                            # print variance to latency metric
-                            row.append(metric_val.to_str(mode="with_variance"))
-                        else:
-                            # For non-numeric lists, convert to string representation
-                            metric_val_str = str(metric_val)
-                            if ";" in metric_val_str:
-                                logger.warning(
-                                    f"Metric value '{metric_val_str}' contains semicolon which may cause CSV parsing issues"
-                                )
-                            row.append(metric_val_str)
-                    elif isinstance(metric_val, bool):
-                        row.append(1.0 if metric_val else 0.0)
-                    elif isinstance(metric_val, str):
-                        if ";" in metric_val:
-                            logger.warning(
-                                f"Metric value '{metric_val}' contains semicolon which may cause CSV parsing issues"
-                            )
-                        row.append(metric_val)
-                    else:
-                        row.append(metric_val)
+                    row.append(metric_val)
             table.append(row)
         return headers, table
+
+    def _post_process_table(self, table, style="plain"):
+        """
+            The "plain" style will use p50 for all List or Latency metrics.
+            The "with_variance" style will use "with_variance" str for Latency.
+        """
+        def _inner(table_cell):
+            if isinstance(table_cell, list):
+                # Check if all elements are numbers before calculating median
+                if all(isinstance(x, Number) for x in table_cell):
+                    return numpy.median(table_cell)
+                elif isinstance(table_cell, Latency):
+                    # print variance to latency metric
+                    return table_cell.to_str(mode=style) if style == "with_variance" else str(table_cell)
+                else:
+                    # For non-numeric lists, convert to string representation
+                    table_cell_str = str(table_cell)
+                    if ";" in table_cell_str:
+                        logger.warning(
+                            f"Metric value '{table_cell_str}' contains semicolon which may cause CSV parsing issues"
+                        )
+                    return table_cell_str
+            elif isinstance(table_cell, bool):
+                return 1.0 if table_cell else 0.0
+            elif isinstance(table_cell, str):
+                if ";" in table_cell:
+                    logger.warning(
+                        f"Metric value '{table_cell}' contains semicolon which may cause CSV parsing issues"
+                    )
+                return table_cell
+            else:
+                return table_cell
+        return [
+            [_inner(cell) for cell in row] for row in table
+        ]
 
     def write_csv_to_file(self, fileobj):
         import csv
 
         headers, table = self._table()
+        table = self._post_process_table()
         writer = csv.writer(fileobj, delimiter=";", quoting=csv.QUOTE_MINIMAL)
         writer.writerow(headers)
         writer.writerows(table)
@@ -394,7 +406,7 @@ class BenchmarkOperatorResult:
         # tritonbench_{op_name}_{op_mode}[{x_val}-{provider}-{metric}]
         userbenchmark_metrics_dict = {}
         headers, table = self._table()
-        num_rows = len(table)
+        table = self._post_process_table()
         agg_data = {}
         for row in table:
             x_val = row[0]
@@ -446,6 +458,7 @@ class BenchmarkOperatorResult:
 
     def __str__(self):
         headers, table = self._table()
+        table = self._post_process_table(style="with_variance")
         table = tabulate.tabulate(table, headers=headers, stralign="right")
         return table
 
