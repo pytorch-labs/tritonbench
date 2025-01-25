@@ -185,7 +185,7 @@ def _find_op_name_from_module_path(module_path: str) -> str:
 
 @dataclass
 class BenchmarkOperatorMetrics:
-    # latency in list
+    # latency
     latency: Optional[Latency] = None
     # tflops
     tflops: Optional[float] = None
