@@ -38,18 +38,18 @@ class Latency:
 
     def to_str(self, mode="p50"):
         if mode == "p50":
-            return self.p50
+            return str(self.p50)
         elif mode == "with_variance":
             min = min(self.time)
             max = max(self.times)
             max_variance = max((max - self.p50), (self.p50 - min))
             return f"{self.p50} (+/-{max_variance})"
         elif mode == "max":
-            return max(self.times)
+            return str(max(self.times))
         elif mode == "min":
-            return min(self.times)
+            return str(min(self.times))
         elif mode == "mean":
-            return statistics.mean(self.times)
+            return str(statistics.mean(self.times))
         else:
             raise ValueError(f"Unsupported latency output mode: {mode}")
 
