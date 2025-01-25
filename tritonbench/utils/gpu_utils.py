@@ -35,23 +35,23 @@ AMD_MI300X = {
 }
 
 
-HW_ROOFLINE_SPECS: Dict[
-    bool, Dict[str, Dict[str, float]]
-] = {  # true is compute bound false would be memory bound
-    True: {
-        "NVIDIA A100-SXM4-40GB": NV_A100,
-        "NVIDIA A100-PG509-200": NV_A100,
-        "NVIDIA H100": NV_H100,
-        "AMD MI300X": AMD_MI300X,
-    },
-    False: {
-        # https://www.nvidia.com/en-gb/data-center/h100
-        # values in gbps
-        "NVIDIA H100": 2000,
-        # https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-platform-data-sheet.pdf
-        "AMD MI300X": 5300,
-    },
-}
+HW_ROOFLINE_SPECS: Dict[bool, Dict[str, Dict[str, float]]] = (
+    {  # true is compute bound false would be memory bound
+        True: {
+            "NVIDIA A100-SXM4-40GB": NV_A100,
+            "NVIDIA A100-PG509-200": NV_A100,
+            "NVIDIA H100": NV_H100,
+            "AMD MI300X": AMD_MI300X,
+        },
+        False: {
+            # https://www.nvidia.com/en-gb/data-center/h100
+            # values in gbps
+            "NVIDIA H100": 2000,
+            # https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-platform-data-sheet.pdf
+            "AMD MI300X": 5300,
+        },
+    }
+)
 
 CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
 
@@ -111,6 +111,21 @@ def _set_clock(gpu_info: str):
         subprocess.check_call(command)
 
 
+def _maybe_set_app_clocks(gpu_info: str):
+    graphic_freq = GRAPHIC_FREQ_LIMIT.get(gpu_info, None)
+    memory_freq = MEMORY_FREQ_LIMIT.get(gpu_info, None)
+    if graphic_freq and memory_freq:
+        command = [
+            "sudo",
+            "nvidia-smi",
+            "-i",
+            CUDA_VISIBLE_DEVICES,
+            "-ac",
+            f"{memory_freq},{graphic_freq}",
+        ]
+        subprocess.check_call(command)
+
+
 def _reset_clock(gpu_info: str):
     # rgc: reset gpu clocks
     command = ["sudo", "nvidia-smi", "-i", CUDA_VISIBLE_DEVICES, "-rgc"]
@@ -136,6 +151,7 @@ def gpu_lockdown(enabled=True):
             _set_pm()
             _set_power(gpu_name)
             _set_clock(gpu_name)
+            _maybe_set_app_clocks(gpu_name)
         yield
     finally:
         if enabled:

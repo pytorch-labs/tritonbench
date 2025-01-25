@@ -21,19 +21,21 @@ class Latency:
         return statistics.median(self.times)
 
     def __add__(self, other):
-        return self.p50 + other
+        return self.p50 + other.p50 if isinstance(other, Latency) else self.p50 + other
 
     def __sub__(self, other):
-        return self.p50 - other
+        return self.p50 - other.p50 if isinstance(other, Latency) else self.p50 - other
 
     def __mul__(self, other):
-        return self.p50 * other
+        return self.p50 * other.p50 if isinstance(other, Latency) else self.p50 * other
 
     def __truediv__(self, other):
-        return self.p50 / other
+        return self.p50 / other.p50 if isinstance(other, Latency) else self.p50 / other
 
     def __floordiv__(self, other):
-        return self.p50 // other
+        return (
+            self.p50 // other.p50 if isinstance(other, Latency) else self.p50 // other
+        )
 
     def __str__(self):
         return self.to_str()
