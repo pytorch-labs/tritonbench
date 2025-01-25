@@ -332,6 +332,9 @@ class BenchmarkOperatorResult:
                         # Check if all elements are numbers before calculating median
                         if all(isinstance(x, Number) for x in metric_val):
                             row.append(numpy.median(metric_val))
+                        elif isinstance(metric_val, Latency):
+                            # print variance to latency metric
+                            row.append(metric_val.to_str(mode="with_variance"))
                         else:
                             # For non-numeric lists, convert to string representation
                             metric_val_str = str(metric_val)

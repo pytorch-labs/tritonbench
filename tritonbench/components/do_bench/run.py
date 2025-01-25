@@ -32,6 +32,9 @@ class Latency:
     def __floordiv__(self, other):
         return self.p50 // other
 
+    def __str__(self):
+        return self.to_str()
+
     def to_str(self, mode="p50"):
         if mode == "p50":
             return self.p50
