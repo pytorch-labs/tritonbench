@@ -35,23 +35,23 @@ AMD_MI300X = {
 }
 
 
-HW_ROOFLINE_SPECS: Dict[bool, Dict[str, Dict[str, float]]] = (
-    {  # true is compute bound false would be memory bound
-        True: {
-            "NVIDIA A100-SXM4-40GB": NV_A100,
-            "NVIDIA A100-PG509-200": NV_A100,
-            "NVIDIA H100": NV_H100,
-            "AMD MI300X": AMD_MI300X,
-        },
-        False: {
-            # https://www.nvidia.com/en-gb/data-center/h100
-            # values in gbps
-            "NVIDIA H100": 2000,
-            # https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-platform-data-sheet.pdf
-            "AMD MI300X": 5300,
-        },
-    }
-)
+HW_ROOFLINE_SPECS: Dict[
+    bool, Dict[str, Dict[str, float]]
+] = {  # true is compute bound false would be memory bound
+    True: {
+        "NVIDIA A100-SXM4-40GB": NV_A100,
+        "NVIDIA A100-PG509-200": NV_A100,
+        "NVIDIA H100": NV_H100,
+        "AMD MI300X": AMD_MI300X,
+    },
+    False: {
+        # https://www.nvidia.com/en-gb/data-center/h100
+        # values in gbps
+        "NVIDIA H100": 2000,
+        # https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/data-sheets/amd-instinct-mi300x-platform-data-sheet.pdf
+        "AMD MI300X": 5300,
+    },
+}
 
 CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
 
