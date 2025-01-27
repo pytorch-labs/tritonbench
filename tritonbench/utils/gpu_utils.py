@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 from contextlib import contextmanager
-from typing import Dict
+from typing import Dict, List, Optional
 
 # NVIDIA A100 GPU Spec:
 # https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/nvidia-a100-datasheet-us-nvidia-1758950-r4-web.pdf
@@ -157,3 +157,47 @@ def gpu_lockdown(enabled=True):
         if enabled:
             gpu_name = _get_gpu_name()
             _reset_clock(gpu_name)
+
+def _nvidia_smi_query(query: str, device_ids: Optional[List[int]]=None) -> List[str]:
+    if device_ids:
+        device_ids = [str(id) for id in device_ids]
+        device_ids = ",".join(device_ids)
+    id_selector = f"-i {device_ids}" if device_ids else ""
+    values = (
+        subprocess.check_output(
+            f'nvidia-smi --query-gpu="{query}" {id_selector} --format=csv,noheader,nounits',
+            shell=True,
+        )
+        .strip()
+        .decode()
+        .split("\n")
+    )
+    return values
+
+def get_nvidia_gpu_states() -> Dict[str, List[str]]:
+    results = {}
+    device_ids = os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")
+    # get power
+    raw_powers = _nvidia_smi_query("power.draw.average,power.draw.instant", device_ids)
+    results["power.draw.average"] = [power.split(",")[0] for power in raw_powers]
+    results["power.draw.instant"] = [power.split(",")[1] for power in raw_powers]
+    # get temperatures
+    raw_temps = _nvidia_smi_query("temperature.gpu,temperature.memory", device_ids)
+    results["temperature.gpu"] = [temp.split(",")[0] for temp in raw_temps]
+    results["temperature.memory"] = [temp.split(",")[1] for temp in raw_temps]
+    # get clocks
+    raw_clocks = _nvidia_smi_query("clock.current.sm,clock.current.memory", device_ids)
+    results["clock.current.sm"] = [clock.split(",")[0] for clock in raw_clocks]
+    results["clock.current.memory"] = [clock.split(",")[1] for clock in raw_clocks]
+    # get throttling reasons
+    raw_throttles = _nvidia_smi_query("clocks_throttle_reasons.hw_thermal_slowdown,clocks_throttle_reasons.sw_thermal_slowdown")
+    results=["hw_thermal_slowdown"] = [throttles.split(",")[0] for throttles in raw_throttles]
+    results=["sw_thermal_slowdown"] = [throttles.split(",")[1] for throttles in raw_throttles]
+    return results
+
+def has_nvidia_smi() -> bool:
+    try:
+        subprocess.check_call("nvidia-smi")
+        return True
+    except subprocess.SubprocessError:
+        return False
