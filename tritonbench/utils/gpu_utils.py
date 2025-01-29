@@ -111,6 +111,21 @@ def _set_clock(gpu_info: str):
         subprocess.check_call(command)
 
 
+def _maybe_set_app_clocks(gpu_info: str):
+    graphic_freq = GRAPHIC_FREQ_LIMIT.get(gpu_info, None)
+    memory_freq = MEMORY_FREQ_LIMIT.get(gpu_info, None)
+    if graphic_freq and memory_freq:
+        command = [
+            "sudo",
+            "nvidia-smi",
+            "-i",
+            CUDA_VISIBLE_DEVICES,
+            "-ac",
+            f"{memory_freq},{graphic_freq}",
+        ]
+        subprocess.check_call(command)
+
+
 def _reset_clock(gpu_info: str):
     # rgc: reset gpu clocks
     command = ["sudo", "nvidia-smi", "-i", CUDA_VISIBLE_DEVICES, "-rgc"]
@@ -136,6 +151,7 @@ def gpu_lockdown(enabled=True):
             _set_pm()
             _set_power(gpu_name)
             _set_clock(gpu_name)
+            _maybe_set_app_clocks(gpu_name)
         yield
     finally:
         if enabled:
