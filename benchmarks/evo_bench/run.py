@@ -1,9 +1,7 @@
 """
 Run benchmark and print tflops metrics
 """
-
-import tritonbench
-from tritonbench.utils.parser import get_parser
+import argparse
 
 evo_bench_config = {
     "flash_attention_fwd": [
@@ -38,21 +36,20 @@ evo_bench_config = {
         "1",
         "--input-id",
         "4",
-    ],
-    "ragged_attention_bwd": [
-        "--op",
-        "ragged_attention",
-        "--num-inputs",
-        "1",
-        "--input-id",
-        "4",
-        "--bwd",
+        "--cudagraph",
     ],
 }
 
 def run():
     from tritonbench.utils.run_utils import run_in_task
-    for op_name in evo_bench_config:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--op", required=False)
+    args = parser.parse_args()
+    if args.op:
+        ops = [args.op]
+    else:
+        ops = evo_bench_config.keys()
+    for op_name in ops:
         op_args = evo_bench_config[op_name]
         run_in_task(op=op_name, op_args=op_args)
 
