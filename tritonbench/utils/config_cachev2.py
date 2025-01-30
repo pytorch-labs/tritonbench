@@ -9,19 +9,9 @@ class AutotuneCache:
         cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = cache_dir / cache_file
         print(f"Initializing cache at: {self.cache_file}")
-        # os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         self._load_cache()
+        self._build_index()  # Build in-memory index for fast lookups
 
-    def _tuple_to_key(self, t):
-        """Convert a tuple to a JSON-compatible string key."""
-        return f"{json.dumps(list(t))}"
-
-    # def _key_to_tuple(self, key):
-    #     """Convert a JSON-compatible string key back to a tuple."""
-    #     if key.startswith("key_"):
-    #         return tuple(json.loads(key[4:]))
-    #     return key
-    
     def _load_cache(self):
         try:
             with open(self.cache_file, 'r') as f:
@@ -32,34 +22,49 @@ class AutotuneCache:
                     "version": "1.0",
                     "last_updated": datetime.datetime.now().isoformat(),
                 },
-                "configs": {}
+                "configs": []  # Array of configs
             }
             self._save_cache()
+
+    def _build_index(self):
+        """Build in-memory index for fast lookups"""
+        self._index = {}
+        for idx, config_entry in enumerate(self.cache["configs"]):
+            key = json.dumps(config_entry["key"])
+            self._index[key] = idx
 
     def _save_cache(self):
         with open(self.cache_file, 'w') as f:
             json.dump(self.cache, f, indent=2)
-
-    def get_key(self, B, M, seq_lengths, MAX_SEQLEN):
-        sorted_lengths = tuple(sorted(seq_lengths))
-        
-        # Return tuple key
-        key_tuple = [B, M, sorted_lengths, MAX_SEQLEN]
-        return self._tuple_to_key(key_tuple)
+        self._build_index()
 
     def get_config(self, B, M, seq_lengths, MAX_SEQLEN):
-        key = self.get_key(B, M, seq_lengths, MAX_SEQLEN)
-        return self.cache["configs"].get(key)
+        key = json.dumps([B, M, sorted(seq_lengths), MAX_SEQLEN])
+        idx = self._index.get(key)
+        if idx is not None:
+            return self.cache["configs"][idx]["data"]
+        return None
 
-    #ignore storing_configs
-    def store_config(self, B, M, seq_lengths, MAX_SEQLEN, config, perf = 0.0):
-        key = self.get_key(B, M, seq_lengths, MAX_SEQLEN)
-        current = self.cache["configs"].get(key)
+    def store_config(self, B, M, seq_lengths, MAX_SEQLEN, config, perf=0.0):
+        key = [B, M, sorted(seq_lengths), MAX_SEQLEN]
+        key_str = json.dumps(key)
         
-        # print(f"Storing config for key {key}")  # Debug print
-        # print(f"Config: {config}")
-        if current is None or perf < current["perf"]:
-            self.cache["configs"][key] = {
+        # Check
+        idx = self._index.get(key_str)
+        if idx is not None:
+            if perf < self.cache["configs"][idx]["data"]["perf"]:
+                self.cache["configs"][idx]["data"].update({
+                    "config": config,
+                    "perf": perf,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                })
+                self._save_cache()
+            return
+
+        # If not found, append 
+        new_entry = {
+            "key": key,
+            "data": {
                 "config": config,
                 "perf": perf,
                 "timestamp": datetime.datetime.now().isoformat(),
@@ -75,5 +80,8 @@ class AutotuneCache:
                     }
                 }
             }
-            self.cache["metadata"]["last_updated"] = datetime.datetime.now().isoformat()
-            self._save_cache()
+        }
+        self.cache["configs"].append(new_entry)
+        self._index[key_str] = len(self.cache["configs"]) - 1
+        self.cache["metadata"]["last_updated"] = datetime.datetime.now().isoformat()
+        self._save_cache()

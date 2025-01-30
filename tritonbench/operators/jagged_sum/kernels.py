@@ -8,6 +8,50 @@ from .cache_utils import jagged_cache
 BLOCK_SIZES = [2**n for n in range(3, 7, 3)]
 NUM_WARPS = [4, 8]
 NUM_STAGES = [2, 4]
+UNROLL_FACTORS = [2, 4, 8 , 16]
+
+@triton.jit
+def triton_jagged_sum_kernel_simple_fused_sum_then_buffer_new(
+    input_ptr_values,
+    input_ptr_offsets,
+    output_ptr,
+    M,
+    MAX_SEQLEN,
+    BLOCK_SIZE_RAGGED: tl.constexpr,
+    BLOCK_SIZE_M: tl.constexpr,
+    num_stages: tl.constexpr, 
+    unroll_factor: tl.constexpr, 
+):
+    pid = tl.program_id(axis=0)
+    pid_ragged = pid // tl.cdiv(M, BLOCK_SIZE_M)
+    pid_m = pid % tl.cdiv(M, BLOCK_SIZE_M)
+    
+    buffer = tl.zeros((1, BLOCK_SIZE_M), dtype=tl.float32)
+    
+    block_start_m = pid_m * BLOCK_SIZE_M
+    offsets_m = block_start_m + tl.arange(0, BLOCK_SIZE_M)
+    mask_m = offsets_m < M
+    
+    ragged_start, ragged_end = (tl.load(input_ptr_offsets + pid_ragged),
+        tl.load(input_ptr_offsets + (pid_ragged + 1)),
+    ) 
+    
+    # Use tl.range with num_stages and unroll factor
+    for block_pos in tl.range(0, tl.cdiv(MAX_SEQLEN, BLOCK_SIZE_RAGGED), 
+                             num_stages=num_stages, loop_unroll_factor=unroll_factor):
+        block_start_ragged = ragged_start + block_pos * BLOCK_SIZE_RAGGED
+        offsets_ragged = block_start_ragged + tl.arange(0, BLOCK_SIZE_RAGGED)
+        mask_ragged = offsets_ragged < ragged_end
+        idxs = (offsets_ragged[:, None] * M) + offsets_m
+        mask = mask_ragged[:, None] & mask_m
+        
+        input = tl.load(input_ptr_values + idxs, mask=mask, other=0)
+        buffer += tl.sum(input, axis=0)
+
+    buffer_view = buffer.reshape((BLOCK_SIZE_M,))
+    output_offsets = offsets_m + (pid_ragged * M)
+    output_mask = output_offsets < (M * (pid_ragged + 1))
+    tl.store(output_ptr + output_offsets, buffer_view, mask=output_mask)
 
 #No autotune function
 @triton.jit
@@ -26,33 +70,26 @@ def triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune(
     pid_ragged = pid // tl.cdiv(M, BLOCK_SIZE_M)
     pid_m = pid % tl.cdiv(M, BLOCK_SIZE_M)
 
-    buffer = tl.zeros(
-        (1, BLOCK_SIZE_M), dtype=tl.float32
-    )  # create buffer as a row tensor
+    buffer = tl.zeros((1, BLOCK_SIZE_M), dtype=tl.float32) 
 
     block_start_m = pid_m * BLOCK_SIZE_M
     offsets_m = block_start_m + tl.arange(0, BLOCK_SIZE_M)
     mask_m = offsets_m < M
 
-    ragged_start, ragged_end = (
-        tl.load(input_ptr_offsets + pid_ragged),
+    ragged_start, ragged_end = (tl.load(input_ptr_offsets + pid_ragged),
         tl.load(input_ptr_offsets + (pid_ragged + 1)),
-    )  # load start and end offsets for current program, similar to offsets[i] and offsets[i + 1]
+    )  
 
     for block_pos in range(
         0, MAX_SEQLEN, BLOCK_SIZE_RAGGED
     ):  # loop over ragged dimension, ranging until maximum seqlen
-        block_start_ragged = (
-            ragged_start + block_pos
-        )  # offset block position by start of current program
+        block_start_ragged = (ragged_start + block_pos)  # offset block position by start of current program
         offsets_ragged = block_start_ragged + tl.arange(0, BLOCK_SIZE_RAGGED)
         mask_ragged = offsets_ragged < ragged_end
-
         idxs = (offsets_ragged[:, None] * M) + offsets_m
         mask = mask_ragged[:, None] & mask_m
 
         input = tl.load(input_ptr_values + idxs, mask=mask, other=0)
-
         buffer += tl.sum(input, axis=0)
 
     buffer_view = buffer.reshape(

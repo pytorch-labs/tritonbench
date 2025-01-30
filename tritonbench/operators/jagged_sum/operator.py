@@ -42,6 +42,7 @@ from .kernels import (
     triton_jagged_sum_kernel_variable_length_loop_buffer_then_sum,
     triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer,
     triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune,
+    triton_jagged_sum_kernel_simple_fused_sum_then_buffer_new,
     triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer_no_autotune,
 )
 
@@ -79,6 +80,7 @@ def autotune_jagged_sum(kernel_fn, x, kernel_output, M, max_seqlen, grid_fn):
     BLOCK_SIZES = [2**n for n in range(3, 7, 3)]  # [8, 64]
     NUM_WARPS = [4, 8]
     NUM_STAGES = [2, 4]
+    UNROLL_FACTORS = [2, 4, 8, 16]
     
     best_ms = float('inf')
     best_config = None
@@ -86,12 +88,13 @@ def autotune_jagged_sum(kernel_fn, x, kernel_output, M, max_seqlen, grid_fn):
 
     grid_fn = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     # Try all configurations
-    for b_r, b_m, w, s in itertools.product(BLOCK_SIZES, BLOCK_SIZES, NUM_WARPS, NUM_STAGES):
+    for b_r, b_m, w, s, u in itertools.product(BLOCK_SIZES, BLOCK_SIZES, NUM_WARPS, NUM_STAGES, UNROLL_FACTORS):
         config = {
             "BLOCK_SIZE_RAGGED": b_r,
             "BLOCK_SIZE_M": b_m,
             "num_warps": w,
-            "num_stages": s
+            "num_stages": s,
+            "unroll_factor": u,
         }
         
         try:
@@ -106,7 +109,8 @@ def autotune_jagged_sum(kernel_fn, x, kernel_output, M, max_seqlen, grid_fn):
                     BLOCK_SIZE_RAGGED=b_r,
                     BLOCK_SIZE_M=b_m,
                     num_warps=w,
-                    num_stages=s
+                    num_stages=s,
+                    unroll_factor=u,
                 )
 
             # Warmup run
@@ -157,7 +161,7 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
         config = cached_config['config']
         # print("Using cached config:", config)
         if sum_then_buffer:
-            triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune[grid](
+            triton_jagged_sum_kernel_simple_fused_sum_then_buffer_new[grid](
                 x.values(),
                 x.offsets(),
                 kernel_output,
@@ -166,7 +170,8 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
                 BLOCK_SIZE_RAGGED=config['BLOCK_SIZE_RAGGED'],
                 BLOCK_SIZE_M=config['BLOCK_SIZE_M'],
                 num_warps=config['num_warps'],
-                num_stages=config['num_stages']
+                num_stages=config['num_stages'],
+                unroll_factor=config['unroll_factor'],
             )
         else:
             triton_jagged_sum_kernel_simple_fused_buffer_then_sum[grid](
@@ -184,7 +189,7 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
         # print("No cached config found for M:", M)
         if sum_then_buffer:
             best_ms, best_config, kernel = autotune_jagged_sum(
-                triton_jagged_sum_kernel_simple_fused_sum_then_buffer_no_autotune,
+                triton_jagged_sum_kernel_simple_fused_sum_then_buffer_new,
                 x, kernel_output, M, max_seqlen, grid
             )
 
