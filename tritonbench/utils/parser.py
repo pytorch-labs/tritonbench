@@ -65,6 +65,12 @@ def get_parser(args=None):
         help="Print result as csv.",
     )
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        defualt=None,
+        help="Output result csv to the dir."
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default=None,
