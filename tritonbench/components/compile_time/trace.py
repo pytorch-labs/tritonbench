@@ -1,10 +1,25 @@
-from typing import Callable, Dict
+import random
+import string
+from datetime import datetime
+from functools import partial
+from typing import Callable, Dict, Optional
 
 import torch
+import torch.profiler as profiler
 from tritonbench.utils.env_utils import fresh_triton_cache, is_fbcode
 
 if is_fbcode():
     from triton.fb.triton_util import triton_add_listener, TritonHook
+
+    from .fb.run_utils import trace_handler
+
+DEFAULT_PROFILE_OPTS = {
+    "record_shapes": True,
+    "profile_memory": True,
+    "with_stack": True,
+    "with_flops": True,
+    "with_modules": True,
+}
 
 
 def fbcode_do_compile_time_in_task(fn: Callable) -> Dict[str, float]:
@@ -37,3 +52,41 @@ def do_compile_time_in_task(fn: Callable) -> float:
         torch.cuda.synchronize()  # Wait for the events to be recorded!
     latency_with_compile = start_event.elapsed_time(end_event)
     return latency_with_compile
+
+
+def do_compile_kineto_trace_in_task(
+    fn: Callable,
+    profile_opts: Optional[Dict[str, bool]] = None,
+    output_dir: Optional[str] = None,
+) -> Optional[str]:
+    """Profile compilation stage using Kineto."""
+    activity_groups = [
+        profiler.ProfilerActivity.CUDA,
+        profiler.ProfilerActivity.CPU,
+    ]
+    if not profile_opts:
+        profile_opts = DEFAULT_PROFILE_OPTS
+    prefix = f"tritonbench_{fn._name}"
+    name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{''.join(random.choices(string.digits, k=10))}.json"
+    with fresh_triton_cache():
+        with profiler.profile(
+            schedule=profiler.schedule(wait=0, warmup=0, active=1, repeat=1),
+            activities=activity_groups,
+            record_shapes=profile_opts["record_shapes"],
+            profile_memory=profile_opts["profile_memory"],
+            with_stack=profile_opts["with_stack"],
+            with_flops=profile_opts["with_flops"],
+            with_modules=profile_opts["with_modules"],
+            on_trace_ready=(
+                partial(trace_handler, name)
+                if is_fbcode()
+                else profiler.tensorboard_trace_handler(output_dir)
+            ),
+        ) as prof:
+            fn()
+            prof.step()
+    print(f"output dir: {output_dir}")
+    if not hasattr(torch.version, "git_version"):
+        return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/test/{name}.gz&bucket=pyper_traces"
+    else:
+        return output_dir
