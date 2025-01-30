@@ -1,7 +1,5 @@
 import argparse
 
-from typing import List
-
 from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
 from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP, IS_FBCODE
 
@@ -65,10 +63,7 @@ def get_parser(args=None):
         help="Print result as csv.",
     )
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        defualt=None,
-        help="Output result csv to the dir."
+        "--output-dir", type=str, default=None, help="Output result csv to the dir."
     )
     parser.add_argument(
         "--output",
