@@ -1656,7 +1656,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         op_task.run()
         if kineto_trace:
             kineto_trace_loc = op_task.get_attribute("_compile_time_kineto_trace")
-            print(f"kineto_trace_loc: {kineto_trace_loc}")
             del op_task
             return kineto_trace_loc
         if op_task.get_attribute("triton_hook_latency") is not None:
