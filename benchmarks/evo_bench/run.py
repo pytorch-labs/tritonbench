@@ -49,7 +49,6 @@ evo_bench_config = {
         "--bwd",
         "--metrics",
         "tflops",
-        "--cudagraph",
     ],
     "jagged_sum": [
         "--op",
