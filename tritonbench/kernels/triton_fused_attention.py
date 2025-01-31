@@ -432,6 +432,7 @@ configsWS = [
     ]  # (24, 240), (40, 232)]  # 32,240 hangs, 24, 240 works 40, 232 works
 ]
 # BLOCK_M: 128, BLOCK_N: 128, ENABLE_TMA: False, LOOP_SCHEDULE: default, num_warps: 8, num_ctas: 1, num_stages: 3
+# <<<<START_AUTOTUNE_SECTION>>>>
 configsOrig = [
     (
         triton.Config(
@@ -463,6 +464,7 @@ configsOrig = [
     for s in [3, 4, 7]
     for w in [4, 8]
 ]
+# <<<<END_AUTOTUNE_SECTION>>>>
 # TMA, WS, and CompPipe
 configsTmaWS = [
     (

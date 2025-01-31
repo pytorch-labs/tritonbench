@@ -10,6 +10,7 @@ NUM_STAGES = [2, 4]
 
 
 @triton.autotune(
+# <<<<START_AUTOTUNE_SECTION>>>>
     configs=[
         triton.Config(
             {
@@ -26,6 +27,7 @@ NUM_STAGES = [2, 4]
             NUM_STAGES,  # number of stages
         )
     ],
+# <<<<END_AUTOTUNE_SECTION>>>>
     key=["M"],
 )
 @triton.jit
