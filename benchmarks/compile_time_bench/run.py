@@ -102,6 +102,11 @@ def reduce(run_timestamp, output_dir, output_files, args):
         aggregated_obj["github"] = get_github_env()
 
     for result_json_file in output_files:
+        if not exists(result_json_file):
+            logger.warning(
+                f"[compile_time] result json file {result_json_file} does not exist."
+            )
+            continue
         with open(
             result_json_file,
             "r",
