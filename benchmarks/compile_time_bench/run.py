@@ -106,6 +106,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ci", action="store_true", help="Running in GitHub Actions CI mode."
     )
+    parser.add_argument(
+        "--op", required=False, default=None, help="Run a single operator."
+    )
     args = parser.parse_args()
     setup_tritonbench_cwd()
     
@@ -113,9 +116,13 @@ if __name__ == "__main__":
     output_files = []
     run_timestamp, output_dir = setup_output_dir("compile_time")
     op_args_list = {}
-    for op in TRITON_OPERATORS:
+    if args.op:
+        op_list = [args.op]
+    else:
+        op_list = TRITON_OPERATORS.keys()
+    for op in op_list:
         op_args_list[op] = get_common_args(op, TRITON_OPERATORS[op])
-    for op in op_args_list:
+    for op in op_list:
         for mode in op_args_list[op]:
             op_args = op_args_list[op][mode]
             output_file = output_dir.joinpath(f"{op}_{mode}.json")
