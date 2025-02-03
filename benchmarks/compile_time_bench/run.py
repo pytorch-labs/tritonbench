@@ -1,6 +1,7 @@
 """
 Measure and collect compile time for operators.
 """
+
 import argparse
 import json
 import logging
@@ -8,7 +9,7 @@ import os
 import sys
 
 from os.path import abspath, exists
-from typing import List, Dict
+from typing import Dict, List
 
 
 logger = logging.getLogger(__name__)
@@ -31,10 +32,11 @@ def setup_tritonbench_cwd():
         sys.path.append(tritonbench_dir)
     return original_dir
 
+
 # A list of operators and their Triton backends
 TRITON_OPERATORS = {
     "addmm": ["triton_addmm"],
-    "bf16xbf16_gemm": ["bf16xbf16"],
+    "bf16xint16_gemm": ["bf16xbf16"],
     "cross_entropy": ["liger_cross_entropy_loss"],
     "embedding": ["liger_embedding"],
     "flash_attention": ["triton_tutorial_flash_v2"],
@@ -62,9 +64,20 @@ TRITON_OPERATORS = {
     "welford": ["test_welford"],
 }
 
-def get_common_args(op: str, backends List[str]) -> Dict[List[str]]:
-    command_args = ["--op", op, "--only", ",".join(backends), "--num-inputs", "1", "--metrics", "compile_time"]
-    bwd_command_args = command_args.copy().append("--bwd")
+
+def get_common_args(op: str, backends: List[str]) -> Dict[str, List[str]]:
+    command_args = [
+        "--op",
+        op,
+        "--only",
+        ",".join(backends),
+        "--num-inputs",
+        "1",
+        "--metrics",
+        "compile_time",
+    ]
+    bwd_command_args = command_args.copy()
+    bwd_command_args.append("--bwd")
     return {"fwd": command_args, "bwd": bwd_command_args}
 
 
@@ -111,8 +124,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     setup_tritonbench_cwd()
-    
+
     from tritonbench.utils.run_utils import run_in_task, setup_output_dir
+
     output_files = []
     run_timestamp, output_dir = setup_output_dir("compile_time")
     op_args_list = {}
@@ -127,7 +141,7 @@ if __name__ == "__main__":
             op_args = op_args_list[op][mode]
             output_file = output_dir.joinpath(f"{op}_{mode}.json")
             op_args.extend(["--output-json", str(output_file.absolute())])
-            run_in_task(op=op, op_args=op_args[op])
+            run_in_task(op=op, op_args=op_args)
             output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(run_timestamp, output_dir, output_files, args)
