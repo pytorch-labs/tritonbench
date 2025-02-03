@@ -199,6 +199,8 @@ class BenchmarkOperatorMetrics:
     compile_time: Optional[float] = None
     # stage breakdown of compile times
     compile_time_by_stage: Optional[Dict[str, float]] = None
+    # compile time with kineto trace
+    compile_trace: Optional[str] = None
     # ncu trace file
     ncu_trace: Optional[str] = None
     # ncu replay file
@@ -1145,6 +1147,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.compile_time = compile_time
                 if compile_time_by_stage:
                     metrics.compile_time_by_stage = compile_time_by_stage
+            if "compile_trace" in self.required_metrics:
+                metrics.compile_trace = self.compile_time(
+                    input_id, fn_name, metrics, kineto_trace=True
+                )
             if "ncu_trace" in self.required_metrics:
                 metrics.ncu_trace = self.ncu_trace(input_id, fn_name)
             # Collect NCU metrics if any required metrics match the ncu analyzer
@@ -1236,6 +1242,29 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.all_configs = self.all_configs(fn)
             if "kernel_source_hash" in self.required_metrics:
                 metrics.kernel_source_hash = self.kernel_hash(fn)
+            if "_compile_time_kineto_trace_in_task" in self.required_metrics:
+                assert (
+                    self.required_metrics == ["_compile_time_kineto_trace_in_task"]
+                    and len(self._only) == 1
+                    and (self._input_id is not None)
+                ), (
+                    "_compile_time_kineto_trace_in_task must be measured by itself. "
+                    f"required_metrics: {self.required_metrics}, _only: {self._only}, _input_id: {self._input_id}"
+                )
+                from tritonbench.components.compile_time import (
+                    do_compile_kineto_trace_in_task,
+                )
+
+                kineto_trace_output_dir = self.get_temp_path("kineto_trace")
+                kineto_trace_output_dir.mkdir(parents=True, exist_ok=True)
+                metrics.extra_metrics["_compile_time_kineto_trace_in_task"] = (
+                    do_compile_kineto_trace_in_task(
+                        fn, output_dir=str(kineto_trace_output_dir)
+                    )
+                )
+                self._compile_time_kineto_trace_in_task = metrics.extra_metrics[
+                    "_compile_time_kineto_trace_in_task"
+                ]
             if "_compile_time_in_task" in self.required_metrics:
                 assert (
                     self.required_metrics == ["_compile_time_in_task"]
@@ -1591,8 +1620,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         )
 
     def compile_time(
-        self, input_id: int, fn_name: str, metrics: BenchmarkOperatorMetrics
-    ) -> float:
+        self,
+        input_id: int,
+        fn_name: str,
+        metrics: BenchmarkOperatorMetrics,
+        kineto_trace: bool = False,
+    ) -> Union[float, str]:
         # We need to spawn a subprocess when user wants to measure the compile time
         # of multiple sample inputs and backends.
         from tritonbench.operators.op_task import OpTask
@@ -1611,12 +1644,27 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 "--input-id",
                 str(input_id),
                 "--metrics",
-                "_compile_time_in_task",
+                (
+                    "_compile_time_in_task"
+                    if not kineto_trace
+                    else "_compile_time_kineto_trace_in_task"
+                ),
             ]
         )
-        op_task = OpTask(name=self.name)
+        op_task = OpTask(name=self.name, save_output_dir=Path("/tmp/tritonbench"))
         op_task.make_operator_instance(args=op_task_args)
         op_task.run()
+        if kineto_trace:
+            kineto_trace_loc = op_task.get_attribute(
+                "_compile_time_kineto_trace_in_task"
+            )
+            if IS_FBCODE:
+                from tritonbench.components.kineto.fb.run_utils import (
+                    manifold_upload_file,
+                )
+
+                return manifold_upload_file(kineto_trace_loc, perfdoctor=True)
+            return kineto_trace_loc
         if op_task.get_attribute("triton_hook_latency") is not None:
             compiled_time = op_task.get_attribute("triton_hook_latency")
             compile_time_by_stage = op_task.get_attribute("compile_time_by_stage")

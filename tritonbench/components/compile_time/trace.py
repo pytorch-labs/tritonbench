@@ -1,10 +1,24 @@
-from typing import Callable, Dict
+import os
+import random
+import string
+from datetime import datetime
+from functools import partial
+from typing import Callable, Dict, Optional
 
 import torch
+import torch.profiler as profiler
 from tritonbench.utils.env_utils import fresh_triton_cache, is_fbcode
 
 if is_fbcode():
     from triton.fb.triton_util import triton_add_listener, TritonHook
+
+DEFAULT_PROFILE_OPTS = {
+    "record_shapes": True,
+    "profile_memory": True,
+    "with_stack": True,
+    "with_flops": True,
+    "with_modules": True,
+}
 
 
 def fbcode_do_compile_time_in_task(fn: Callable) -> Dict[str, float]:
@@ -37,3 +51,36 @@ def do_compile_time_in_task(fn: Callable) -> float:
         torch.cuda.synchronize()  # Wait for the events to be recorded!
     latency_with_compile = start_event.elapsed_time(end_event)
     return latency_with_compile
+
+
+def do_compile_kineto_trace_in_task(
+    fn: Callable,
+    profile_opts: Optional[Dict[str, bool]] = None,
+    output_dir: Optional[str] = None,
+) -> Optional[str]:
+    """Profile compilation stage using Kineto."""
+    activity_groups = [
+        profiler.ProfilerActivity.CUDA,
+        profiler.ProfilerActivity.CPU,
+    ]
+    if not profile_opts:
+        profile_opts = DEFAULT_PROFILE_OPTS
+    prefix = f"tritonbench_{fn._name}"
+    name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{''.join(random.choices(string.digits, k=10))}.json"
+    trace_path = os.path.join(output_dir, name)
+    with fresh_triton_cache():
+        with profiler.profile(
+            schedule=profiler.schedule(wait=0, warmup=0, active=1, repeat=1),
+            activities=activity_groups,
+            record_shapes=profile_opts["record_shapes"],
+            profile_memory=profile_opts["profile_memory"],
+            with_stack=profile_opts["with_stack"],
+            with_flops=profile_opts["with_flops"],
+            with_modules=profile_opts["with_modules"],
+            on_trace_ready=(
+                partial(lambda name, prof: prof.export_chrome_trace(name), trace_path)
+            ),
+        ) as prof:
+            fn()
+            prof.step()
+        return trace_path
