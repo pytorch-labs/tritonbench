@@ -11,7 +11,7 @@ from tritonbench.operators.gemm.kernels import matmul as kernels
 from tritonbench.operators.gemm.partition_k import matmul_partition_k
 from tritonbench.operators.gemm.stream_k import streamk_matmul
 from tritonbench.utils.data_utils import get_production_shapes
-from tritonbench.utils.env_utils import is_cuda
+from tritonbench.utils.env_utils import is_cuda, supports_tma
 
 from tritonbench.utils.path_utils import REPO_PATH
 
@@ -187,7 +187,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT)
+    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT and supports_tma())
     def triton_tma_persistent_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if bias is not None:
@@ -195,7 +195,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_tma_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT)
+    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT and supports_tma())
     def triton_tma_persistent_cached_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if bias is not None:
