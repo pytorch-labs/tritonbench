@@ -1,7 +1,7 @@
 name: Triton Compile Time Benchmark
 on:
   schedule:
-    # Test nightly docker daily at 4 PM UTC
+    # Run nightly at 4 PM UTC after the nightly docker is updated
     - cron: '0 16 * * *'
   workflow_dispatch:
   pull_request:
