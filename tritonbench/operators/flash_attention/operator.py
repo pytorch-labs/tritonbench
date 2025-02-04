@@ -161,6 +161,9 @@ def parse_op_args(args: List[str]):
     parser.add_argument(
         "--additional-inputs", action="store_true", help="enable additional inputs"
     )
+    parser.add_argument(
+        "--ragged-shapes", action="store_true", help="enable additional inputs"
+    )
     return parser.parse_args(args)
 
 
@@ -185,6 +188,7 @@ class Operator(BenchmarkOperator):
         if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
             self.causal = True
         self.additional_inputs = args.additional_inputs
+        self.ragged_shapes = args.ragged_shapes
         self.sm_scale = 1.3
 
     @register_benchmark()
@@ -521,7 +525,10 @@ class Operator(BenchmarkOperator):
                 yield (BATCH, H, N_CTX, D_HEAD)
 
         ctx_vals = get_ctx_vals()
-        if self.additional_inputs:
+
+        if self.ragged_shapes:
+            shapes = self.__ragged_shapes()
+        elif self.additional_inputs:
             shapes = self.__additional_example_input(ctx_vals)
         else:
             shapes = ctx_vals
@@ -567,6 +574,19 @@ class Operator(BenchmarkOperator):
                 ),
             )
         return shapes
+
+    def __ragged_shapes(self) -> Generator:
+        additional_shapes = [
+            (1024, 4, 1024, 128),
+            (256, 4, 256, 128),
+            (256, 4, 512, 128),
+            (256, 4, 1024, 128),
+            (256, 4, 2048, 128),
+            (256, 4, 4096, 128),
+            (256, 4, 8192, 128),
+            (256, 4, 16384, 128),
+        ]
+        return chain(additional_shapes)
 
     @register_x_val(label="(Batch, Heads, SeqLen, Dhead)")
     def get_x_val(self, example_inputs) -> float:
