@@ -49,6 +49,7 @@ jobs:
           name: ${{ env.JOB_NAME }}
           path: benchmark-output/
       - name: Upload result to Scribe
+        if: github.event_name != 'pull_request'
         run: |
           . "${SETUP_SCRIPT}"
           latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
