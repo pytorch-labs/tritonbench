@@ -49,11 +49,16 @@ jobs:
           name: ${{ env.JOB_NAME }}
           path: benchmark-output/
       - name: Upload result to Scribe
-        if: github.event_name != 'pull_request'
         run: |
           . "${SETUP_SCRIPT}"
           latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
           python ./.ci/upload/scribe.py --json ${latest_result_json}
+      - name: Upload result to S3 bucket
+        run: |
+          . "${SETUP_SCRIPT}"
+          pip install -r ./.ci/upload/requirements.txt
+          latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
+          python ./.ci/upload/s3.py --json ${latest_result_json}
       - name: Restore Nvidia GPU
         if: always()
         run: |
