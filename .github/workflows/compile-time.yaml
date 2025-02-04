@@ -15,9 +15,10 @@ jobs:
     uses: ./.github/workflows/_linux-benchmark-h100.yml
     with:
       conda_env: "triton-main"
-      benchmark_name: "compile_time_bench"
+      benchmark_name: "compile_time"
     secrets:
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
+
 
 
 concurrency:
