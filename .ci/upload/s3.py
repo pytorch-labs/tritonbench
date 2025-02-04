@@ -103,5 +103,5 @@ if __name__ == "__main__":
         runner = args.runner
     assert runner, "Expected GitHub runner name exists, get None. Pass in --runner or set env RUNNER_NAME."
     benchmark_name = benchmark_result["name"]
-    date_str = benchmark_result["benchmark_date"]
+    date_str = benchmark_result["env"]["benchmark_date"]
     upload_s3(benchmark_name, runner, date_str, upload_file_path)
