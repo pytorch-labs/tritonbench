@@ -1,4 +1,4 @@
-name: TritonBench Nightly
+name: Triton Compile Time Benchmark
 on:
   schedule:
     # Test nightly docker daily at 4 PM UTC
