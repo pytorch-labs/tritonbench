@@ -83,6 +83,7 @@ def upload_s3(benchmark_name: str, runner: str, date_str: str, file_path: Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--runner", required=False, default=None, help="Specify runner name.")
     parser.add_argument(
         "--json",
         required=True,
@@ -95,10 +96,12 @@ if __name__ == "__main__":
     ), f"Specified result json path {args.json} does not exist."
     with open(upload_file_path, "r") as fp:
         benchmark_result = json.load(fp)
-    runner = os.environ.get("GITHUB_RUNNER", None)
+    runner = os.environ.get("RUNNER_NAME", None)
     if not runner:
-        runner = benchmark_result["github"]["GITHUB_RUNNER"]
-    assert runner, "Expected runner name exists, get None. Pass --runner or set env GITHUB_RUNNER."
+        runner = benchmark_result["github"]["RUNNER_NAME"]
+    if not runner:
+        runner = args.runner
+    assert runner, "Expected GitHub runner name exists, get None. Pass in --runner or set env RUNNER_NAME."
     benchmark_name = benchmark_result["name"]
     date_str = benchmark_result["benchmark_date"]
     upload_s3(benchmark_name, runner, date_str, upload_file_path)
