@@ -72,18 +72,18 @@ class S3Client:
         return filename
 
 
-def upload_s3(benchmark_name: str, runner: str, date_str: str, file_path: Path):
+def upload_s3(benchmark_name: str, job: str, date_str: str, file_path: Path):
     """S3 path:
-    s3://ossci-metrics/tritonbench/<benchmark-name>/<runner>/<date>/metrics-<YYmmddHHMMSS>.json
+    s3://ossci-metrics/tritonbench/<benchmark-name>/<job-name>/<date>/metrics-<YYmmddHHMMSS>.json
     """
     s3client = S3Client(TRITONBENCH_S3_BUCKET, TRITONBENCH_S3_OBJECT)
-    prefix = f"{benchmark_name}/{runner}/{date_str}"
+    prefix = f"{benchmark_name}/{job}/{date_str}"
     s3client.upload_file(prefix=prefix, file_path=file_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runner", required=False, default=None, help="Specify runner name.")
+    parser.add_argument("--job", required=False, default=None, help="Specify job name.")
     parser.add_argument(
         "--json",
         required=True,
@@ -96,12 +96,12 @@ if __name__ == "__main__":
     ), f"Specified result json path {args.json} does not exist."
     with open(upload_file_path, "r") as fp:
         benchmark_result = json.load(fp)
-    runner = os.environ.get("RUNNER_NAME", None)
-    if not runner:
-        runner = benchmark_result["github"]["RUNNER_NAME"]
-    if not runner:
-        runner = args.runner
-    assert runner, "Expected GitHub runner name exists, get None. Pass in --runner or set env RUNNER_NAME."
+    job = os.environ.get("JOB_NAME", None)
+    if not job:
+        job = benchmark_result["github"]["JOB_NAME"]
+    if not job:
+        job = args.job
+    assert job, "Expected GitHub job name exists, get None. Pass in --job or set env JOB_NAME."
     benchmark_name = benchmark_result["name"]
     date_str = benchmark_result["env"]["benchmark_date"]
-    upload_s3(benchmark_name, runner, date_str, upload_file_path)
+    upload_s3(benchmark_name, job, date_str, upload_file_path)
