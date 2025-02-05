@@ -42,33 +42,35 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
             "gpu_count": 1,
             "gpu_mem_info": "not_available",
             "avail_gpu_mem_in_gb": 0,
-            "extra_info": {},
-        }
-    ]
-    out = []
-    for metric_id in benchmark_result["metrics"]:
-        # bypass if the metric is target
-        if metric_id.endswith("-target"):
-            continue
-        entry = common.copy()
-        entry["dependencies"] = parse_dependencies(benchmark_result["env"])
-        mode, dtype, inputs, metric_name = parse_metric_id(metric_id)
-        metric_value = benchmark_result["metrics"][metric_id]
-        entry["benchmark"] = {
-            "name": benchmark_result["name"],
-            "mode": benchmark_result["mode"],
-            "dtype": benchmark_result["dtype"],
             "extra_info": {
                 "cuda_version": benchmark_result["env"]["cuda_version"],
                 "conda_env": benchmark_result["env"]["conda_env"],
             },
         }
+    ]
+    out = []
+    for metric_id in benchmark_result["metrics"]:
+        # bypass if the metric is a target value
+        if metric_id.endswith("-target"):
+            continue
+        entry = common.copy()
+        entry["dependencies"] = parse_dependencies(benchmark_result["env"])
+        op, mode, backend, dtype, inputs, metric_name = parse_metric_id(metric_id)
+        metric_value = benchmark_result["metrics"][metric_id]
+        entry["benchmark"] = {
+            "name": benchmark_result["name"],
+            "mode": mode,
+            "dtype": dtype,
+            "extra_info": { },
+        }
         # We use the model field for operator
         entry["model"] = {
-            "name": "aaa",
+            "name": op,
             "type": "",
-            "backend": "",
+            "backend": backend,
         }
+        entry["inputs"] = [
+        ]
         entry["metric"] = {
             "name": metric_name,
             "benchmark_values": [metric_value],
@@ -86,6 +88,11 @@ if __name__ == "__main__":
         required=True,
         help="Upload benchmark result json file.",
     )
+    parser.add_argument(
+        "--output",
+        required=True,
+        help="output json."
+    )
     args = parser.parse_args()
     upload_file_path = Path(args.json)
     assert (
@@ -93,3 +100,6 @@ if __name__ == "__main__":
     ), f"Specified result json path {args.json} does not exist."
     with open(upload_file_path, "r") as fp:
         benchmark_result = json.load(fp)
+    oss_ci_v3_json = generate_oss_ci_benchmark_v3_json(benchmark_result)
+    with open(args.output, "w") as fp:
+        json.dump(fp, oss_ci_v3_json, indent=4)
