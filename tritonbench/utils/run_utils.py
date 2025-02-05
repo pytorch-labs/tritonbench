@@ -74,10 +74,12 @@ def get_github_env() -> Dict[str, str]:
     out["GITHUB_RUN_ATTEMPT"] = os.environ["GITHUB_RUN_ATTEMPT"]
     out["GITHUB_RUN_ID"] = os.environ["GITHUB_RUN_ID"]
     out["GITHUB_RUN_NUMBER"] = os.environ["GITHUB_RUN_NUMBER"]
+    out["GITHUB_WORKFLOW"] = os.environ["GITHUB_WORKFLOW"]
     out["GITHUB_WORKFLOW_REF"] = os.environ["GITHUB_WORKFLOW_REF"]
     out["GITHUB_WORKFLOW_SHA"] = os.environ["GITHUB_WORKFLOW_SHA"]
     out["JOB_NAME"] = os.environ["JOB_NAME"]
     out["RUNNER_ARCH"] = os.environ["RUNNER_ARCH"]
+    out["RUNNER_TYPE"] = os.environ["RUNNER_TYPE"]
     out["RUNNER_NAME"] = os.environ["RUNNER_NAME"]
     out["RUNNER_OS"] = os.environ["RUNNER_OS"]
     return out
