@@ -40,8 +40,13 @@ def fbcode_do_compile_time_in_task(fn: Callable) -> Dict[str, float]:
     return None
 
 
-def do_compile_time_in_task(fn: Callable) -> float:
+def do_compile_time_in_task(fn: Callable, cold_start: bool = False) -> float:
     with fresh_triton_cache():
+        if not cold_start:
+            # compile a dummy kernel to skip cold start overhead
+            from tritonbench.kernels.nop import nop_kernel
+
+            nop_kernel[1,]()
         torch.cuda.synchronize()
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
@@ -57,6 +62,7 @@ def do_compile_kineto_trace_in_task(
     fn: Callable,
     profile_opts: Optional[Dict[str, bool]] = None,
     output_dir: Optional[str] = None,
+    cold_start: bool = False,
 ) -> Optional[str]:
     """Profile compilation stage using Kineto."""
     activity_groups = [
@@ -69,6 +75,12 @@ def do_compile_kineto_trace_in_task(
     name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{''.join(random.choices(string.digits, k=10))}.json"
     trace_path = os.path.join(output_dir, name)
     with fresh_triton_cache():
+        if not cold_start:
+            # compile a dummy kernel to skip cold start overhead
+            from tritonbench.kernels.nop import nop_kernel
+
+            nop_kernel[1,]()
+        torch.cuda.synchronize()
         with profiler.profile(
             schedule=profiler.schedule(wait=0, warmup=0, active=1, repeat=1),
             activities=activity_groups,

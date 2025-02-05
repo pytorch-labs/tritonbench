@@ -1259,7 +1259,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 kineto_trace_output_dir.mkdir(parents=True, exist_ok=True)
                 metrics.extra_metrics["_compile_time_kineto_trace_in_task"] = (
                     do_compile_kineto_trace_in_task(
-                        fn, output_dir=str(kineto_trace_output_dir)
+                        fn,
+                        output_dir=str(kineto_trace_output_dir),
+                        cold_start=self.tb_args.compile_cold_start,
                     )
                 )
                 self._compile_time_kineto_trace_in_task = metrics.extra_metrics[
@@ -1294,7 +1296,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         )  # converting from ms to s
                 if "compile_times" not in metrics.extra_metrics:
                     metrics.extra_metrics["_compile_time_in_task"] = (
-                        do_compile_time_in_task(fn)
+                        do_compile_time_in_task(
+                            fn, cold_start=self.tb_args.compile_cold_start
+                        )
                     )
                     self._latency_with_compile_in_task = metrics.extra_metrics[
                         "_compile_time_in_task"
@@ -1651,6 +1655,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 ),
             ]
         )
+        if self.tb_args.compile_cold_start:
+            op_task_args.append("--compile-cold-start")
         op_task = OpTask(name=self.name, save_output_dir=Path("/tmp/tritonbench"))
         op_task.make_operator_instance(args=op_task_args)
         op_task.run()
