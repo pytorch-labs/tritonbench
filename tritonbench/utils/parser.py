@@ -175,6 +175,11 @@ def get_parser(args=None):
         action="store_true",
         help="when true randomly shuffles the inputs before running benchmarks where possible.",
     )
+    parser.add_argument(
+        "--compile-cold-start",
+        action="store_true",
+        help="Include cold start time in compile_time and compile_trace.",
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
