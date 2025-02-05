@@ -53,7 +53,7 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
                 "metrics": metrics,
                 "benchmark_name": args.op,
                 "device": args.device,
-                "logging_group": args.logging_group,
+                "logging_group": args.logging_group or args.op,
                 "precision": args.precision,
             }
             if args.production_shapes:
