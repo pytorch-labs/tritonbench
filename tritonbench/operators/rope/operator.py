@@ -45,18 +45,26 @@ class Operator(BenchmarkOperator):
     def prepare_input(self, hidden_size, seq_length):
         head_dim = hidden_size // self.num_q_heads
         rotary_emb = LlamaRotaryEmbedding(head_dim, device=self.device)
-        q = torch.randn(
-            (1, seq_length, self.num_q_heads, head_dim),
-            device=self.device,
-            requires_grad=True,
-            dtype=self.dtype,
-        ).transpose(1, 2)
-        k = torch.randn(
-            (1, seq_length, self.num_kv_heads, head_dim),
-            device=self.device,
-            requires_grad=True,
-            dtype=self.dtype,
-        ).transpose(1, 2)
+        q = (
+            torch.randn(
+                (1, seq_length, self.num_q_heads, head_dim),
+                device=self.device,
+                requires_grad=True,
+                dtype=self.dtype,
+            )
+            .transpose(1, 2)
+            .contiguous()
+        )
+        k = (
+            torch.randn(
+                (1, seq_length, self.num_kv_heads, head_dim),
+                device=self.device,
+                requires_grad=True,
+                dtype=self.dtype,
+            )
+            .transpose(1, 2)
+            .contiguous()
+        )
         dq, dk = (
             torch.randn_like(q, device=self.device, dtype=self.dtype),
             torch.randn_like(k, device=self.device),
