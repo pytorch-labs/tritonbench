@@ -700,6 +700,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self._available_num_inputs = self.count_example_inputs()
         if self._num_inputs is None:
             self._num_inputs = self._available_num_inputs - self._input_id
+        if self._num_inputs > self._available_num_inputs:
+            self._num_inputs = self._available_num_inputs
 
     def _get_bm_func(self, bm_func_name: str):
         fwd_fn_lambda = getattr(self, bm_func_name, None)
@@ -1008,9 +1010,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         )
 
     def count_example_inputs(self):
-        if self._num_inputs is not None:
+        total_possible = sum(1 for _ in self.get_input_iter())
+        if self._num_inputs is not None and self._num_inputs <= total_possible:
             return self._num_inputs
-        return sum(1 for _ in self.get_input_iter())
+        return total_possible
 
     def get_example_inputs(self):
         if self._input_iter is None:
