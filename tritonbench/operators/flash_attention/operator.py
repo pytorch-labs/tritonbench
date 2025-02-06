@@ -516,7 +516,10 @@ class Operator(BenchmarkOperator):
 
         def get_ctx_vals():
             if self.SEQ_LEN:
-                yield (BATCH, self.H, self.SEQ_LEN, self.D_HEAD)
+                SEQ_LEN = self.SEQ_LEN
+                for _i in range(self.tb_args.num_inputs):
+                    yield (BATCH, self.H, SEQ_LEN, self.D_HEAD)
+                    SEQ_LEN *= 2
                 return
             for i in range(SEQ_LEN_LOG2, 15):
                 N_CTX = 2**i
