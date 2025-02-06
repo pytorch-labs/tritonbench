@@ -460,7 +460,7 @@ configsOrig = [
     )
     for BM in [64, 128]
     for BN in [64, 128]
-    for s in [3, 4, 7]
+    for s in ([3, 4, 7] if not torch.version.hip else [2])
     for w in [4, 8]
 ]
 # TMA, WS, and CompPipe
@@ -1800,12 +1800,16 @@ class _attention_opt(torch.autograd.Function):
 
         TMA_SIZE = 128
         BATCH, H, N_CTX = q.shape[0], q.shape[1], q.shape[2]
+
         # no autotune with fixed BLOCK_N
-        desc_helper = TmaAutoTuneHelper()
-        desc_helper.init_tma_descriptor("k")
-        desc_helper.init_tma_descriptor("v")
-        desc_helper.init_tma_descriptor("q")
-        desc_helper.init_tma_descriptor("o")
+        if torch.version.hip is None:
+            desc_helper = TmaAutoTuneHelper()
+            desc_helper.init_tma_descriptor("k")
+            desc_helper.init_tma_descriptor("v")
+            desc_helper.init_tma_descriptor("q")
+            desc_helper.init_tma_descriptor("o")
+        else:
+            desc_helper = None
 
         def grid_tma(META):
             if META["ENABLE_TMA"] == False:
@@ -1945,10 +1949,15 @@ class _attention_opt(torch.autograd.Function):
                 1,
             )
 
-        desc_q = desc_helper.get_tma_descriptor_kernel_param("q")
-        desc_k = desc_helper.get_tma_descriptor_kernel_param("k")
-        desc_v = desc_helper.get_tma_descriptor_kernel_param("v")
-        desc_o = desc_helper.get_tma_descriptor_kernel_param("o")
+        desc_q = None
+        desc_k = None
+        desc_v = None
+        desc_o = None
+        if desc_helper is not None:
+            desc_q = desc_helper.get_tma_descriptor_kernel_param("q")
+            desc_k = desc_helper.get_tma_descriptor_kernel_param("k")
+            desc_v = desc_helper.get_tma_descriptor_kernel_param("v")
+            desc_o = desc_helper.get_tma_descriptor_kernel_param("o")
 
         M = torch.empty(
             (q.shape[0], q.shape[1], q.shape[2]), device=q.device, dtype=torch.float32
