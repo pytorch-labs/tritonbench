@@ -150,7 +150,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument(
         "--causal",
         action="store_true",
-        help="enable causal (always true on backward)",
+        help="enable causal",
     )
     parser.add_argument(
         "--native-sdpa", action="store_true", help="Use SDPA native choice."
@@ -183,10 +183,6 @@ class Operator(BenchmarkOperator):
         self.causal = args.causal
         self.native_sdpa = args.native_sdpa
         self.pt2_sdpa = args.pt2_sdpa
-        # We always turn on causal for backward
-        # Because Triton-Flash-V2 does not support backward with non-causal
-        if self.mode == BenchmarkMode.BWD or self.mode == BenchmarkMode.FWD_BWD:
-            self.causal = True
         self.additional_inputs = args.additional_inputs
         self.ragged_shapes = args.ragged_shapes
         self.sm_scale = 1.3
