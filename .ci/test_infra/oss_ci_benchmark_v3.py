@@ -27,15 +27,16 @@ def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     return out
 
 def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
+    print(metric_id)
     # per-input metric
     if ("[x_" in metric_id):
-        metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)\[(.*)-([a-z_]+)\]_([a-z_]+)"
+        metric_id_regex = r"tritonbench_([0-9a-z_]+)_([a-z_]+)\[x_(.*)-([0-9a-z_]+)\]_([a-z_]+)"
         op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
         out = (op, mode, input, backend, metric)
         return out
     # aggregated metric
     input = None
-    metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)\[([a-z_]+)\]-(.+)"
+    metric_id_regex = r"tritonbench_([0-9a-z_]+)_([a-z_]+)\[([0-9a-z_]+)\]-(.+)"
     op, mode, backend, metric = re.search(metric_id_regex, metric_id).groups()
     return (op, mode, input, backend, metric)
 
