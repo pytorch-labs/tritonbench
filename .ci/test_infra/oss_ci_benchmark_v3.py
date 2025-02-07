@@ -5,24 +5,47 @@ https://github.com/pytorch/test-infra/blob/main/clickhouse_db_schema/oss_ci_benc
 import argparse
 from datetime import datetime
 import json
-import os
+import re
 from pathlib import Path
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
-def parse_dependencies():
-    pass
+def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
+    dependencies = {
+        "pytorch": "pytorch/pytorch",
+        "triton": "triton-lang/triton",
+        "tritonbench": "pytorch-labs/tritonbench",
+    }
+    out = {}
+    for dep in dependencies:
+        out[dep]["repo"] = dependencies[dep]
+        out[dep]["branch"] = envs[f"{dep}_branch"]
+        out[dep]["sha"] = envs[f"{dep}_commit"]
+        out[dep]["extra_info"] = {}
+        out[dep]["extra_info"]["commit_time"] = envs[f"{dep}_commit_time"]
+    return out
+
+def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
+    # per-input metric
+    if ("[x_" in metric_id):
+        metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)[x_(.*)-([a-z_]+)]-([a-z_]+)"
+        op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
+        return (op, mode, input, backend, metric)
+    # aggregated metric
+    metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)[([a-z]+)]-(.+)"
+    op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
+    return (op, mode, input, backend, metric)
+
 
 def maybe_get_target_value(metrics: Dict[str, float], metric_id: str) -> float:
     target_metric_id = f"{metric_id}-target"
     return metrics.get(target_metric_id, 0.0)
 
-def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[List[Any]]:
+def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Parse Benchmark Json and return a list of entries
     """
     common = {}
-    common["timestamp"] = benchmark_result["env"]["benchmark_date"]
     common["name"] = benchmark_result["name"]
     common["repo"] = benchmark_result["github"]["GITHUB_REPOSITORY"]
     common["head_branch"] = benchmark_result["github"]["GITHUB_REF"]
@@ -43,6 +66,7 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
             "gpu_mem_info": "not_available",
             "avail_gpu_mem_in_gb": 0,
             "extra_info": {
+                "benchmark_date": benchmark_result["env"]["benchmark_date"],
                 "cuda_version": benchmark_result["env"]["cuda_version"],
                 "conda_env": benchmark_result["env"]["conda_env"],
             },
@@ -55,30 +79,34 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
             continue
         entry = common.copy()
         entry["dependencies"] = parse_dependencies(benchmark_result["env"])
-        op, mode, backend, dtype, inputs, metric_name = parse_metric_id(metric_id)
+        op, mode, _input, backend, metric_name = parse_metric_id(metric_id)
         metric_value = benchmark_result["metrics"][metric_id]
         entry["benchmark"] = {
             "name": benchmark_result["name"],
             "mode": mode,
-            "dtype": dtype,
+            "dtype": "unknown",
             "extra_info": { },
         }
         # We use the model field for operator
         entry["model"] = {
             "name": op,
-            "type": "",
+            "type": "tritonbench-oss",
             "backend": backend,
         }
-        entry["inputs"] = [
-        ]
         entry["metric"] = {
             "name": metric_name,
             "benchmark_values": [metric_value],
             "target_value": maybe_get_target_value(benchmark_result["metrics"], metric_id),
-            "extra_info": {},
         }
         out.append(entry)
     return out
+
+def v3_json_to_str(v3_json: List[Dict[str, Any]], to_lines: bool=False) -> str:
+    if to_lines:
+        entry_list = [json.dumps(entry) for entry in v3_json]
+        return "\n".join(entry_list)
+    else:
+        return json.dumps(v3_json, indent=4)
 
 
 if __name__ == "__main__":
@@ -100,8 +128,10 @@ if __name__ == "__main__":
     ), f"Specified result json path {args.json} does not exist."
     with open(upload_file_path, "r") as fp:
         benchmark_result = json.load(fp)
-    oss_ci_v3_json = generate_oss_ci_benchmark_v3_json(benchmark_result)
+    oss_ci_v3_json = generate_oss_ci_benchmark_v3_json(benchmark_result, to_lines=True)
+    out_str = v3_json_to_str(oss_ci_v3_json)
     output_dir = Path(args.output).parent
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w") as fp:
-        json.dump(fp, oss_ci_v3_json, indent=4)
+        fp.write(out_str)
+    print(f"[oss_ci_benchmark_v3] Successfully saved to {args.output}")
