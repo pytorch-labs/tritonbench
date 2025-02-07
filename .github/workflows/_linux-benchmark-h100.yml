@@ -32,6 +32,9 @@ jobs:
     runs-on: [gcp-h100-runner]
     timeout-minutes: 240
     environment: docker-s3-upload
+    permissions:
+      id-token: write
+      contents: read
     env:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
       CONDA_ENV: ${{ inputs.conda_env }}
@@ -69,12 +72,12 @@ jobs:
       - name: Upload result to Scribe
         run: |
           . "${SETUP_SCRIPT}"
-          latest_result_json=$(find ./benchmark-output/results -name "result.json"  | sort -r | head -n 1)
+          latest_result_json=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
           python ./.ci/upload/scribe.py --json ${latest_result_json}
       - name: Rewrite Tritonbench json to ClickHouse style
         run: |
           . "${SETUP_SCRIPT}"
-          latest_result_json=$(find ./benchmark-output/ -name "result.json"  | sort -r | head -n 1)
+          latest_result_json=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
           python ./.ci/test_infra/oss_ci_benchmark_v3.py --json ${latest_result_json} \
                  --output benchmark-output/results/result.json
       - name: Upload result to ClickHouse
