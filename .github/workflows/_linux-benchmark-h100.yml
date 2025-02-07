@@ -6,14 +6,6 @@ on:
         required: True
         description: |
           Tritonbench Scribe Graph Access Token
-      AWS_ACCESS_KEY_ID:
-        required: True
-        description: |
-          AWS S3 bucket access key
-      AWS_SECRET_ACCESS_KEY:
-        required: True
-        description: |
-          AWS S3 bucket secret access key
     inputs:
       benchmark_name:
         required: True
