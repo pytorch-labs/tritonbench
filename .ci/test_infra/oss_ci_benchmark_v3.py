@@ -10,6 +10,7 @@ from pathlib import Path
 
 from typing import Any, Dict, List, Tuple
 
+
 def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     dependencies = {
         "pytorch": "pytorch/pytorch",
@@ -30,7 +31,7 @@ def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
 def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
     print(metric_id)
     # per-input metric
-    if ("[x_" in metric_id):
+    if "[x_" in metric_id:
         metric_id_regex = (
             r"tritonbench_([0-9a-z_]+)_([a-z_]+)\[x_(.*)-([0-9a-z_]+)\]_([a-z_]+)"
         )
@@ -43,8 +44,9 @@ def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
     op, mode, backend, metric = re.search(metric_id_regex, metric_id).groups()
     return (op, mode, input, backend, metric)
 
+
 def generate_oss_ci_benchmark_v3_json(
-        benchmark_result: Dict[str, Any],
+    benchmark_result: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
     Parse Benchmark Json and return a list of entries
@@ -78,6 +80,7 @@ def generate_oss_ci_benchmark_v3_json(
         out.append(entry)
     return out
 
+
 def v3_json_to_str(v3_json: List[Dict[str, Any]], to_lines: bool = True) -> str:
     if to_lines:
         entry_list = [json.dumps(entry) for entry in v3_json]
@@ -93,7 +96,7 @@ if __name__ == "__main__":
         required=True,
         help="Upload benchmark result json file.",
     )
-    parser.add_argument("--output",required=True,help="output json.")
+    parser.add_argument("--output", required=True, help="output json.")
     args = parser.parse_args()
     upload_file_path = Path(args.json)
     assert (
