@@ -2,13 +2,13 @@
 Convert Tritonbench json to ClickHouse oss_ci_benchmark_v3 schema.
 https://github.com/pytorch/test-infra/blob/main/clickhouse_db_schema/oss_ci_benchmark_v3/schema.sql
 """
+
 import argparse
-from datetime import datetime
 import json
 import re
 from pathlib import Path
 
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     dependencies = {
@@ -26,11 +26,14 @@ def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
         out[dep]["extra_info"]["commit_time"] = envs[f"{dep}_commit_time"]
     return out
 
+
 def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
     print(metric_id)
     # per-input metric
     if ("[x_" in metric_id):
-        metric_id_regex = r"tritonbench_([0-9a-z_]+)_([a-z_]+)\[x_(.*)-([0-9a-z_]+)\]_([a-z_]+)"
+        metric_id_regex = (
+            r"tritonbench_([0-9a-z_]+)_([a-z_]+)\[x_(.*)-([0-9a-z_]+)\]_([a-z_]+)"
+        )
         op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
         out = (op, mode, input, backend, metric)
         return out
@@ -40,7 +43,9 @@ def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
     op, mode, backend, metric = re.search(metric_id_regex, metric_id).groups()
     return (op, mode, input, backend, metric)
 
-def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+def generate_oss_ci_benchmark_v3_json(
+        benchmark_result: Dict[str, Any],
+) -> List[Dict[str, Any]]:
     """
     Parse Benchmark Json and return a list of entries
     """
@@ -84,7 +89,7 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
             "name": benchmark_result["name"],
             "mode": mode,
             "dtype": "unknown",
-            "extra_info": { },
+            "extra_info": {},
         }
         # We use the model field for operator
         entry["model"] = {
@@ -99,7 +104,7 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
         out.append(entry)
     return out
 
-def v3_json_to_str(v3_json: List[Dict[str, Any]], to_lines: bool=True) -> str:
+def v3_json_to_str(v3_json: List[Dict[str, Any]], to_lines: bool = True) -> str:
     if to_lines:
         entry_list = [json.dumps(entry) for entry in v3_json]
         return "\n".join(entry_list)
@@ -114,11 +119,7 @@ if __name__ == "__main__":
         required=True,
         help="Upload benchmark result json file.",
     )
-    parser.add_argument(
-        "--output",
-        required=True,
-        help="output json."
-    )
+    parser.add_argument("--output",required=True,help="output json.")
     args = parser.parse_args()
     upload_file_path = Path(args.json)
     assert (
