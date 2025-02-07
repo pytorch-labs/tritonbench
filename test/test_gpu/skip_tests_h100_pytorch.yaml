@@ -9,8 +9,6 @@ flash_attention:
   - tk
   # triton_op_flash_v2 will segfault on triton-pytorch
   - triton_op_flash_v2
-  # force causal mode in backward
-  - triton_tutorial_flash_v2
   # triton_tutorial_*_ws kernels require triton-main
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
