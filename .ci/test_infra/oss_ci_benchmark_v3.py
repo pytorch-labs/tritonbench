@@ -18,6 +18,7 @@ def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     }
     out = {}
     for dep in dependencies:
+        out[dep] = {}
         out[dep]["repo"] = dependencies[dep]
         out[dep]["branch"] = envs[f"{dep}_branch"]
         out[dep]["sha"] = envs[f"{dep}_commit"]
@@ -28,18 +29,15 @@ def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
 def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
     # per-input metric
     if ("[x_" in metric_id):
-        metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)[x_(.*)-([a-z_]+)]-([a-z_]+)"
+        metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)\[(.*)-([a-z_]+)\]_([a-z_]+)"
         op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
-        return (op, mode, input, backend, metric)
+        out = (op, mode, input, backend, metric)
+        return out
     # aggregated metric
-    metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)[([a-z]+)]-(.+)"
-    op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
+    input = None
+    metric_id_regex = r"tritonbench_([a-z_]+)_([a-z_]+)\[([a-z_]+)\]-(.+)"
+    op, mode, backend, metric = re.search(metric_id_regex, metric_id).groups()
     return (op, mode, input, backend, metric)
-
-
-def maybe_get_target_value(metrics: Dict[str, float], metric_id: str) -> float:
-    target_metric_id = f"{metric_id}-target"
-    return metrics.get(target_metric_id, 0.0)
 
 def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -52,7 +50,7 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
     common["head_sha"] = benchmark_result["github"]["GITHUB_WORKFLOW_SHA"]
     common["workflow_id"] = benchmark_result["github"]["GITHUB_WORKFLOW"]
     common["run_attempt"] = benchmark_result["github"]["GITHUB_RUN_ATTEMPT"]
-    common["job_id"] = benchmark_result["github"]["GITHUB_JOB"]
+    common["job_id"] = benchmark_result["github"]["JOB_NAME"]
     common["runners"] = [
         {
             "name": benchmark_result["github"]["RUNNER_NAME"],
@@ -96,12 +94,11 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
         entry["metric"] = {
             "name": metric_name,
             "benchmark_values": [metric_value],
-            "target_value": maybe_get_target_value(benchmark_result["metrics"], metric_id),
         }
         out.append(entry)
     return out
 
-def v3_json_to_str(v3_json: List[Dict[str, Any]], to_lines: bool=False) -> str:
+def v3_json_to_str(v3_json: List[Dict[str, Any]], to_lines: bool=True) -> str:
     if to_lines:
         entry_list = [json.dumps(entry) for entry in v3_json]
         return "\n".join(entry_list)
@@ -128,7 +125,7 @@ if __name__ == "__main__":
     ), f"Specified result json path {args.json} does not exist."
     with open(upload_file_path, "r") as fp:
         benchmark_result = json.load(fp)
-    oss_ci_v3_json = generate_oss_ci_benchmark_v3_json(benchmark_result, to_lines=True)
+    oss_ci_v3_json = generate_oss_ci_benchmark_v3_json(benchmark_result)
     out_str = v3_json_to_str(oss_ci_v3_json)
     output_dir = Path(args.output).parent
     output_dir.mkdir(parents=True, exist_ok=True)
