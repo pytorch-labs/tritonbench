@@ -1,8 +1,7 @@
-import argparse
 import logging
 import unittest
 
-from typing import List, Dict
+from typing import Dict, List
 
 import yaml
 
