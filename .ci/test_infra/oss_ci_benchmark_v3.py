@@ -101,5 +101,7 @@ if __name__ == "__main__":
     with open(upload_file_path, "r") as fp:
         benchmark_result = json.load(fp)
     oss_ci_v3_json = generate_oss_ci_benchmark_v3_json(benchmark_result)
+    output_dir = Path(args.output).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w") as fp:
         json.dump(fp, oss_ci_v3_json, indent=4)
