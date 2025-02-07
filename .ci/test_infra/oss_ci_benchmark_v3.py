@@ -50,32 +50,6 @@ def generate_oss_ci_benchmark_v3_json(
     Parse Benchmark Json and return a list of entries
     """
     common = {}
-    common["name"] = benchmark_result["name"]
-    common["repo"] = benchmark_result["github"]["GITHUB_REPOSITORY"]
-    common["head_branch"] = benchmark_result["github"]["GITHUB_REF"]
-    common["head_sha"] = benchmark_result["github"]["GITHUB_WORKFLOW_SHA"]
-    common["workflow_id"] = benchmark_result["github"]["GITHUB_WORKFLOW"]
-    common["run_attempt"] = benchmark_result["github"]["GITHUB_RUN_ATTEMPT"]
-    common["job_id"] = benchmark_result["github"]["JOB_NAME"]
-    common["runners"] = [
-        {
-            "name": benchmark_result["github"]["RUNNER_NAME"],
-            "type": benchmark_result["github"]["RUNNER_TYPE"],
-            "cpu_info": "unknown",
-            "cpu_count": 0,
-            "mem_info": "unknown",
-            "avail_mem_in_gb": 0,
-            "gpu_info": benchmark_result["env"]["device"],
-            "gpu_count": 1,
-            "gpu_mem_info": "unknown",
-            "avail_gpu_mem_in_gb": 0,
-            "extra_info": {
-                "benchmark_date": benchmark_result["env"]["benchmark_date"],
-                "cuda_version": benchmark_result["env"]["cuda_version"],
-                "conda_env": benchmark_result["env"]["conda_env"],
-            },
-        }
-    ]
     out = []
     for metric_id in benchmark_result["metrics"]:
         # bypass if the metric is a target value
