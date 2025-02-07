@@ -2,7 +2,7 @@ import argparse
 import logging
 import unittest
 
-from typing import List, Optional
+from typing import List, Dict
 
 import yaml
 
@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 # Ops that we run forward only
 FWD_ONLY_OPS = skip_tests.get("fwd_only_ops", [])
+# Ops that require special arguments in backwards
+BWD_ARGS_OPS: Dict[str, List[str]] = skip_tests.get("bwd_args", {})
 
 TEST_OPERATORS = set(list_operators_by_collection(op_collection="default"))
 
@@ -77,6 +79,8 @@ def _run_one_operator(args: List[str]):
     if op.has_bwd():
         del op
         tb_args.mode = "bwd"
+        if tb_args.op in BWD_ARGS_OPS:
+            extra_args.extend(BWD_ARGS_OPS[tb_args.op])
         op = Operator(tb_args=tb_args, extra_args=extra_args)
         op.run()
         check_ci_output(op)
@@ -101,6 +105,8 @@ def _run_operator_in_task(op: str, args: List[str]):
     if task.get_attribute("has_bwd", method=True):
         task.del_op_instance()
         args.extend(["--bwd"])
+        if op in BWD_ARGS_OPS:
+            args.extend(BWD_ARGS_OPS[op])
         task.make_operator_instance(args=args)
         task.run()
         task.check_output()

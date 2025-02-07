@@ -26,11 +26,6 @@ jagged_mean:
 jagged_softmax:
 jagged_sum:
 ragged_attention:
-  # ../../../lib/Tools/LinearLayout.cpp:565: LinearLayout
-  # mlir::triton::LinearLayout::reshapeOuts(ArrayRef<std::pair<StringAttr, int32_t>>) const:
-  # Assertion `getTotalOutDimSize() == std::accumulate( newOutDims.begin(), newOutDims.end(),
-  # 1, [&](int32_t acc, auto &outDim) { return acc * outDim.second; })' failed.
-  - hstu_triton_ragged_attention
   # presistent kernel is not ready for OSS
   - hstu_triton_ragged_attention_persistent
 # cpu-op for testing
@@ -38,10 +33,7 @@ test_op:
 # TODO: decoding attention requires updated xformers and flash_attn
 # Which will RAM OOM on the CI machine
 decoding_attention:
-# FIXME: PT2 is broken with Triton-main
-launch_latency:
 addmm:
 gemm:
-flash_attention:
 gather_gemv:
 layer_norm:
