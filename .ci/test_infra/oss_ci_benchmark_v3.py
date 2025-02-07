@@ -55,13 +55,13 @@ def generate_oss_ci_benchmark_v3_json(benchmark_result: Dict[str, Any]) -> List[
         {
             "name": benchmark_result["github"]["RUNNER_NAME"],
             "type": benchmark_result["github"]["RUNNER_TYPE"],
-            "cpu_info": "not_available",
+            "cpu_info": "unknown",
             "cpu_count": 0,
-            "mem_info": "not_available",
+            "mem_info": "unknown",
             "avail_mem_in_gb": 0,
             "gpu_info": benchmark_result["env"]["device"],
             "gpu_count": 1,
-            "gpu_mem_info": "not_available",
+            "gpu_mem_info": "unknown",
             "avail_gpu_mem_in_gb": 0,
             "extra_info": {
                 "benchmark_date": benchmark_result["env"]["benchmark_date"],
