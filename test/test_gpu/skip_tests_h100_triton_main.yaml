@@ -38,10 +38,11 @@ test_op:
 # TODO: decoding attention requires updated xformers and flash_attn
 # Which will RAM OOM on the CI machine
 decoding_attention:
-# FIXME: PT2 is broken with Triton-main
-launch_latency:
 addmm:
 gemm:
-flash_attention:
 gather_gemv:
 layer_norm:
+bwd_args:
+  # flash_attention/triton_tutorial_flash_v2 does not support non-causal in backward
+  flash_attention:
+    - --causal
