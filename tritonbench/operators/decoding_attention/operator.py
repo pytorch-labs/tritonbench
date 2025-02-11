@@ -237,24 +237,6 @@ class Operator(BenchmarkOperator):
         )
 
     @register_benchmark(enabled=HAS_FLASH_V3)
-    def fa3_kvcache_non_gpa_heuristic(
-        self,
-        q: torch.Tensor,
-        k_cache: torch.Tensor,
-        v_cache: torch.Tensor,
-        cache_seqlens: torch.Tensor,
-    ) -> Callable:
-        return lambda: flash_attn_v3.flash_attn_with_kvcache(
-            q=q,
-            k_cache=k_cache,
-            v_cache=v_cache,
-            cache_seqlens=cache_seqlens,
-            causal=CAUSAL,
-            gqa_parallel=False,
-            num_splits=0,
-        )
-
-    @register_benchmark(enabled=HAS_FLASH_V3)
     def fa3_kvcache_gqa_heuristic(
         self,
         q: torch.Tensor,
@@ -262,19 +244,17 @@ class Operator(BenchmarkOperator):
         v_cache: torch.Tensor,
         cache_seqlens: torch.Tensor,
     ) -> Callable:
-        max_seqlen_k_hint = cache_seqlens.max().item()
         return lambda: flash_attn_v3.flash_attn_with_kvcache(
             q=q,
             k_cache=k_cache,
             v_cache=v_cache,
             cache_seqlens=cache_seqlens,
             causal=CAUSAL,
-            gqa_parallel=True,
+            pack_gqa=True,
             num_splits=0,
-            max_seqlen_k_hint=max_seqlen_k_hint,
         )
 
-    @register_benchmark(enabled=HAS_XFORMERS)
+    @register_benchmark(enabled=HAS_XFORMERS and HAS_FLASH_V3)
     def fa3_mha_varlen_fwd(
         self,
         q: torch.Tensor,
