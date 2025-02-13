@@ -21,6 +21,67 @@ if not IS_FBCODE:
         cublas = None
 
 
+def persistent_matmul_configs():
+    if torch.version.hip:
+        configs = [
+            triton.Config(
+                {
+                    "BLOCK_SIZE_M": 128,
+                    "BLOCK_SIZE_N": 256,
+                    "BLOCK_SIZE_K": 128,
+                    "GROUP_SIZE_M": 8,
+                },
+                # TODO: Check Ping Pong Schedule
+                num_stages=3,
+                num_warps=8,
+            ),
+            triton.Config(
+                {
+                    "BLOCK_SIZE_M": 128,
+                    "BLOCK_SIZE_N": 256,
+                    "BLOCK_SIZE_K": 64,
+                    "GROUP_SIZE_M": 8,
+                },
+                num_stages=2,
+                num_warps=8,
+            ),
+            triton.Config(
+                {
+                    "BLOCK_SIZE_M": 256,
+                    "BLOCK_SIZE_N": 256,
+                    "BLOCK_SIZE_K": 64,
+                    "GROUP_SIZE_M": 8,
+                },
+                num_stages=2,
+                num_warps=8,
+            ),
+        ]
+    else:
+        configs = [
+            triton.Config(
+                {
+                    "BLOCK_SIZE_M": 128,
+                    "BLOCK_SIZE_N": 256,
+                    "BLOCK_SIZE_K": 128,
+                    "GROUP_SIZE_M": 8,
+                },
+                num_stages=4,
+                num_warps=8,
+            ),
+            triton.Config(
+                {
+                    "BLOCK_SIZE_M": 128,
+                    "BLOCK_SIZE_N": 256,
+                    "BLOCK_SIZE_K": 64,
+                    "GROUP_SIZE_M": 8,
+                },
+                num_stages=3,
+                num_warps=8,
+            ),
+        ]
+    return configs
+
+
 def _matmul_launch_metadata(grid, kernel, args):
     ret = {}
     M, N, K = args["M"], args["N"], args["K"]
@@ -34,6 +95,10 @@ def _matmul_launch_metadata(grid, kernel, args):
     return ret
 
 
+@triton.autotune(
+    configs=persistent_matmul_configs(),
+    key=["M", "N", "K"],
+)
 @triton.jit(launch_metadata=_matmul_launch_metadata)
 def matmul_kernel_persistent(
     a_ptr,
@@ -126,36 +191,6 @@ def matmul_kernel_persistent(
 
 
 def matmul_persistent(a, b):
-    reduced_stages = 0
-    if torch.version.hip:
-        # amd hits shared memory limits with current settings
-        reduced_stages = 1
-    configs = {
-        torch.float8_e4m3fn: {
-            "BLOCK_SIZE_M": 128,
-            "BLOCK_SIZE_N": 256,
-            "BLOCK_SIZE_K": 128,
-            "GROUP_SIZE_M": 8,
-            "num_stages": 4 - reduced_stages,
-            "num_warps": 8,
-        },
-        torch.float16: {
-            "BLOCK_SIZE_M": 128,
-            "BLOCK_SIZE_N": 256,
-            "BLOCK_SIZE_K": 64,
-            "GROUP_SIZE_M": 8,
-            "num_stages": 3 - reduced_stages,
-            "num_warps": 8,
-        },
-        torch.bfloat16: {
-            "BLOCK_SIZE_M": 128,
-            "BLOCK_SIZE_N": 256,
-            "BLOCK_SIZE_K": 64,
-            "GROUP_SIZE_M": 8,
-            "num_stages": 3 - reduced_stages,
-            "num_warps": 8,
-        },
-    }
     # Check constraints.
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
     assert a.dtype == b.dtype, "Incompatible dtypes"
@@ -185,13 +220,7 @@ def matmul_persistent(a, b):
         b.stride(1),  #
         c.stride(0),
         c.stride(1),  #
-        BLOCK_SIZE_M=configs[dtype]["BLOCK_SIZE_M"],  #
-        BLOCK_SIZE_N=configs[dtype]["BLOCK_SIZE_N"],  #
-        BLOCK_SIZE_K=configs[dtype]["BLOCK_SIZE_K"],  #
-        GROUP_SIZE_M=configs[dtype]["GROUP_SIZE_M"],  #
         NUM_SMS=NUM_SMS,  #
-        num_stages=configs[dtype]["num_stages"],  #
-        num_warps=configs[dtype]["num_warps"],  #
     )
     return c
 
