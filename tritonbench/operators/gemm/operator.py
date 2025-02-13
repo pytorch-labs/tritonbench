@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import csv
 import os
 from typing import Any, Callable, Generator, List, Optional, Tuple
@@ -102,6 +103,20 @@ SPLIT_K_SHAPES = [
 ]
 
 
+@contextlib.contextmanager
+def set_env_variable(key, value):
+    """Context manager to temporarily set an environment variable."""
+    original = os.environ.get(key)
+    os.environ[key] = value
+    try:
+        yield
+    finally:
+        if original is not None:
+            os.environ[key] = original
+        else:
+            del os.environ[key]
+
+
 def parse_args(args: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TritonBench Gemm operator Benchmark")
     parser.add_argument("--m", type=int)
@@ -111,6 +126,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     parser.add_argument("--input", type=str)
     parser.add_argument("--splitk", action="store_true", default=False)
     parser.add_argument("--llama", action="store_true", default=False)
+    parser.add_argument("--buffer-ops", action="store_true", default=False)
     parser.add_argument("--layout", type=str, default="tn")
     args = parser.parse_args(args)
     return args
@@ -165,6 +181,11 @@ class Operator(BenchmarkOperator):
                     )
                 )
 
+        self.use_buffer_ops = gemm_args.buffer_ops
+
+        if self.use_buffer_ops and torch.version.hip is None:
+            raise ValueError("Buffer ops are only supported on AMD GPUs.")
+
     @register_benchmark()
     def triton_tutorial_matmul(self, a, b, bias) -> Callable:
         if bias is not None:
@@ -205,9 +226,20 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(enabled=is_cuda())
     def triton_ops_matmul(self, a, b, bias) -> Callable:
-        if bias is None:
-            return lambda: kernels.matmul(a, b)
-        return lambda: kernels.matmul(a, b) + bias
+        # kwargs are not allowed in torch autograd functions, so passing
+        # in as parameter is messy. Instead, we set env var and extract
+        # it in the triton kernel call
+
+        def func():
+            with set_env_variable(
+                "AMDGCN_USE_BUFFER_OPS", "1" if self.use_buffer_ops else "0"
+            ):
+                if bias is not None:
+                    return kernels.matmul(a, b) + bias
+                else:
+                    return kernels.matmul(a, b)
+
+        return func
 
     @register_benchmark(baseline=True)
     def aten_matmul(self, a, b, bias) -> Callable:

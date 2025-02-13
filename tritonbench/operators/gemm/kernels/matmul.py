@@ -1,3 +1,5 @@
+import os
+
 import torch
 
 from triton import autotune, cdiv, Config, heuristics, jit, language as tl
@@ -210,6 +212,7 @@ def _kernel(
     SPLIT_K: tl.constexpr,
     EVEN_K: tl.constexpr,
     AB_DTYPE: tl.constexpr,  #
+    use_buffer_ops: tl.constexpr,  #
 ):
     # matrix multiplication
     pid = tl.program_id(0)
@@ -217,6 +220,14 @@ def _kernel(
     grid_m = tl.cdiv(M, BLOCK_M)
     grid_n = tl.cdiv(N, BLOCK_N)
     # re-order program ID for better L2 performance
+    if use_buffer_ops:
+        tl.assume(stride_am > 0)
+        tl.assume(stride_ak > 0)
+        tl.assume(stride_bk > 0)
+        tl.assume(stride_bn > 0)
+        tl.assume(stride_cm > 0)
+        tl.assume(stride_cn > 0)
+
     width = GROUP_M * grid_n
     group_id = pid // width
     group_size = min(grid_m - group_id * GROUP_M, GROUP_M)
@@ -271,7 +282,14 @@ class _matmul(torch.autograd.Function):
     _locks = {}
 
     @staticmethod
-    def _call(a, b, acc_dtype, input_precision, fp8_fast_accum, output_dtype):
+    def _call(
+        a,
+        b,
+        acc_dtype,
+        input_precision,
+        fp8_fast_accum,
+        output_dtype,
+    ):
         device = a.device
         # handle non-contiguous inputs if necessary
         if a.stride(0) > 1 and a.stride(1) > 1:
@@ -324,6 +342,8 @@ class _matmul(torch.autograd.Function):
             tl.float8e5,
         ]:
             ab_dtype = None
+
+        use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
         # launch kernel
         grid = lambda META: (
             cdiv(M, META["BLOCK_M"]) * cdiv(N, META["BLOCK_N"]),
@@ -347,6 +367,7 @@ class _matmul(torch.autograd.Function):
             fp8_fast_accum=fp8_fast_accum,  #
             GROUP_M=8,
             AB_DTYPE=ab_dtype,
+            use_buffer_ops=use_buffer_ops,
         )
         return c
 
