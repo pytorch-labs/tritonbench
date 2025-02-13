@@ -4,6 +4,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from .torch_utils import install_pytorch_nightly
+
 # defines the default CUDA version to compile against
 DEFAULT_CUDA_VERSION = "12.4"
 
@@ -16,10 +18,14 @@ CUDA_VERSION_MAP = {
 }
 
 
-def _nvcc_output_match(nvcc_output, target_cuda_version):
+def detect_cuda_version_with_nvcc(env):
+    test_nvcc = ["nvcc", "--version"]
     regex = "release (.*),"
-    version = re.search(regex, nvcc_output).groups()[0]
-    return version == target_cuda_version
+    output = subprocess.check_output(
+        test_nvcc, stderr=subprocess.STDOUT
+    ).decode()
+    version = re.search(regex, output).groups()[0]
+    return version
 
 
 def prepare_cuda_env(cuda_version: str, dryrun=False):
@@ -42,18 +48,11 @@ def prepare_cuda_env(cuda_version: str, dryrun=False):
     )
     if dryrun:
         print(f"CUDA_HOME is set to {env['CUDA_HOME']}")
+
     # step 2: test call to nvcc to confirm the version is correct
-    test_nvcc = ["nvcc", "--version"]
-    if dryrun:
-        print(f"Checking nvcc version, command {test_nvcc}")
-    else:
-        output = subprocess.check_output(
-            test_nvcc, stderr=subprocess.STDOUT, env=env
-        ).decode()
-        print(f"NVCC version output: {output}")
-        assert _nvcc_output_match(
-            output, cuda_version
-        ), f"Expected CUDA version {cuda_version}, getting nvcc test result {output}"
+    nvcc_version = detect_cuda_version_with_nvcc(env=env)
+    assert (nvcc_version == cuda_version), f"Expected CUDA version {cuda_version}, getting nvcc test result {nvcc_version}"
+
     # step 3: install the correct magma version
     install_magma_cmd = [
         "conda",
@@ -84,28 +83,6 @@ def setup_cuda_softlink(cuda_version: str):
         ), "Expected /usr/local/cuda to be a symlink."
         current_cuda_path.unlink()
     os.symlink(str(cuda_path.resolve()), str(current_cuda_path.resolve()))
-
-
-def install_pytorch_nightly(cuda_version: str, env, dryrun=False):
-    from .torch_utils import TORCH_NIGHTLY_PACKAGES
-
-    uninstall_torch_cmd = ["pip", "uninstall", "-y"]
-    uninstall_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
-    if dryrun:
-        print(f"Uninstall pytorch: {uninstall_torch_cmd}")
-    else:
-        # uninstall multiple times to make sure the env is clean
-        for _loop in range(3):
-            subprocess.check_call(uninstall_torch_cmd)
-    pytorch_nightly_url = f"https://download.pytorch.org/whl/nightly/{CUDA_VERSION_MAP[cuda_version]['pytorch_url']}"
-    install_torch_cmd = ["pip", "install", "--pre", "--no-cache-dir"]
-    install_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
-    install_torch_cmd.extend(["-i", pytorch_nightly_url])
-    if dryrun:
-        print(f"Install pytorch nightly: {install_torch_cmd}")
-    else:
-        subprocess.check_call(install_torch_cmd, env=env)
-
 
 def install_torch_deps(cuda_version: str):
     # install magma
@@ -179,7 +156,8 @@ if __name__ == "__main__":
         install_torch_deps(cuda_version=args.cudaver)
         install_torch_build_deps()
     if args.install_torch_nightly:
-        install_pytorch_nightly(cuda_version=args.cudaver, env=os.environ)
+        pytorch_cuda_version = CUDA_VERSION_MAP[args.cudaver]['pytorch_url']
+        install_pytorch_nightly(cuda_version=pytorch_cuda_version, env=os.environ)
     if args.check_torch_nightly_version:
         from .torch_utils import check_torch_nightly_version
 
