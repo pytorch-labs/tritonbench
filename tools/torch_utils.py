@@ -72,3 +72,23 @@ def check_torch_nightly_version(force_date: Optional[str] = None):
     print(
         f"Installed consistent torch nightly packages: {pkg_versions}. {force_date_str}"
     )
+
+def install_pytorch_nightly(cuda_version: str, env, dryrun=False):
+    from .torch_utils import TORCH_NIGHTLY_PACKAGES
+
+    uninstall_torch_cmd = ["pip", "uninstall", "-y"]
+    uninstall_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
+    if dryrun:
+        print(f"Uninstall pytorch: {uninstall_torch_cmd}")
+    else:
+        # uninstall multiple times to make sure the env is clean
+        for _loop in range(3):
+            subprocess.check_call(uninstall_torch_cmd)
+    pytorch_nightly_url = f"https://download.pytorch.org/whl/nightly/{cuda_version}"
+    install_torch_cmd = ["pip", "install", "--pre", "--no-cache-dir"]
+    install_torch_cmd.extend(TORCH_NIGHTLY_PACKAGES)
+    install_torch_cmd.extend(["-i", pytorch_nightly_url])
+    if dryrun:
+        print(f"Install pytorch nightly: {install_torch_cmd}")
+    else:
+        subprocess.check_call(install_torch_cmd, env=env)
