@@ -123,6 +123,17 @@ if __name__ == "__main__":
     if args.numpy or not has_pkg("numpy"):
         pip_install_requirements("requirements_numpy.txt", add_build_constraints=False)
 
+    # Install the latest pytorch nightly if does not exist
+    if not has_pkg("torch"):
+        from tools.cuda_utils import detect_cuda_version_with_nvcc
+        from tools.torch_utils import install_pytorch_nightly
+
+        env = os.environ
+        cuda_version = CUDA_VERSION_MAP[detect_cuda_version_with_nvcc(env)][
+            "pytorch_url"
+        ]
+        install_pytorch_nightly(cuda_version, env)
+
     # generate build constraints before installing anything
     deps = get_pkg_versions(TRITONBENCH_DEPS)
     generate_build_constraints(deps)
