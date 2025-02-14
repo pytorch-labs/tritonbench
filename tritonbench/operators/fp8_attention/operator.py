@@ -18,6 +18,11 @@ from tritonbench.utils.triton_op import (
     register_benchmark,
     register_metric,
 )
+from tritonbench.utils.triton_utils import has_warp_spec
+
+HAS_CUDA_124 = (
+    torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
+)
 
 try:
     # colfax Flash Attention V2 on FP8 for Hopper
@@ -138,6 +143,19 @@ class Operator(BenchmarkOperator):
         # full fp8 will be enabled if type of q,k,v is fp8
         return lambda: triton_attention(
             triton_q, triton_k, triton_v, self.causal, self.sm_scale, "tma"
+        )
+
+    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
+    def triton_flash_v2_ws(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        triton_q, triton_k, triton_v = self.triton_preprocess(q, k, v)
+        # full fp8 will be enabled if type of q,k,v is fp8
+        return lambda: triton_attention(
+            triton_q, triton_k, triton_v, self.causal, self.sm_scale, "ws"
         )
 
     def get_input_iter(self) -> Generator:
