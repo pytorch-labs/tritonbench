@@ -13,6 +13,11 @@ CUDA_VERSION_MAP = {
         "magma": "magma-cuda124",
         "jax": "jax[cuda12]",
     },
+    "12.6": {
+        "pytorch_url": "cu126",
+        "magma": "magma-cuda126",
+        "jax": "jax[cuda12]",
+    },
 }
 
 
