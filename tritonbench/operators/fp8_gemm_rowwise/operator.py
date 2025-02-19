@@ -26,7 +26,10 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--no_fp8_fast_accum", dest="fp8_fast_accum", action="store_false"
     )
-    parser.add_argument("--no_use_tma", dest="use_tma", action="store_false")
+    parser.add_argument(
+        "--no_use_tma", dest="use_tma", default=None, action="store_false"
+    )
+    parser.add_argument("--use_tma", dest="use_tma", action="store_true")
     parser.add_argument(
         "--no_use_persistent",
         dest="no_use_persistent",
@@ -34,6 +37,11 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     )
     parser.add_argument("--warp_specialization", action="store_true")
     parsed_args = parser.parse_args(args)
+    if parsed_args.use_tma is None:
+        # Default to True for CUDA, False for ROCm
+        parsed_args.use_tma = True if torch.version.hip is None else False
+    if torch.version.hip is not None and parsed_args.use_tma:
+        raise RuntimeError("TMA is not supported on ROCm")
     return parsed_args
 
 
