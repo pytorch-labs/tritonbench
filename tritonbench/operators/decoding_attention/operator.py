@@ -9,14 +9,16 @@ import os
 from typing import Callable, Optional, Tuple
 
 import torch
+from gen_ai.llm_inference.fb.llm.quantization.kv_quantize import quantize_kv_fp8
 
 from tritonbench.utils.path_utils import add_ld_library_path
 
 # [Optional] flash_attn v2
+HAS_FLASH_V2 = True
 try:
     from flash_attn import flash_attn_interface as flash_attn_v2
 except (ImportError, IOError, AttributeError):
-    pass
+    HAS_FLASH_V2 = False
 
 HAS_CUDA_124 = (
     torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
@@ -43,18 +45,22 @@ except (ImportError, IOError, AttributeError):
 from typing import Generator, List
 
 # [Optional] xformers backend
+HAS_XFORMERS = True
 try:
     import xformers.ops.fmha as fmha  # @manual=//fair/xformers:xformers
-
-    HAS_XFORMERS = True
 except (ImportError, IOError, AttributeError):
     HAS_XFORMERS = False
 
-HAS_XFORMERS = True
+
+torch.ops.load_library(
+    "//deeplearning/fbgemm/fbgemm_gpu/experimental:gen_ai_attention_ops"
+)
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
+    BenchmarkOperatorMetrics,
     register_benchmark,
+    register_metric,
     register_x_val,
 )
 
@@ -99,7 +105,7 @@ def _generate_shapes():
 
     SEQ_LEN_KVs = [1024, 2048, 4096, 8190]
     SEQ_LEN_Qs = [1, 4]
-    BATCHs = [4, 16, 64, 128]
+    BATCHs = [32, 64]
 
     return [
         _Shape(
@@ -149,7 +155,7 @@ def _pack_xformer_input(
 class Operator(BenchmarkOperator):
     DEFAULT_PRECISION = "bf16"
 
-    DEFAULT_METRICS = ["latency", "accuracy"]
+    DEFAULT_METRICS = ["latency", "tflops", "gbps", "speedup"]
 
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
@@ -220,7 +226,48 @@ class Operator(BenchmarkOperator):
         finally:
             return accuracy
 
-    @register_benchmark(baseline=True)
+    @register_metric()
+    def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics) -> float:
+        # fp16/bf16 by default
+        Q_ELEMENT_SIZE = 2
+        K_ELEMENT_SIZE = 2
+        if "fp8qkv" in str(fn):
+            Q_ELEMENT_SIZE = 1
+            K_ELEMENT_SIZE = 1
+        elif "fp8kv" in str(fn):
+            K_ELEMENT_SIZE = 1
+
+        def nbytes(t):
+            return t.numel() * Q_ELEMENT_SIZE
+
+        q, k_cache, v_cache, cache_seqlens = example_inputs
+
+        q_bytes = nbytes(q)
+        # k_cache: B, max_len_kv, head_kv, head_d
+        k_cache_bytes = (
+            k_cache.shape[-1]
+            * k_cache.shape[-2]
+            * int(cache_seqlens.sum().item())
+            * K_ELEMENT_SIZE
+        )
+        v_cache_bytes = k_cache_bytes
+        gb = (q_bytes + k_cache_bytes + v_cache_bytes) * 1e-9
+        return gb / metrics.latency * 1e3
+
+    @register_metric()
+    def flops(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics) -> float:
+        q, k_cache, v_cache, cache_seqlens = example_inputs
+
+        batch, seq_len_q, head_q, head_d = q.shape
+        total_kv_length = int(cache_seqlens.sum().item())
+
+        qk_gemm = 2 * total_kv_length * seq_len_q * head_q * head_d
+
+        attention_flops = qk_gemm * 2
+
+        return attention_flops
+
+    @register_benchmark(enabled=HAS_FLASH_V2)
     def fa2_kvcache(
         self,
         q: torch.Tensor,
@@ -271,7 +318,7 @@ class Operator(BenchmarkOperator):
             op=fmha.flash3.FwOp,
         ).view(q.shape)
 
-    @register_benchmark(enabled=HAS_XFORMERS)
+    @register_benchmark(enabled=HAS_FLASH_V2 and HAS_XFORMERS)
     def fa2_mha_varlen_fwd(
         self,
         q: torch.Tensor,
@@ -288,7 +335,7 @@ class Operator(BenchmarkOperator):
             op=fmha.flash.FwOp,
         ).view(q.shape)
 
-    @register_benchmark(enabled=HAS_XFORMERS)
+    @register_benchmark(baseline=True, enabled=HAS_XFORMERS)
     def triton_splitk(
         self,
         q: torch.Tensor,
@@ -305,3 +352,48 @@ class Operator(BenchmarkOperator):
             attn_bias,
             op=fmha.triton_splitk.FwOp,
         ).view(q.shape)
+
+    @register_benchmark(enabled=HAS_FLASH_V3)
+    def fa3_kvcache_fp8qkv(
+        self,
+        q: torch.Tensor,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_seqlens: torch.Tensor,
+    ) -> Callable:
+        _q = q.to(torch.float8_e4m3fn)
+        _k_cache = k_cache.to(torch.float8_e4m3fn)
+        _v_cache = v_cache.to(torch.float8_e4m3fn)
+        return lambda: flash_attn_v3.flash_attn_with_kvcache(
+            q=_q,
+            k_cache=_k_cache,
+            v_cache=_v_cache,
+            cache_seqlens=cache_seqlens,
+            causal=CAUSAL,
+            pack_gqa=True,
+            num_splits=0,
+        )
+
+    @register_benchmark(enabled=True)
+    def fbgemm_gqa_fp8kv(
+        self,
+        q: torch.Tensor,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_seqlens: torch.Tensor,
+    ) -> Callable:
+        kv_cache_quant_num_groups = 1
+
+        k_fp8 = quantize_kv_fp8(k_cache, kv_cache_quant_num_groups).view(torch.uint8)
+        v_fp8 = quantize_kv_fp8(v_cache, kv_cache_quant_num_groups).view(torch.uint8)
+        return lambda: torch.ops.fbgemm.gqa_attn_splitk(
+            q,
+            k_fp8,
+            v_fp8,
+            cache_seqlens,
+            1.0,  # qk_scale
+            num_split_ks=16,
+            kv_cache_quant_num_groups=kv_cache_quant_num_groups,
+            use_tensor_cores=True,
+            cache_logical_dtype_int=1,  # FP8 = 1
+        )
