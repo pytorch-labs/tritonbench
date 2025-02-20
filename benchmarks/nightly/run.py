@@ -66,6 +66,7 @@ OPERATOR_BENCHMARKS = {
 
 def reduce(run_timestamp, output_dir, output_files, args):
     """aggregate all op benchmark csvs into json file"""
+    from tritonbench.utils.gpu_utils import get_nvidia_gpu_states, has_nvidia_smi
     from tritonbench.utils.path_utils import REPO_PATH
     from tritonbench.utils.run_utils import get_github_env, get_run_env
 
@@ -80,6 +81,13 @@ def reduce(run_timestamp, output_dir, output_files, args):
         "env": get_run_env(run_timestamp, repo_locs),
         "metrics": {},
     }
+    if has_nvidia_smi():
+        aggregated_obj.update(
+            {
+                "nvidia_gpu_states": get_nvidia_gpu_states(),
+            }
+        )
+
     # Collecting GitHub environment variables when running in CI environment
     if args.ci:
         aggregated_obj["github"] = get_github_env()
