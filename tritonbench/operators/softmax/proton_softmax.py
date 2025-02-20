@@ -60,7 +60,9 @@ def proton_softmax(x):
     proton_grid = proton.const_grid(
         grid,
         # config from autotune
-        autotune_configs=[],
+        autotune_configs=[triton.Config({},
+            num_warps=num_warps,
+        )],
         # local variables that used in grid lambda function
         func_args={"n_rows": n_rows},
         # copy all named args except `proton_slots` and `profile_mem` in the kernel callsite
