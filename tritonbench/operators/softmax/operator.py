@@ -4,6 +4,8 @@ import torch
 import triton
 import triton.language as tl
 
+from .proton_softmax import proton_softmax as proton_kernel
+
 from tritonbench.utils.data_utils import get_production_shapes
 
 from tritonbench.utils.triton_op import (
@@ -80,6 +82,10 @@ class Operator(BenchmarkOperator):
         output_row_start_ptr = output_ptr + row_idx * output_row_stride
         output_ptrs = output_row_start_ptr + col_offsets
         tl.store(output_ptrs, softmax_output, mask=col_offsets < n_cols)
+
+    @register_benchmark(enabled=False)
+    def proton_softmax(self, x):
+        return lambda: proton_kernel(x)
 
     @register_benchmark(baseline=True)
     def naive_softmax(self, x):
