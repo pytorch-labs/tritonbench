@@ -18,7 +18,9 @@ from tritonbench.utils.triton_op import (
 
 
 def parse_args(args: List[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="TorchBench Addmm operator Benchmark")
+    parser = argparse.ArgumentParser(
+        description="TorchBench fp8 gemm rowwise operator Benchmark"
+    )
     parser.add_argument("--m", type=int)
     parser.add_argument("--n", type=int)
     parser.add_argument("--k", type=int)
@@ -40,8 +42,10 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     if parsed_args.use_tma is None:
         # Default to True for CUDA, False for ROCm
         parsed_args.use_tma = True if torch.version.hip is None else False
-    if torch.version.hip is not None and parsed_args.use_tma:
-        raise RuntimeError("TMA is not supported on ROCm")
+    if torch.version.hip is not None:
+        if parsed_args.use_tma:
+            raise RuntimeError("TMA is not supported on ROCm")
+        parsed_args.no_use_persistent = True  # default true for ROCm
     return parsed_args
 
 
