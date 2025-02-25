@@ -132,13 +132,13 @@ def do_bench_walltime(fn, warmup=25, rep=100):
     return wall_time_ms
 
 
-def gemm_shapes():
+def gemm_shapes(prefill: bool = False):
     """Gets an extensive list of GEMM shapes for benchmarking"""
     if not IS_FBCODE:
         return
     from .fb.fp8_gemm_rowwise_shapes import read_shapes_for_fp8_gemm_rowwise
 
-    return read_shapes_for_fp8_gemm_rowwise()
+    return read_shapes_for_fp8_gemm_rowwise(prefill)
 
 
 def llama_shapes():

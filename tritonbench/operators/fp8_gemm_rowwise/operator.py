@@ -25,6 +25,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     parser.add_argument("--n", type=int)
     parser.add_argument("--k", type=int)
     parser.add_argument("--llama", action="store_true")
+    parser.add_argument("--prefill", default=False, action="store_true")
     parser.add_argument(
         "--no_fp8_fast_accum", dest="fp8_fast_accum", action="store_false"
     )
@@ -143,7 +144,7 @@ class Operator(BenchmarkOperator):
         if addmm_args.m and addmm_args.n and addmm_args.k:
             self.shapes = [(addmm_args.m, addmm_args.n, addmm_args.k)]
         elif addmm_args.llama:
-            self.shapes = gemm_shapes()
+            self.shapes = gemm_shapes(addmm_args.prefill)
         else:
             self.shapes = BUILDIN_SHAPES
         if hasattr(tb_args, "production_shapes") and tb_args.production_shapes:
