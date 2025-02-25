@@ -46,6 +46,9 @@ def parse_args(args: List[str]) -> argparse.Namespace:
         if parsed_args.use_tma:
             raise RuntimeError("TMA is not supported on ROCm")
         parsed_args.no_use_persistent = True  # default true for ROCm
+        if parsed_args.warp_specialization:
+            parsed_args.warp_specialization = False
+            print("Warp specialization is not supported on ROCm defaulting to False")
     return parsed_args
 
 

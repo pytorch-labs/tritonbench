@@ -134,10 +134,11 @@ def do_bench_walltime(fn, warmup=25, rep=100):
 
 def gemm_shapes():
     """Gets an extensive list of GEMM shapes for benchmarking"""
-    input_file = os.path.join(os.path.dirname(__file__), "gemm_shapes.csv")
-    with open(input_file, "r") as f:
-        reader = csv.DictReader(f)
-        return [(int(row["M"]), int(row["N"]), int(row["K"])) for row in reader]
+    if not IS_FBCODE:
+        return
+    from .fb.fp8_gemm_rowwise_shapes import read_shapes_for_fp8_gemm_rowwise
+
+    return read_shapes_for_fp8_gemm_rowwise()
 
 
 def llama_shapes():
