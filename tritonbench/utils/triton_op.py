@@ -296,23 +296,36 @@ class BenchmarkOperatorResult:
         hashes = {}
         if "kernel_source_hash" in self.metrics:
             self.result.append(tuple(["hashes", {}]))
+        avg_row = []
         for x_val, y_val in self.result:
+            col_num = 0
             row = []
             row.append(x_val)
             # Append x_only metrics
             for x_only_metric in x_only_metrics:
                 if x_val == "hashes" and len(hashes) > 0:
                     continue
-
+                next_val = None
                 # retrieve x_only metrics from the first backend metrics
                 x_only_metric_dict = asdict(y_val[backends[0]])
                 if (
                     "extra_metrics" in x_only_metric_dict
                     and x_only_metric in x_only_metric_dict["extra_metrics"]
                 ):
-                    row.append(x_only_metric_dict["extra_metrics"][x_only_metric])
+                    next_val = x_only_metric_dict["extra_metrics"][x_only_metric]
+
                 else:
-                    row.append(x_only_metric_dict[x_only_metric])
+                    next_val = x_only_metric_dict[x_only_metric]
+                row.append(next_val)
+                if len(avg_row) <= col_num:
+                    avg_row.append(next_val if isinstance(next_val, Number) else None)
+                else:
+                    avg_row[col_num] = (
+                        avg_row[col_num] + next_val
+                        if isinstance(next_val, Number)
+                        else None
+                    )
+                col_num += 1
             for backend in backends:
                 if x_val == "hashes" and len(hashes) > 0:
                     row.append(hashes[backend])
@@ -332,7 +345,22 @@ class BenchmarkOperatorResult:
                     )
                     metric_val = _metrics_dict.get(metric, None)
                     row.append(metric_val)
+                    if len(avg_row) <= col_num:
+                        avg_row.append(
+                            metric_val if isinstance(metric_val, Number) else None
+                        )
+                    else:
+                        avg_row[col_num] = (
+                            avg_row[col_num] + metric_val
+                            if isinstance(metric_val, Number)
+                            else None
+                        )
+                    col_num += 1
             table.append(row)
+        avg_row = ["average"] + [
+            x / len(self.result) if isinstance(x, Number) else None for x in avg_row
+        ]
+        table.append(avg_row)
         return headers, table
 
     def _post_process_table(self, table, style="plain"):
