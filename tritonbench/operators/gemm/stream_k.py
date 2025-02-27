@@ -6,6 +6,8 @@ Implementation from: https://github.com/ROCm/triton/blob/902b8329cadfb23b8ff4cbb
 This kernel has some known numerical issues due to the use of atomic_add.
 """
 
+import os
+
 import torch
 
 import triton
@@ -56,7 +58,12 @@ def streamk_gemm(
     EVEN_M: tl.constexpr,
     EVEN_N: tl.constexpr,
     EVEN_K: tl.constexpr,
+    USE_BUFFER_OPS: tl.constexpr,
 ):
+    if USE_BUFFER_OPS:
+        tl.assume(M > 0)
+        tl.assume(N > 0)
+        tl.assume(K > 0)
     tl.assume(stride_am > 0)
     tl.assume(stride_ak > 0)
     tl.assume(stride_bk > 0)
@@ -313,7 +320,7 @@ def streamk_matmul(a, b, bias=None):
         if grids % 38 == 0:
             NUM_XCDS = grids // 38
     # print("NUM_XCDS: ", grids, NUM_XCDS)
-
+    use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
     streamk_gemm[(grids,)](
         a,
         b,
@@ -340,6 +347,7 @@ def streamk_matmul(a, b, bias=None):
         GROUP_M=GROUP_SIZE_M,
         num_stages=2,
         num_warps=8,
+        USE_BUFFER_OPS=use_buffer_ops,
     )
 
     # print(c)

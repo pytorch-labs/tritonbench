@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 import torch
@@ -118,7 +119,19 @@ def matmul_kernel_persistent(
     BLOCK_SIZE_K: tl.constexpr,  #
     GROUP_SIZE_M: tl.constexpr,  #
     NUM_SMS: tl.constexpr,  #
+    USE_BUFFER_OPS: tl.constexpr,  #
 ):
+    if USE_BUFFER_OPS:
+        tl.assume(M > 0)
+        tl.assume(N > 0)
+        tl.assume(K > 0)
+        tl.assume(stride_am > 0)
+        tl.assume(stride_ak > 0)
+        tl.assume(stride_bk > 0)
+        tl.assume(stride_bn > 0)
+        tl.assume(stride_cm > 0)
+        tl.assume(stride_cn > 0)
+
     start_pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
@@ -207,6 +220,7 @@ def matmul_persistent(a, b):
             triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"]),
         ),
     )
+    use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
     matmul_kernel_persistent[grid](
         a,
         b,
@@ -221,6 +235,7 @@ def matmul_persistent(a, b):
         c.stride(0),
         c.stride(1),  #
         NUM_SMS=NUM_SMS,  #
+        USE_BUFFER_OPS=use_buffer_ops,
     )
     return c
 

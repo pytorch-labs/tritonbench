@@ -3,6 +3,8 @@ Triton Matrix Multiplication is from the Triton tutorial:
 - https://github.com/openai/triton/blob/main/python/tutorials/03-matrix-multiplication.py
 """
 
+import os
+
 import torch
 
 import triton
@@ -45,10 +47,23 @@ def matmul_kernel(
     BLOCK_SIZE_K: tl.constexpr,  #
     GROUP_SIZE_M: tl.constexpr,  #
     ACTIVATION: tl.constexpr,  #
+    USE_BUFFER_OPS: tl.constexpr,  #
 ):
     """Kernel for computing the matmul C = A x B.
     A has shape (M, K), B has shape (K, N) and C has shape (M, N)
     """
+
+    if USE_BUFFER_OPS:
+        tl.assume(M > 0)
+        tl.assume(N > 0)
+        tl.assume(K > 0)
+        tl.assume(stride_am > 0)
+        tl.assume(stride_ak > 0)
+        tl.assume(stride_bk > 0)
+        tl.assume(stride_bn > 0)
+        tl.assume(stride_cm > 0)
+        tl.assume(stride_cn > 0)
+
     # -----------------------------------------------------------
     # Map program ids `pid` to the block of C it should compute.
     # This is done in a grouped ordering to promote L2 data reuse.
@@ -130,6 +145,7 @@ def matmul(a, b, activation=""):
     grid = lambda META: (
         triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"]),
     )
+    use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
     matmul_kernel[grid](
         a,
         b,
@@ -144,5 +160,6 @@ def matmul(a, b, activation=""):
         c.stride(0),
         c.stride(1),  #
         ACTIVATION=activation,  #
+        USE_BUFFER_OPS=use_buffer_ops,
     )
     return c
