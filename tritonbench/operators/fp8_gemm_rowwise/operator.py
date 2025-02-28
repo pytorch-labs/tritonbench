@@ -204,6 +204,18 @@ class Operator(BenchmarkOperator):
         flops = m * k * 2 * n
         return flops
 
+    @register_metric()
+    def gbps(self, fn, example_inputs: Any, metrics: BenchmarkOperatorMetrics) -> float:
+        def nbytes(t):
+            return t.numel() * t.element_size()
+
+        a, b, _, _ = example_inputs
+        c = fn()
+        c = c[0] if isinstance(c, tuple) else c
+
+        gb = (nbytes(a) + nbytes(b) + nbytes(c)) / 1e9
+        return gb / metrics.latency * 1e3
+
     @register_x_val(label="(M, N, K)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
         xq, wq, _, _ = example_inputs
