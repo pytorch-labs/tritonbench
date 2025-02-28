@@ -24,8 +24,8 @@ import torch
 import triton
 
 from tritonbench.components.do_bench import do_bench_wrapper, Latency
-from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 from tritonbench.components.export import export_data
+from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 from tritonbench.utils.env_utils import apply_precision, set_env, set_random_seed
 from tritonbench.utils.input import input_cast
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
@@ -1363,7 +1363,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     f"required_metrics: {self.required_metrics}, _only: {self._only}, _input_id: {self._input_id}"
                 )
                 from tritonbench.components.ncu import do_bench_in_task
-    
+
                 do_bench_in_task(
                     fn=fn,
                     grad_to_none=self.get_grad_to_none(self.example_inputs),

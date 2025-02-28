@@ -184,13 +184,13 @@ def get_parser(args=None):
         "--export",
         default=None,
         choices=["in", "out", "both"],
-        help="Export input or output. Must be used together with --export-dir."
+        help="Export input or output. Must be used together with --export-dir.",
     )
     parser.add_argument(
         "--export-dir",
         default=None,
         type=str,
-        help="The directory to store input or output."
+        help="The directory to store input or output.",
     )
 
     if IS_FBCODE:

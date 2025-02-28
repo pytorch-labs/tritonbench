@@ -122,6 +122,7 @@ class Operator(BenchmarkOperator):
         def _bwd(out, dout):
             out.backward(dout, retain_graph=True)
             return out.grad()
+
         o = fwd_fn()
         o_tensor = input_filter(
             lambda x: isinstance(x, torch.Tensor),
