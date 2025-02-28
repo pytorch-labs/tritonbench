@@ -23,6 +23,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--heads", type=int, default=4, help="Number of heads")
     parser.add_argument("--attn-dim", type=int, default=128)
     parser.add_argument("--hidden-dim", type=int, default=128)
+    parser.add_argument("--min-seq-len-log2", type=int, default=8)
     parser.add_argument("--max-seq-len-log2", type=int, default=15)
     parser.add_argument("--num-buckets", type=int, default=2048)
     parser.add_argument("--seq-sparsity", type=float, default=0.95)
@@ -43,6 +44,7 @@ class Operator(BenchmarkOperator):
         self.num_heads = args.heads
         self.attn_dim = args.attn_dim
         self.hidden_dim = args.hidden_dim
+        self.min_seq_len_log2 = args.min_seq_len_log2
         self.max_seq_len_log2 = args.max_seq_len_log2
         self.num_buckets = args.num_buckets
         self.sparsity = args.seq_sparsity
@@ -105,7 +107,9 @@ class Operator(BenchmarkOperator):
         )
 
     def get_input_iter(self):
-        for seq_len in [2**i for i in range(8, self.max_seq_len_log2)]:
+        for seq_len in [
+            2**i for i in range(self.min_seq_len_log2, self.max_seq_len_log2 + 1)
+        ]:
             yield get_test_inputs(
                 self.batch_size,
                 self.num_heads,
