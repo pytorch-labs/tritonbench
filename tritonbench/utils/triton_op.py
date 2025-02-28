@@ -1376,7 +1376,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 export_data(
                     x_val=self.get_x_val(self.example_inputs),
                     input=self.example_inputs,
-                    fn_mode=str(self.mode),
+                    fn_mode=self.mode.value,
                     fn=fn,
                     export_type=self.tb_args.export,
                     export_dir=self.tb_args.export_dir,
