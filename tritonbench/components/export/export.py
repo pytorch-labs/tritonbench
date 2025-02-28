@@ -7,7 +7,13 @@ import pickle
 from typing import Callable, Any
 
 def get_fn_output(fn_mode: str, fn: Callable):
-    pass
+    if fn_mode == "fwd":
+        pass
+    elif fn_mode == "bwd":
+        pass
+    else:
+        raise ValueError(f"Unexpected mode {fn_mode}")
+
 
 def export_data(x_val: str, input: Any, fn_mode: str, fn: Callable, export_type: str, export_dir: str):
     # pickle naming convention
