@@ -495,16 +495,13 @@ class Operator(BenchmarkOperator):
         return flops
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
-        def _bwd(out, dout):
-            out.backward(dout, retain_graph=True)
-            return out.grad()
         o = fwd_fn()
         o_tensor = input_filter(
             lambda x: isinstance(x, torch.Tensor),
             o,
         )
         do = torch.rand_like(o_tensor)
-        fn = lambda: _bwd(o, do)
+        fn = lambda: o.backward(do, retain_graph=True)
         return fn
 
     def get_input_iter(self) -> Generator:
