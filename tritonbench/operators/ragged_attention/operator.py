@@ -107,7 +107,9 @@ class Operator(BenchmarkOperator):
         )
 
     def get_input_iter(self):
-        for seq_len in [2**i for i in range(self.min_seq_len_log2, self.max_seq_len_log2+1)]:
+        for seq_len in [
+            2**i for i in range(self.min_seq_len_log2, self.max_seq_len_log2+1)
+        ]:
             yield get_test_inputs(
                 self.batch_size,
                 self.num_heads,
