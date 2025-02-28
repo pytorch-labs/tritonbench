@@ -25,7 +25,7 @@ import triton
 
 from tritonbench.components.do_bench import do_bench_wrapper, Latency
 from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
-from tritonbench.components.export import 
+from tritonbench.components.export import export_data
 from tritonbench.utils.env_utils import apply_precision, set_env, set_random_seed
 from tritonbench.utils.input import input_cast
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
@@ -1186,8 +1186,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if "ncu_trace" in self.required_metrics:
                 metrics.ncu_trace = self.ncu_trace(input_id, fn_name)
-            if self.tb_args.export:
-                pass
             # Collect NCU metrics if any required metrics match the ncu analyzer
             # metrics. Only profile with the necessary metrics to avoid excessive
             # overhead.
@@ -1374,6 +1372,15 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     use_cuda_profiler_range=True,
                 )
                 metrics.extra_metrics["_nsys_rep_in_task"] = "success"
+            if self.tb_args.export:
+                export_data(
+                    x_val=self.get_x_val(),
+                    input=self.example_inputs,
+                    fn_mode=str(self.mode),
+                    fn=fn,
+                    export_type=self.tb_args.export,
+                    export_dir=self.tb_args.export_dir,
+                )
             # generate customized metrics
             if self.name in REGISTERED_METRICS:
                 for metric_name in REGISTERED_METRICS[self.name]:
