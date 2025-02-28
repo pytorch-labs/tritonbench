@@ -6,15 +6,6 @@ import pickle
 
 from typing import Callable, Any
 
-def get_fn_output(fn_mode: str, fn: Callable):
-    if fn_mode == "fwd":
-        pass
-    elif fn_mode == "bwd":
-        pass
-    else:
-        raise ValueError(f"Unexpected mode {fn_mode}")
-
-
 def export_data(x_val: str, input: Any, fn_mode: str, fn: Callable, export_type: str, export_dir: str):
     # pickle naming convention
     # x_<x_val>-input.pkl
@@ -30,6 +21,6 @@ def export_data(x_val: str, input: Any, fn_mode: str, fn: Callable, export_type:
     if export_type == "output" or export_type == "both":
         output_file_name = f"x_{x_val}-{fn._name}-{fn_mode}-output.pkl"
         output_file_path = export_path.joinpath(output_file_name)
-        output = get_fn_output(fn_mode, fn)
+        output = fn()
         with open(output_file_path, "w") as ofp:
             pickle.dump(ofp, output)
