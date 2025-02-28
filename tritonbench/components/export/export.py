@@ -11,9 +11,9 @@ from tritonbench.utils.input import input_cast
 
 
 def get_input_gradients(inputs):
-    all_inputs = []
-    input_cast(lambda x: True, lambda y: all_inputs.append(y), inputs)
-    return [x.grad for x in all_inputs]
+    all_input_grads = []
+    input_cast(lambda x: True, lambda y: all_input_grads.append(y.grad), inputs)
+    return all_input_grads
 
 
 def export_data(
