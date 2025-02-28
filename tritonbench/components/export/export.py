@@ -28,7 +28,7 @@ def export_data(
     # x_<x_val>-input.pkl
     # x_<x_val>-<fn_name>-fwd-output.pkl
     # x_<x_val>-<fn_name>-bwd-grad.pkl
-    assert export_dir, f"Export dir must be specified."
+    assert export_dir, "Export dir must be specified."
     export_path = Path(export_dir)
     assert export_path.exists(), f"Export path {export_dir} must exist."
     if export_type == "input" or export_type == "both":
