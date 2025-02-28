@@ -1363,7 +1363,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     f"required_metrics: {self.required_metrics}, _only: {self._only}, _input_id: {self._input_id}"
                 )
                 from tritonbench.components.ncu import do_bench_in_task
-
+    
                 do_bench_in_task(
                     fn=fn,
                     grad_to_none=self.get_grad_to_none(self.example_inputs),
@@ -1374,7 +1374,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.extra_metrics["_nsys_rep_in_task"] = "success"
             if self.tb_args.export:
                 export_data(
-                    x_val=self.get_x_val(),
+                    x_val=self.get_x_val(self.example_inputs),
                     input=self.example_inputs,
                     fn_mode=str(self.mode),
                     fn=fn,
