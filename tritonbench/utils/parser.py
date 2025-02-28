@@ -180,6 +180,18 @@ def get_parser(args=None):
         action="store_true",
         help="Include cold start time in compile_time and compile_trace.",
     )
+    parser.add_argument(
+        "--export",
+        default=None,
+        choices=["in", "out", "both"],
+        help="Export input or output. Must be used together with --export-dir.",
+    )
+    parser.add_argument(
+        "--export-dir",
+        default=None,
+        type=str,
+        help="The directory to store input or output.",
+    )
 
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
