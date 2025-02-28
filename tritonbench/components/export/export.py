@@ -18,10 +18,10 @@ def export_data(x_val: str, input: Any, fn_mode: str, fn: Callable, export_type:
         input_file_name = f"x_{x_val}-input.pkl"
         input_file_path = export_path.joinpath(input_file_name)
         with open(input_file_path, "w") as ifp:
-            pickle.dump(ifp, input)
+            pickle.dump(input, ifp)
     if export_type == "output" or export_type == "both":
         output_file_name = f"x_{x_val}-{fn._name}-{fn_mode}-output.pkl"
         output_file_path = export_path.joinpath(output_file_name)
         output = fn()
         with open(output_file_path, "w") as ofp:
-            pickle.dump(ofp, output)
+            pickle.dump(output, ofp)
