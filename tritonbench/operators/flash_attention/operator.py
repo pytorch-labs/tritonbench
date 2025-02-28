@@ -501,7 +501,7 @@ class Operator(BenchmarkOperator):
             o,
         )
         do = torch.rand_like(o_tensor)
-        fn = lambda: o.backward(do, retain_graph=True)
+        fn = lambda: o_tensor.backward(do, retain_graph=True)
         return fn
 
     def get_input_iter(self) -> Generator:
