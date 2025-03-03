@@ -5,13 +5,12 @@ from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 from tritonbench.utils.triton_op import IS_FBCODE
 
 try:
-    from hammer.ops.triton.utils import prev_power_of_2
-
     # Internal Import
-    from hammer.oss.generative_recommenders.ops.triton.triton_ragged_hstu_attention import (
+    from hammer.ops.triton.triton_ragged_hstu_attention import (
         _ragged_hstu_attn_fwd_persistent,
         RaggedAttentionRelativeBiasFunction,
     )
+    from hammer.ops.triton.utils import prev_power_of_2
 except ModuleNotFoundError:
     # OSS Import
     with add_path(str(SUBMODULE_PATH.joinpath("generative-recommenders"))):
