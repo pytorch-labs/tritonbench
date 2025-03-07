@@ -420,11 +420,11 @@ configsWS = [
             num_warps=w,
         )
     )
-    for BM in [128]
-    for BN in [128]
+    for BM in [64, 128]
+    for BN in [64, 128]
     for sched in schedList
     for enable_ws in [True]
-    for w in [4]
+    for w in [4, 8]
     for buf in [2]
     for grp in [2]
     for dec, inc in [
