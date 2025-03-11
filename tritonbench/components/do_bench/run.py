@@ -10,15 +10,48 @@ class Latency:
     times: List[float]
 
     def __init__(self, times):
-        self.times = times
+        self.times = self._remove_outliers_iqr(times)
 
     def __str__(self):
         """By default, use p50"""
         return self.to_str()
 
+    def _remove_outliers_iqr(self, data):
+        """
+        Removes outliers from a list of floats using the IQR method.
+
+        Args:
+            data: A list of floats.
+
+        Returns:
+            A new list with outliers removed.
+        """
+        starting_length = len(data)
+        if starting_length <= 3:
+            return data
+        if not data:
+            return []
+
+        data.sort()
+        quantiles = statistics.quantiles(data, n=100)
+        q1 = quantiles[25]
+        q3 = quantiles[75]
+        iqr = q3 - q1
+
+        lower_bound = q1 - (1.5 * iqr)
+        upper_bound = q3 + (1.5 * iqr)
+
+        filtered_data = [x for x in data if lower_bound <= x and x <= upper_bound]
+        end_len = len(filtered_data)
+        if end_len != starting_length:
+            print(
+                f"Removed {starting_length - end_len} outliers from {starting_length} samples"
+            )
+        return filtered_data
+
     @property
     def p50(self):
-        return statistics.median(self.times)
+        return statistics.median_low(self.times)
 
     def __add__(self, other):
         return self.p50 + other.p50 if isinstance(other, Latency) else self.p50 + other
