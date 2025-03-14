@@ -133,6 +133,57 @@ def generate_input_vals(B, M, max_seqlen, sparsity, sizes):
     return B_vals, M_vals, seqlen_vals, sparsity_vals
 
 
+def jagged_to_nested_tensor(values: torch.Tensor, offsets: list[torch.Tensor]):
+    """
+    Convert jagged tensor (values + offsets) to torch.nested.nested_tensor
+
+    Args:
+        values: Compressed values tensor
+        offsets: List of offset tensors, indicating the starting position of each sequence
+
+    Returns:
+        Tensor in torch.nested.nested_tensor format
+    """
+    # Calculate the length of each sequence
+    lengths = []
+    for i in range(len(offsets)):
+        if i == 0:
+            # For the first layer, calculate the length of each batch
+            batch_size = offsets[i].size(0) - 1
+            batch_lengths = []
+            for b in range(batch_size):
+                batch_lengths.append(offsets[i][b + 1] - offsets[i][b])
+            lengths.append(batch_lengths)
+        else:
+            # For deeper levels of nesting
+            prev_lengths = lengths[i - 1]
+            curr_lengths = []
+            offset_idx = 0
+            for prev_len in prev_lengths:
+                seq_lengths = []
+                for _ in range(prev_len):
+                    seq_lengths.append(
+                        offsets[i][offset_idx + 1] - offsets[i][offset_idx]
+                    )
+                    offset_idx += 1
+                curr_lengths.append(seq_lengths)
+            lengths.append(curr_lengths)
+
+    # Build tensor list based on lengths and values
+    tensor_list = []
+    start_idx = 0
+    for b in range(len(lengths[0])):
+        length = lengths[0][b]
+        end_idx = start_idx + length
+        tensor_list.append(values[start_idx:end_idx])
+        start_idx = end_idx
+
+    # Create nested tensor
+    return torch.nested.nested_tensor(
+        tensor_list, layout=torch.jagged, device=values.device, dtype=values.dtype
+    )
+
+
 def get_size_in_bytes(shape, dtype) -> int:
     num_elements = math.prod(shape)
     element_size = dtype.itemsize

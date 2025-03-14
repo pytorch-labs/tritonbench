@@ -18,6 +18,7 @@ from tritonbench.utils.jagged_utils import (
     get_styles,
     get_tensor_bytes_limit,
     GIGABYTES_PER_BYTE,
+    jagged_to_nested_tensor,
     RANDOM_CHOICE_MARGIN,
     RELATIVE_TOLERANCE,
 )
@@ -178,20 +179,49 @@ class Operator(BenchmarkOperator):
         """
         Generate random nested tensors of shape (B, *, M), where * is the ragged dimension
         """
+        if not self.prod_shapes:
+            B_vals, M_vals, seqlen_vals, sparsity_vals = self.get_x_vals()
 
-        B_vals, M_vals, seqlen_vals, sparsity_vals = self.get_x_vals()
+            for nt, B, M, max_seqlen, sparsity in generate_random_nested_tensors(
+                B_vals,
+                M_vals,
+                seqlen_vals,
+                sparsity_vals,
+                device=self.device,
+                dtype=self.dtype,
+                TENSOR_BYTES_LIMIT=self.tensor_bytes_limit,
+                RANDOM_CHOICE_MARGIN=RANDOM_CHOICE_MARGIN,
+            ):
+                yield (nt, B, M, max_seqlen, sparsity)
+        else:
+            from tritonbench.data.fb.jagged_dense_dense import (
+                generate_input_vals_fb,
+                get_prod_input_metadata,
+            )
 
-        for nt, B, M, max_seqlen, sparsity in generate_random_nested_tensors(
-            B_vals,
-            M_vals,
-            seqlen_vals,
-            sparsity_vals,
-            device=self.device,
-            dtype=self.dtype,
-            TENSOR_BYTES_LIMIT=self.tensor_bytes_limit,
-            RANDOM_CHOICE_MARGIN=RANDOM_CHOICE_MARGIN,
-        ):
-            yield (nt, B, M, max_seqlen, sparsity)
+            input_data = get_prod_input_metadata()
+            for (
+                jagged_values_shape,
+                dense_0_shape,
+                dense_1_shape,
+                jagged_values_dtype,
+                dense_0_dtype,
+                dense_1_dtype,
+            ) in input_data:
+                jagged_values, jagged_offsets, _, _ = generate_input_vals_fb(
+                    jagged_values_shape,
+                    dense_0_shape=dense_0_shape,
+                    dense_1_shape=dense_1_shape,
+                    jagged_values_dtype=jagged_values_dtype,
+                    dense_0_dtype=dense_0_dtype,
+                    dense_1_dtype=dense_1_dtype,
+                )
+                nested_tensor = jagged_to_nested_tensor(jagged_values, jagged_offsets)
+                # Yueming: in the future, if we integrate more input shapes for other jagged operators,
+                # the dense_0 may be None. In that case, we should use another way to obtain the batch size
+                # and max seq len.
+                batch_size, max_seq_len, _ = dense_0_shape
+                yield (nested_tensor, batch_size, 1, max_seq_len, 0.0)
 
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
         output = fn()

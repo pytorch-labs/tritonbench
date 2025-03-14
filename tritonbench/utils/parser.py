@@ -193,6 +193,12 @@ def get_parser(args=None):
         help="The directory to store input or output.",
     )
 
+    parser.add_argument(
+        "--prod-shapes",
+        action="store_true",
+        help="Only run with pre-defined production shapes.",
+    )
+
     if IS_FBCODE:
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
         parser.add_argument(

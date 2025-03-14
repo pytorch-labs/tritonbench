@@ -724,6 +724,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self._skip = _split_params_by_comma(self.tb_args.skip)
         self._input_id = self.tb_args.input_id
         self._num_inputs = self.tb_args.num_inputs
+        self.prod_shapes = self.tb_args.prod_shapes
 
     # Run the post initialization
     def __post__init__(self):
