@@ -150,9 +150,6 @@ def parse_args(args: List[str]) -> argparse.Namespace:
             parsed_args.warp_specialization = False
             print("Warp specialization is not supported on ROCm defaulting to False")
 
-    # assert that n == k inm grouped gemm.
-    assert parsed_args.n == parsed_args.k
-
     return parsed_args
 
 
@@ -471,8 +468,10 @@ class Operator(BenchmarkOperator):
         xq, wq = group_A, group_B
         m, k = xq.size()  # input size
         gn, k = wq.size()  # weight size
+        group_size = len(m_sizes)
+        n = gn // group_size
         # Calculate the FLOPS
-        flops = gn * m * k * 2
+        flops = n * m * k * 2
         return flops
 
     @register_metric()
