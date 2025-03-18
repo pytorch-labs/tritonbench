@@ -323,6 +323,29 @@ class Operator(BenchmarkOperator):
             compiled(a, b)
         return lambda: compiled(a, b)
 
+    @register_benchmark()
+    def matmul_decompose_k(self, a, b, bias) -> Callable:
+        def decompose_func():
+            M, K = a.shape
+            K, N = b.shape
+
+            # TODO: Ideally we want to autotune over this parameter
+            kPartitions = 256
+            assert K % kPartitions == 0, "K must be divisible by Kmini"
+            B = K // kPartitions
+
+            a_reshaped = a.reshape(M, B, kPartitions).transpose(
+                0, 1
+            )  # Shape: (B, M, kPartitions)
+            b_reshaped = b.reshape(B, kPartitions, N)  # Shape: (B, kPartitions, N)
+            result = torch.bmm(a_reshaped, b_reshaped)  # Shape: (B, M, N)
+            return result.sum(dim=0)  # Sum over B dimension, Shape: (M, N)
+
+        if bias is not None:
+            return lambda: decompose_func() + bias
+        else:
+            return lambda: decompose_func()
+
     @register_x_val(label="(M, N, K)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
         # x-value: computation intensity
