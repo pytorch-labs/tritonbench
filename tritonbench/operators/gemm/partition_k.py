@@ -4,63 +4,83 @@ import triton
 import triton.language as tl
 
 
+def get_mm_configs():
+    configs = [
+        triton.Config(
+            {
+                "BLOCK_SIZE_M": 32,
+                "BLOCK_SIZE_N": 32,
+                "BLOCK_SIZE_K": 64,
+            },
+            num_stages=4,
+            num_warps=2,
+        ),
+        triton.Config(
+            {
+                "BLOCK_SIZE_M": 32,
+                "BLOCK_SIZE_N": 32,
+                "BLOCK_SIZE_K": 64,
+            },
+            num_stages=5,
+            num_warps=2,
+        ),
+        triton.Config(
+            {
+                "BLOCK_SIZE_M": 32,
+                "BLOCK_SIZE_N": 32,
+                "BLOCK_SIZE_K": 64,
+            },
+            num_stages=6,
+            num_warps=2,
+        ),
+        triton.Config(
+            {
+                "BLOCK_SIZE_M": 32,
+                "BLOCK_SIZE_N": 32,
+                "BLOCK_SIZE_K": 128,
+            },
+            num_stages=4,
+            num_warps=2,
+        ),
+        triton.Config(
+            {
+                "BLOCK_SIZE_M": 32,
+                "BLOCK_SIZE_N": 32,
+                "BLOCK_SIZE_K": 128,
+            },
+            num_stages=5,
+            num_warps=2,
+        ),
+        triton.Config(
+            {
+                "BLOCK_SIZE_M": 32,
+                "BLOCK_SIZE_N": 32,
+                "BLOCK_SIZE_K": 128,
+            },
+            num_stages=6,
+            num_warps=2,
+        ),
+    ]
+
+    partition_k_configs = []
+    for config in configs:
+        for GROUP_SIZE_M in [1, 4, 8]:
+            partition_k_configs.append(
+                triton.Config(
+                    {
+                        **config.kwargs,
+                        "GROUP_SIZE_M": GROUP_SIZE_M,
+                    },
+                    num_stages=config.num_stages,
+                    num_warps=config.num_warps,
+                )
+            )
+
+    return partition_k_configs
+
+
 @triton.autotune(
-    configs=[
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 32,
-                "BLOCK_SIZE_N": 32,
-                "BLOCK_SIZE_K": 64,
-            },
-            num_stages=4,
-            num_warps=2,
-        ),
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 32,
-                "BLOCK_SIZE_N": 32,
-                "BLOCK_SIZE_K": 64,
-            },
-            num_stages=5,
-            num_warps=2,
-        ),
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 32,
-                "BLOCK_SIZE_N": 32,
-                "BLOCK_SIZE_K": 64,
-            },
-            num_stages=6,
-            num_warps=2,
-        ),
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 32,
-                "BLOCK_SIZE_N": 32,
-                "BLOCK_SIZE_K": 128,
-            },
-            num_stages=4,
-            num_warps=2,
-        ),
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 32,
-                "BLOCK_SIZE_N": 32,
-                "BLOCK_SIZE_K": 128,
-            },
-            num_stages=5,
-            num_warps=2,
-        ),
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 32,
-                "BLOCK_SIZE_N": 32,
-                "BLOCK_SIZE_K": 128,
-            },
-            num_stages=6,
-            num_warps=2,
-        ),
-    ],
+    configs=get_mm_configs(),
     key=["M", "N", "K", "PK"],
 )
 @triton.jit
@@ -89,6 +109,7 @@ def _matmul_partition_k(
     BLOCK_SIZE_M: tl.constexpr,
     BLOCK_SIZE_N: tl.constexpr,
     BLOCK_SIZE_K: tl.constexpr,  #
+    GROUP_SIZE_M: tl.constexpr,
 ):
     """Kernel for computing the matmul C = A x B.
     A has shape (M, K), B has shape (K, N) and C has shape (M, N)
@@ -97,21 +118,22 @@ def _matmul_partition_k(
     # Map program ids `pid` to the block of C it should compute.
     # This is done in a grouped ordering to promote L2 data reuse.
     # See above `L2 Cache Optimizations` section for details.
-    pid_m = tl.program_id(axis=0)
-    pid_n = tl.program_id(axis=1)
-    pid_pk = tl.program_id(axis=2)
-    # num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
-    # num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
-    # num_pid_pk = PK
-    # num_pid_nk = num_pid_n * num_pid_pk
-    # num_pid_in_group = GROUP_SIZE_M * num_pid_nk
-    # group_id = pid // num_pid_in_group
-    # first_pid_m = group_id * GROUP_SIZE_M
-    # group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
-    # pid_m = first_pid_m + (pid % group_size_m)
-    # pid_nk = (pid % num_pid_in_group) // group_size_m
-    # pid_n = pid_nk // num_pid_n
-    # pid_pk = pid_nk % num_pid_n
+    # pid_m = tl.program_id(axis=0)
+    # pid_n = tl.program_id(axis=1)
+    # pid_pk = tl.program_id(axis=2)
+    pid = tl.program_id(0)
+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
+    num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
+    num_pid_pk = PK
+    num_pid_nk = num_pid_n * num_pid_pk
+    num_pid_in_group = GROUP_SIZE_M * num_pid_nk
+    group_id = pid // num_pid_in_group
+    first_pid_m = group_id * GROUP_SIZE_M
+    group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
+    pid_m = first_pid_m + (pid % group_size_m)
+    pid_nk = (pid % num_pid_in_group) // group_size_m
+    pid_n = pid_nk // num_pid_pk
+    pid_pk = pid_nk % num_pid_pk
 
     # ----------------------------------------------------------
     # Create pointers for the first blocks of A and B.
@@ -198,7 +220,8 @@ def matmul_partition_k(a, b, triton_reduce=False):
     assert a.is_contiguous(), "Matrix A must be contiguous"
     assert b.is_contiguous(), "Matrix B must be contiguous"
 
-    partitionK = 64
+    # TODO: Tune on this parameter, currently 32 is best performing
+    partitionK = 32
 
     M, K = a.shape
     K, N = b.shape
@@ -210,9 +233,9 @@ def matmul_partition_k(a, b, triton_reduce=False):
     # 1D launch kernel where each block gets its own program.
 
     grid = lambda META: (
-        triton.cdiv(M, META["BLOCK_SIZE_M"]),
-        triton.cdiv(N, META["BLOCK_SIZE_N"]),
-        partitionK,
+        triton.cdiv(M, META["BLOCK_SIZE_M"])
+        * triton.cdiv(N, META["BLOCK_SIZE_N"])
+        * partitionK,
     )
     _matmul_partition_k[grid](
         a,
