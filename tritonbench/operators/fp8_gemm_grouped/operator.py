@@ -198,12 +198,15 @@ BUILTIN_SHAPES = [
     # (256, 256, 256),
     # (512, 512, 512),
     # (2048, 2048, 2048),
+    (1024, 1024, 1024),
+    (2048, 1024, 1024),
+    (2048, 2048, 2048),
     (4096, 4096, 4096),
     (8192, 4096, 4096),
-    (16384, 4096, 4096),
-    (8192, 8192, 8192),
-    (16384, 8192, 8192),
-    (16384, 16384, 16384),
+    # (16384, 4096, 4096),
+    # (8192, 8192, 8192),
+    # (16384, 8192, 8192),
+    # (16384, 16384, 16384),
     # (1, 2304, 2048),
     # (1, 8192, 16384),
     # (4, 4096, 2304),
@@ -285,16 +288,37 @@ def cumulative_sum_with_initial_offset(tensor):
     return cumsum
 
 
-# TODO: remove this.
-def reshape_tensor(W, m_sizes):
-    N = W.shape[0] // torch.sum(m_sizes)
-    return torch.cat(
-        [
-            x.reshape(-1, N, W.shape[-1])
-            for x in torch.split(W, [size * N for size in m_sizes], dim=0)
-        ],
-        dim=0,
-    )
+def reshape_tensor(input_tensor, m_sizes):
+    """
+    Reshape the input tensor into a specified grouped format.
+    This function takes an input tensor and reshapes it into a 3D tensor
+    with dimensions (G, N, K), where:
+    - G is the number of groups, determined by the length of m_sizes.
+    - N is the size of each group, calculated as the integer division of
+      the first dimension of the input tensor by G.
+    - K is the size of the second dimension of the input tensor.
+    Args:
+        input_tensor (torch.Tensor): The input tensor to be reshaped. It is
+            expected to have at least two dimensions.
+        m_sizes (list): A list whose length determines the number of groups (G).
+    Returns:
+        torch.Tensor: The reshaped tensor with dimensions (G, N, K).
+    Raises:
+        ValueError: If the size of the first dimension of input_tensor is not
+            divisible by the number of groups (G).
+    """
+    # Calculate the number of groups (G) based on the length of m_sizes
+    G = len(m_sizes)
+
+    # Calculate the size of each group (N) by dividing the first dimension of
+    # the input tensor by the number of groups (G)
+    N = input_tensor.size(0) // G
+
+    # Get the size of the second dimension (K) of the input tensor
+    K = input_tensor.size(1)
+    # Reshape the input tensor to have dimensions (G, N, K)
+    reshaped_tensor = input_tensor.view(G, N, K)
+    return reshaped_tensor
 
 
 class Operator(BenchmarkOperator):
@@ -340,6 +364,11 @@ class Operator(BenchmarkOperator):
 
         # Enable CUDA graphs for this operator
         self.use_cuda_graphs = True
+
+        # Enable fp8_fast_accum by default. The cutlass kernel does not support configuring
+        # this parameter as of now. By default it is true, but there will be correctness issues
+        # vs the cutlass kernel, if fp8_fast_accum is turned off.
+        self.fp8_fast_accum = True
 
         # Parse the additional command-line arguments
         addmm_args = parse_args(self.extra_args)
@@ -387,10 +416,17 @@ class Operator(BenchmarkOperator):
 
         # Return a lambda function that calls the grouped_gemm_fp8_rowwise function
         return lambda: grouped_gemm_fp8_rowwise(
-            group_A, group_B, m_sizes, a_scale, b_scale
+            group_A,
+            group_B,
+            m_sizes,
+            a_scale,
+            b_scale,
+            use_fast_accum=self.fp8_fast_accum,
         )
 
-    @register_benchmark(enabled=False, label="ck" if torch.version.hip else "cutlass")
+    @register_benchmark(
+        enabled=HAS_CUTLASS_OR_CK, label="ck" if torch.version.hip else "cutlass"
+    )
     def _cutlass_or_ck(self, group_A, group_B, m_sizes, a_scale, b_scale) -> Callable:
         """
         Returns a lambda function that performs the Cutlass or CK FP8 GEMM grouped operation.
@@ -405,17 +441,16 @@ class Operator(BenchmarkOperator):
         Returns:
             Callable: A lambda function that performs the Cutlass or CK FP8 GEMM grouped operation.
         """
-
-        # Calculate the cumulative sum of the group sizes with an initial offset
-        cum_sum = cumulative_sum_with_initial_offset(m_sizes).to(torch.int64)
+        # Reshape group_B to match the format expected by the cutlass implementation (G, N, K)
+        reshaped_group_B = reshape_tensor(group_B, m_sizes)
 
         # Return a lambda function that calls the cutlass_or_ck_fp8_grouped_mm function
         return lambda: cutlass_or_ck_fp8_grouped_mm(
             group_A,
-            group_B,
+            reshaped_group_B,
             a_scale,
             b_scale,
-            cum_sum,
+            m_sizes.to(torch.int64),
         )
 
     @register_x_val(label="(group_size, M, N, K)")
@@ -514,12 +549,6 @@ class Operator(BenchmarkOperator):
 
         Yields:
             tuple: A tuple containing the input tensors and their corresponding scales.
-
-        Notes:
-            The current cutlass imp0lementation of f8f8bf16 grouped gemm has a different
-            input format than the triton implementation.
-            D69544396 will update the function signature to match the 2 implementations.
-            Disabling the cutlass implementation until it lands.
         """
 
         # Iterate over all possible group sizes and shapes
