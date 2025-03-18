@@ -10,7 +10,12 @@ import torch
 import triton
 import triton.language as tl
 
-from .triton_matmul_configs import configs
+from .triton_matmul_configs import configs, get_full_amd_config_space
+
+if os.environ.get("FULL_AUTOTUNING_AMD", "0") == "1" and torch.version.hip is not None:
+    tuning_configs = get_full_amd_config_space(False)
+else:
+    tuning_configs = configs
 
 
 # `triton.jit`'ed functions can be auto-tuned by using the `triton.autotune` decorator, which consumes:
@@ -19,7 +24,7 @@ from .triton_matmul_configs import configs
 #   - An auto-tuning *key* whose change in values will trigger evaluation of all the
 #       provided configs
 @triton.autotune(
-    configs=configs,
+    configs=tuning_configs,
     key=["M", "N", "K"],
 )
 @triton.jit

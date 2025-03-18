@@ -4,6 +4,8 @@ import torch
 
 from triton import autotune, cdiv, Config, heuristics, jit, language as tl
 
+from ..triton_matmul_configs import get_full_amd_config_space, init_to_zero
+
 from .matmul_perf_model import early_config_prune, estimate_matmul_time
 
 _ordered_datatypes = [torch.int8, torch.float16, torch.bfloat16, torch.float32]
@@ -29,10 +31,6 @@ def get_higher_dtype(a, b):
             return b
         if b is d:
             return a
-
-
-def init_to_zero(name):
-    return lambda nargs: nargs[name].zero_()
 
 
 def get_configs_io_bound():
@@ -85,9 +83,10 @@ prune_configs_by = (
     else {}
 )
 
-
-@autotune(
-    configs=[
+if os.environ.get("FULL_AUTOTUNING_AMD", "0") == "1" and torch.version.hip is not None:
+    tuning_configs = get_full_amd_config_space(True)
+else:
+    tuning_configs = [
         # basic configs for compute-bound matmuls
         Config(
             {"BLOCK_M": 128, "BLOCK_N": 256, "BLOCK_K": 32, "SPLIT_K": 1, "GROUP_M": 8},
@@ -198,8 +197,11 @@ prune_configs_by = (
             num_stages=5,
             num_warps=2,
         ),
-    ]
-    + get_configs_io_bound(),
+    ] + get_configs_io_bound()
+
+
+@autotune(
+    configs=tuning_configs,
     key=["M", "N", "K"],
     prune_configs_by=prune_configs_by,
 )

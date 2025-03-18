@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 import triton
@@ -259,3 +260,57 @@ else:
             num_warps=2,
         ),
     ]
+
+
+def init_to_zero(name):
+    return lambda nargs: nargs[name].zero_()
+
+
+def get_full_amd_config_space(use_splitk: bool):
+    configs = []
+
+    block_mn_range = [16, 32, 64, 128, 256]
+    block_k_range = [16, 32, 64, 128, 256]
+    num_warps_range = [1, 2, 4, 8]
+    group_m_range = [8]
+    waves_per_eu_range = [0, 1, 2, 4]
+
+    for block_m in block_mn_range:
+        for block_n in block_mn_range:
+            for block_k in block_k_range:
+                for num_warps in num_warps_range:
+                    for group_m in group_m_range:
+                        for waves_per_eu in waves_per_eu_range:
+                            base_config_dict = {
+                                "BLOCK_M": block_m,
+                                "BLOCK_N": block_n,
+                                "BLOCK_K": block_k,
+                                "GROUP_M": group_m,
+                                "waves_per_eu": waves_per_eu,
+                                "kpack": 2,
+                            }
+                            config_dicts = []
+                            if use_splitk:
+                                max_k_pow2 = np.int64(np.log2(block_k))
+                                split_k_range = [2**i for i in range(max_k_pow2)]
+                                for split_k in split_k_range:
+                                    config_dicts.append(
+                                        {
+                                            **base_config_dict,
+                                            "SPLIT_K": split_k,
+                                        }
+                                    )
+                            else:
+                                config_dicts.append(base_config_dict)
+                            for config_dict in config_dicts:
+                                configs.append(
+                                    triton.Config(
+                                        config_dict,
+                                        num_warps=num_warps,
+                                        num_stages=2,
+                                        pre_hook=init_to_zero("C")
+                                        if use_splitk
+                                        else None,
+                                    )
+                                )
+    return configs

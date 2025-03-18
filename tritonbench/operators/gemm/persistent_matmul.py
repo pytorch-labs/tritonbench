@@ -8,6 +8,8 @@ import triton.language as tl
 from tritonbench.utils.env_utils import is_cuda
 from tritonbench.utils.triton_op import IS_FBCODE
 
+from .triton_matmul_configs import get_full_amd_config_space
+
 if not IS_FBCODE:
     import triton.tools.experimental_descriptor
 
@@ -96,8 +98,14 @@ def _matmul_launch_metadata(grid, kernel, args):
     return ret
 
 
+if os.environ.get("FULL_AUTOTUNING_AMD", "0") == "1" and torch.version.hip is not None:
+    tuning_configs = get_full_amd_config_space(False)
+else:
+    tuning_configs = persistent_matmul_configs()
+
+
 @triton.autotune(
-    configs=persistent_matmul_configs(),
+    configs=tuning_configs,
     key=["M", "N", "K"],
 )
 @triton.jit(launch_metadata=_matmul_launch_metadata)

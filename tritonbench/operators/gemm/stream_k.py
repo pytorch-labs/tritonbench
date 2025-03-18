@@ -15,28 +15,33 @@ import triton.language as tl
 
 from tritonbench.utils.env_utils import is_hip_mi300
 
-tuning_configs = [
-    triton.Config(
-        {
-            "BLOCK_M": 128,
-            "BLOCK_N": 128,
-            "BLOCK_K": 64,
-            "GROUP_M": 8,
-        },
-        num_stages=2,
-        num_warps=8,
-    ),
-    triton.Config(
-        {
-            "BLOCK_M": 64,
-            "BLOCK_N": 64,
-            "BLOCK_K": 128,
-            "GROUP_M": 8,
-        },
-        num_stages=2,
-        num_warps=8,
-    ),
-]
+from .triton_matmul_configs import get_full_amd_config_space
+
+if os.environ.get("FULL_AUTOTUNING_AMD", "0") == "1" and torch.version.hip is not None:
+    tuning_configs = get_full_amd_config_space(False)
+else:
+    tuning_configs = [
+        triton.Config(
+            {
+                "BLOCK_M": 128,
+                "BLOCK_N": 128,
+                "BLOCK_K": 64,
+                "GROUP_M": 8,
+            },
+            num_stages=2,
+            num_warps=8,
+        ),
+        triton.Config(
+            {
+                "BLOCK_M": 64,
+                "BLOCK_N": 64,
+                "BLOCK_K": 128,
+                "GROUP_M": 8,
+            },
+            num_stages=2,
+            num_warps=8,
+        ),
+    ]
 
 
 @triton.autotune(
