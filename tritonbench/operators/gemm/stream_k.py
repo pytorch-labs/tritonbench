@@ -15,14 +15,34 @@ import triton.language as tl
 
 from tritonbench.utils.env_utils import is_hip_mi300
 
-"""
+tuning_configs = [
+    triton.Config(
+        {
+            "BLOCK_M": 128,
+            "BLOCK_N": 128,
+            "BLOCK_K": 64,
+            "GROUP_M": 8,
+        },
+        num_stages=2,
+        num_warps=8,
+    ),
+    triton.Config(
+        {
+            "BLOCK_M": 64,
+            "BLOCK_N": 64,
+            "BLOCK_K": 128,
+            "GROUP_M": 8,
+        },
+        num_stages=2,
+        num_warps=8,
+    ),
+]
+
+
 @triton.autotune(
-    configs=configs,
+    configs=tuning_configs,
     key=["M", "N", "K"],
 )
-"""
-
-
 @triton.heuristics(
     values={
         "EVEN_M": lambda args: args["M"] % args["BLOCK_M"] == 0,
@@ -257,16 +277,13 @@ def streamk_matmul(a, b, bias=None):
     c = torch.zeros((M, N), device=a.device, dtype=dtype)
     NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
 
+    # TODO: Remove in the future and move to triton heuristics
+    # This is inconsistent for the full autotuning case.
     BLOCK_SIZE_M = 128
     BLOCK_SIZE_N = 128
-    # heuristic for selecting BLOCK_SIZE_K
     if K > (M + N) * 2:
         BLOCK_SIZE_M = 64
         BLOCK_SIZE_N = 64
-        BLOCK_SIZE_K = 128
-    else:
-        BLOCK_SIZE_K = 64
-    GROUP_SIZE_M = 8
 
     # TODO: Figure out a way move this to @triton.heuristics to enable autotuning.
     # We need min(total_programs_streamk, total_tiles) for the launch grid.
@@ -341,12 +358,6 @@ def streamk_matmul(a, b, bias=None):
         NUM_SMS=grids,
         STREAMK_TILES=total_tiles_streamk,
         NUM_XCDS=NUM_XCDS,
-        BLOCK_M=BLOCK_SIZE_M,
-        BLOCK_N=BLOCK_SIZE_N,
-        BLOCK_K=BLOCK_SIZE_K,
-        GROUP_M=GROUP_SIZE_M,
-        num_stages=2,
-        num_warps=8,
         USE_BUFFER_OPS=use_buffer_ops,
     )
 
