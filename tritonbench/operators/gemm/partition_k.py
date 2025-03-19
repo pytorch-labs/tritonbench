@@ -213,6 +213,13 @@ def _reduce(
     tl.store(c_ptrs, reduced_k)
 
 
+def torch_reduction(c_buf, a):
+    return c_buf.sum(dim=2).to(a.dtype)
+
+
+compiled_reduction = torch.compile(torch_reduction)
+
+
 def matmul_partition_k(a, b, triton_reduce=False):
     # Check constraints.
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
@@ -276,4 +283,4 @@ def matmul_partition_k(a, b, triton_reduce=False):
         )
         return c
     else:
-        return c_buf.sum(dim=2).to(a.dtype)
+        return compiled_reduction(c_buf, a)
