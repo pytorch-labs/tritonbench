@@ -144,7 +144,7 @@ def _matmul_partition_k(
     # See above `Pointer Arithmetic` section for details
     offs_am = (pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)) % M
     offs_bn = (pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)) % N
-    offs_k = (pid_pk * PK_SIZE + tl.arange(0, BLOCK_SIZE_K)) % K
+    offs_k = (pid_pk * BLOCK_SIZE_K + tl.arange(0, BLOCK_SIZE_K)) % K
     a_ptrs = a_ptr + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)
     b_ptrs = b_ptr + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
 
@@ -162,9 +162,8 @@ def _matmul_partition_k(
         a = tl.load(a_ptrs)
         b = tl.load(b_ptrs)
         accumulator += tl.dot(a, b)
-        a_ptrs += BLOCK_SIZE_K * stride_ak
-        b_ptrs += BLOCK_SIZE_K * stride_bk
-    acc = accumulator.to(tl.float16)
+        a_ptrs += PK_SIZE * stride_ak
+        b_ptrs += PK_SIZE * stride_bk
 
     offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
     offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
@@ -175,7 +174,7 @@ def _matmul_partition_k(
         + stride_cb_n * offs_cn[None, :, None]
         + stride_cb_k * offs_ck[None, None, :]
     )
-    tl.store(c_buf_ptrs, acc[:, :, None])
+    tl.store(c_buf_ptrs, accumulator[:, :, None])
 
 
 @triton.jit
@@ -228,7 +227,8 @@ def matmul_partition_k(a, b, triton_reduce=False):
     # Allocates output.
     partitionK_SIZE = K // partitionK
 
-    c_buf = torch.empty((M, N, partitionK), device=a.device, dtype=a.dtype)
+    # Enforce accumulation in float32 for accuracy
+    c_buf = torch.empty((M, N, partitionK), device=a.device, dtype=torch.float32)
     c = torch.empty((M, N), device=a.device, dtype=a.dtype)
     # 1D launch kernel where each block gets its own program.
 
@@ -276,4 +276,4 @@ def matmul_partition_k(a, b, triton_reduce=False):
         )
         return c
     else:
-        return c_buf.sum(dim=2)
+        return c_buf.sum(dim=2).to(a.dtype)
