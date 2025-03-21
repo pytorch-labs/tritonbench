@@ -67,15 +67,16 @@ try:
     )
 
     from .test_fmha_utils import make_packed_qkv
+
+    HAS_FLASH_V2 = True
 except (ImportError, IOError, AttributeError):
-    pass
+    HAS_FLASH_V2 = False
 
 HAS_CUDA_124 = (
     torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
 )
 
 # [Optional] flash_attn v3
-HAS_FLASH_V3 = True
 try:
     torch_lib_path = os.path.join(os.path.dirname(__file__), "lib")
     with add_ld_library_path(torch_lib_path):
@@ -85,6 +86,8 @@ except (ImportError, IOError, AttributeError):
         from ai_codesign.gen_ai.flash_attention_v2.hopper.flash_attn_interface import (
             flash_attn_func as flash_attn_v3,
         )
+
+        HAS_FLASH_V3 = True
     except (ImportError, IOError, AttributeError):
         HAS_FLASH_V3 = False
 
@@ -244,7 +247,7 @@ class Operator(BenchmarkOperator):
             v,
         )
 
-    @register_benchmark()
+    @register_benchmark(enabled=HAS_FLASH_V2)
     def flash_v2(
         self,
         q: torch.Tensor,
@@ -533,6 +536,10 @@ class Operator(BenchmarkOperator):
             shapes = ctx_vals
         requires_grad = True
         for shape in shapes:
+            if torch.version.hip is not None and shape == (4, 32, 1, 128):
+                # AMD ROCm has an issue running triton_tutorial_flash_v2
+                # on shape (4, 32, 1, 128). Skip it for now.
+                continue
             BATCH, H, N_CTX, D_HEAD = shape
             q = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
