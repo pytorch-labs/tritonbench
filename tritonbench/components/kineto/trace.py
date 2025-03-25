@@ -62,7 +62,7 @@ def do_bench_kineto_cudagraph(
                 g.replay()
                 prof.step()
         if not hasattr(torch.version, "git_version"):
-            return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/test/{name}.gz&bucket=pyper_traces"
+            return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/tritonbench/{name}.gz&bucket=pyper_traces"
         else:
             return output_dir
 
@@ -158,6 +158,6 @@ def do_bench_kineto(
             fn()
             prof.step()
     if not hasattr(torch.version, "git_version"):
-        return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/test/{name}.gz&bucket=pyper_traces"
+        return f"https://www.internalfb.com/intern/perfdoctor/trace_view?filepath=tree/traces/tritonbench/{name}.gz&bucket=pyper_traces"
     else:
         return output_dir
