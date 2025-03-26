@@ -19,7 +19,7 @@ from .hstu import get_test_inputs, triton_hstu_mha
 
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, default=512, help="Batch size")
+    parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
     parser.add_argument("--heads", type=int, default=4, help="Number of heads")
     parser.add_argument("--attn-dim", type=int, default=128)
     parser.add_argument("--hidden-dim", type=int, default=128)
@@ -74,8 +74,6 @@ class Operator(BenchmarkOperator):
             v=v,
             seq_offsets=seq_offsets,
             causal=self.causal,
-            dropout_pr=0.0,
-            training=True,
             num_targets=num_targets,
             max_attn_len=self.max_attn_len,
             contextual_seq_len=self.contextual_seq_len,
