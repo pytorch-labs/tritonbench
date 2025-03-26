@@ -23,6 +23,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--heads", type=int, default=4, help="Number of heads")
     parser.add_argument("--attn-dim", type=int, default=128)
     parser.add_argument("--hidden-dim", type=int, default=128)
+    parser.add_argument("--causal", action="store_true")
     parser.add_argument("--min-seq-len-log2", type=int, default=8)
     parser.add_argument("--max-seq-len-log2", type=int, default=15)
     parser.add_argument("--num-buckets", type=int, default=2048)
@@ -50,49 +51,24 @@ class Operator(BenchmarkOperator):
         self.sparsity = args.seq_sparsity
         self.target_size = args.target_size
         self.sort_by_length = args.sort_by_length
+        self.causal = args.causal
         self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
 
     @register_benchmark()
-    def hstu_triton_ragged_attention(
-        self, q, k, v, seq_offsets, timestamps, num_targets, seq_len
+    def hstu(
+        self, q, k, v, seq_offsets, num_targets, max_seq_len
     ):
         attn = RaggedHSTUAttn(
             self.batch_size,
             self.num_heads,
-            seq_len,
             self.num_buckets,
+            max_seq_len,
             self.sparsity,
             self.target_size,
             self.sort_by_length,
-            self.requires_grad,
-            persistent_kernel=False,
+            self.causal,
         )
-        return lambda: attn(q, k, v, seq_offsets, timestamps, num_targets)
-
-    # TODO: enable persistent kernels when the OSS backward is ready
-    @register_benchmark(enabled=False)
-    def hstu_triton_ragged_attention_persistent(
-        self,
-        q,
-        k,
-        v,
-        seq_offsets,
-        timestamps,
-        num_targets,
-        seq_len,
-    ):
-        attn = RaggedHSTUAttn(
-            self.batch_size,
-            self.num_heads,
-            seq_len,
-            self.num_buckets,
-            self.sparsity,
-            self.target_size,
-            self.sort_by_length,
-            self.requires_grad,
-            persistent_kernel=True,
-        )
-        return lambda: attn(q, k, v, seq_offsets, timestamps, num_targets)
+        return lambda: attn(q, k, v, seq_offsets, num_targets)
 
     def get_x_val(self, example_inputs):
         seq_len = example_inputs[-1]
@@ -118,8 +94,7 @@ class Operator(BenchmarkOperator):
                 seq_len,
                 self.sparsity,
                 self.target_size,
-                self.sort_by_length,
-                self.requires_grad,
+                requires_grad=self.requires_grad,
             )
 
     def get_bwd_fn(self, fwd_fn: Callable[..., Any]) -> Callable[..., Any]:
