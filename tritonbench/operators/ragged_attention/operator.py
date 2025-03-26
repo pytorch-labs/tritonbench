@@ -24,7 +24,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--attn-dim", type=int, default=128)
     parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--min-seq-len-log2", type=int, default=8)
-    parser.add_argument("--max-seq-len-log2", type=int, default=16)
+    parser.add_argument("--max-seq-len-log2", type=int, default=10)
     parser.add_argument("--seq-sparsity", type=float, default=1.0)
     parser.add_argument("--has-delta-q", type=bool, default=False)
     parser.add_argument("--delta-size", type=int, default=256)
