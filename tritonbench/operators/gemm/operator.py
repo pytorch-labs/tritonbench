@@ -37,6 +37,7 @@ try:
 except ModuleNotFoundError:
     HAS_PERSISTENT = False
 
+from tritonbench.operators.gemm.proton_matmul import matmul as proton_tutorial_matmul
 from tritonbench.operators.gemm.triton_matmul import matmul as triton_tutorial_matmul
 
 if IS_FBCODE:
@@ -192,6 +193,13 @@ class Operator(BenchmarkOperator):
             return lambda: triton_tutorial_matmul(a, b) + bias
         else:
             return lambda: triton_tutorial_matmul(a, b)
+
+    @register_benchmark(enabled=False)
+    def proton_matmul(self, a, b, bias) -> Callable:
+        if bias is not None:
+            return lambda: proton_tutorial_matmul(a, b) + bias
+        else:
+            return lambda: proton_tutorial_matmul(a, b)
 
     @register_benchmark()
     def matmul_partition_k(self, a, b, bias) -> Callable:
