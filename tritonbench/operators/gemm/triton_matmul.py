@@ -82,6 +82,9 @@ def matmul_kernel(
     group_size_m = min(num_pid_m - first_pid_m, GROUP_M)
     pid_m = first_pid_m + (pid % group_size_m)
     pid_n = (pid % num_pid_in_group) // group_size_m
+    if USE_BUFFER_OPS:
+        tl.assume(pid_m >= 0)
+        tl.assume(pid_n >= 0)
 
     # ----------------------------------------------------------
     # Create pointers for the first blocks of A and B.
