@@ -211,7 +211,7 @@ else:
     }
 )
 @jit
-def _kernel(
+def _splitk_kernel(
     A,
     B,
     C,
@@ -302,7 +302,7 @@ def _kernel(
 
 
 class _matmul(torch.autograd.Function):
-    kernel = _kernel
+    kernel = _splitk_kernel
 
     _locks = {}
 
@@ -374,7 +374,7 @@ class _matmul(torch.autograd.Function):
             cdiv(M, META["BLOCK_M"]) * cdiv(N, META["BLOCK_N"]),
             META["SPLIT_K"],
         )
-        _kernel[grid](
+        _splitk_kernel[grid](
             a,
             b,
             c,
