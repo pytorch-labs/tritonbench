@@ -43,17 +43,26 @@ def install_jax(cuda_version=DEFAULT_CUDA_VERSION):
     subprocess.check_call(test_cmd)
 
 
-def install_fbgemm():
+def install_fbgemm(genai=True):
     cmd = ["pip", "install", "-r", "requirements.txt"]
     subprocess.check_call(cmd, cwd=str(FBGEMM_PATH.resolve()))
     # Build target A100(8.0) or H100(9.0, 9.0a)
-    cmd = [
-        sys.executable,
-        "setup.py",
-        "install",
-        "--package_variant=genai",
-        "-DTORCH_CUDA_ARCH_LIST=8.0;9.0;9.0a",
-    ]
+    if genai:
+        cmd = [
+            sys.executable,
+            "setup.py",
+            "install",
+            "--package_variant=genai",
+            "-DTORCH_CUDA_ARCH_LIST=8.0;9.0;9.0a",
+        ]
+    else:
+        cmd = [
+            sys.executable,
+            "setup.py",
+            "install",
+            "--package_variant=cuda",
+            "-DTORCH_CUDA_ARCH_LIST=8.0;9.0;9.0a",
+        ]
     subprocess.check_call(cmd, cwd=str(FBGEMM_PATH.resolve()))
 
 
@@ -92,7 +101,12 @@ def setup_hip(args: argparse.Namespace):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--numpy", action="store_true", help="Install suggested numpy")
-    parser.add_argument("--fbgemm", action="store_true", help="Install FBGEMM GPU")
+    parser.add_argument(
+        "--fbgemm", action="store_true", help="Install FBGEMM GPU (genai only)"
+    )
+    parser.add_argument(
+        "--fbgemm-all", action="store_true", help="Install FBGEMM GPU all kernels."
+    )
     parser.add_argument(
         "--colfax", action="store_true", help="Install optional Colfax CUTLASS kernels"
     )
@@ -149,9 +163,9 @@ if __name__ == "__main__":
         from tools.flash_attn.install import install_fa3
 
         install_fa3()
-    if args.fbgemm or args.all:
+    if args.fbgemm or args.fbgemm_all or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
-        install_fbgemm()
+        install_fbgemm(genai=(not args.fbgemm_all))
     if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2 from source...")
         install_fa2(compile=True)
