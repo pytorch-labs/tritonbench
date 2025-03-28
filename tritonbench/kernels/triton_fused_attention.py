@@ -272,7 +272,7 @@ def _attn_fwd_inner_ws(
                     Q.dtype.element_ty,
                 )
             else:
-                k = tl.load(K_block_ptr)
+                k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
         with tl.async_task([1, 2]):
             if ENABLE_TMA:
                 k = tl.trans(k)
@@ -310,7 +310,7 @@ def _attn_fwd_inner_ws(
                         Q.dtype.element_ty,
                     )
             else:
-                v = tl.load(V_block_ptr)
+                v = tl.load(V_block_ptr, boundary_check=(0,), padding_option="zero")
         with tl.async_task([1, 2]):
             if fp8_v:
                 if ENABLE_TMA:
@@ -661,7 +661,7 @@ def _attn_fwd_compute(
             Q.dtype.element_ty,
         )
     else:
-        q = tl.load(Q_block_ptr)
+        q = tl.load(Q_block_ptr, boundary_check=(0,), padding_option="zero")
     # stage 1: off-band
     # For causal = True, STAGE = 3 and _attn_fwd_inner gets 1 as its STAGE
     # For causal = False, STAGE = 1, and _attn_fwd_inner gets 3 as its STAGE
@@ -728,7 +728,8 @@ def _attn_fwd_compute(
     m_i += tl.math.log2(l_i)
     acc = acc / l_i[:, None]
     m_ptrs = M + off_hz * N_CTX + offs_m
-    tl.store(m_ptrs, m_i)
+    m_mask = off_hz * N_CTX + offs_m < N_CTX
+    tl.store(m_ptrs, m_i, mask=m_mask)
     if ENABLE_TMA:
         tl._experimental_descriptor_store(
             desc_o,
@@ -736,7 +737,7 @@ def _attn_fwd_compute(
             [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
         )
     else:
-        tl.store(O_block_ptr, acc.to(Out.type.element_ty))
+        tl.store(O_block_ptr, acc.to(Out.type.element_ty), boundary_check=(0,))
 
 
 @triton.jit

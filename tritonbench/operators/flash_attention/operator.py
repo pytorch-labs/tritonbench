@@ -536,10 +536,6 @@ class Operator(BenchmarkOperator):
             shapes = ctx_vals
         requires_grad = True
         for shape in shapes:
-            if torch.version.hip is not None and shape == (4, 32, 1, 128):
-                # AMD ROCm has an issue running triton_tutorial_flash_v2
-                # on shape (4, 32, 1, 128). Skip it for now.
-                continue
             BATCH, H, N_CTX, D_HEAD = shape
             q = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
