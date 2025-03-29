@@ -11,6 +11,9 @@ flash_attention:
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
   - triton_tutorial_flash_v2_tma_ws_persistent
+# the two requires full fbgemm instead of genai flavor
+fp8_gemm_rowwise:
+fp8_gemm_grouped:
 fp8_attention:
   # fb-only kernel
   - colfax_fmha
@@ -30,9 +33,7 @@ ragged_attention:
   # mlir::triton::LinearLayout::reshapeOuts(ArrayRef<std::pair<StringAttr, int32_t>>) const:
   # Assertion `getTotalOutDimSize() == std::accumulate( newOutDims.begin(), newOutDims.end(),
   # 1, [&](int32_t acc, auto &outDim) { return acc * outDim.second; })' failed.
-  - hstu_triton_ragged_attention
-  # presistent kernel is not ready for OSS
-  - hstu_triton_ragged_attention_persistent
+  - hstu
 # cpu-op for testing
 test_op:
 # TODO: decoding attention requires updated xformers and flash_attn
