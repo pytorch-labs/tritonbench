@@ -1,0 +1,243 @@
+TMA benchmarks will be running with experimental grid constant TMA descriptor.
+WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+    PyTorch 2.6.0.dev20241204+cu124 with CUDA 1204 (you have 2.8.0.dev20250331+cu126)
+    Python  3.12.7 (you have 3.12.7)
+  Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+  Memory-efficient attention, SwiGLU, sparse and more won't be available.
+  Set XFORMERS_MORE_DETAILS=1 for more details
+  0%|          | 0/8 [00:00<?, ?it/s]CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+CUDA Runtime Error at: /data/users/xzhao9/tritonbench/submodules/ThunderKittens/kernels/attn/h100/h100.cu:765
+invalid configuration argument cudaGetLastError()
+ 25%|██▌       | 2/8 [00:00<00:00, 14.68it/s] 50%|█████     | 4/8 [00:00<00:00, 10.31it/s] 75%|███████▌  | 6/8 [00:00<00:00,  8.67it/s] 88%|████████▊ | 7/8 [00:00<00:00,  7.72it/s]100%|██████████| 8/8 [00:01<00:00,  5.54it/s]100%|██████████| 8/8 [00:01<00:00,  6.99it/s]
+Removed 6 outliers from 83 samples
+Removed 40 outliers from 659 samples
+Removed 42 outliers from 584 samples
+Removed 25 outliers from 372 samples
+Removed 17 outliers from 169 samples
+Removed 2 outliers from 48 samples
+  (Batch, Heads, SeqLen, Dhead)          tk-latency
+-------------------------------  ------------------
+               (4, 48, 128, 64)  0.048896 (±22.97%)
+               (4, 48, 256, 64)   0.042528 (±5.34%)
+               (4, 48, 512, 64)   0.064064 (±2.95%)
+              (4, 48, 1024, 64)   0.163776 (±1.50%)
+              (4, 48, 2048, 64)   0.529888 (±1.09%)
+              (4, 48, 4096, 64)   2.074208 (±0.33%)
+              (4, 48, 8192, 64)   8.105056 (±1.21%)
+             (4, 48, 16384, 64)  32.321217 (±1.56%)
+                        average
