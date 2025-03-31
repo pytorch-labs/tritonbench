@@ -428,7 +428,6 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(enabled=not IS_FBCODE and HAS_TK)
     def tk(self, q, k, v):
-
         def tk_dispatcher():
             out = tk.mha_forward(q, k, v, self.causal)
             return out[0]
