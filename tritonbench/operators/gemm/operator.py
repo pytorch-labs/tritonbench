@@ -325,9 +325,9 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def matmul_decompose_k(self, a, b, bias) -> Callable:
-        def decompose_func():
-            M, K = a.shape
-            K, N = b.shape
+        def decompose_func(a_in, b_in):
+            M, K = a_in.shape
+            K, N = b_in.shape
 
             # TODO: Ideally we want to autotune over this parameter
             kPartitions = 256
@@ -338,13 +338,17 @@ class Operator(BenchmarkOperator):
                 0, 1
             )  # Shape: (B, M, kPartitions)
             b_reshaped = b.reshape(B, kPartitions, N)  # Shape: (B, kPartitions, N)
-            result = torch.bmm(a_reshaped, b_reshaped)  # Shape: (B, M, N)
+            result = torch.bmm(a_reshaped, b_reshaped).to(
+                torch.float32
+            )  # Shape: (B, M, N)
             return result.sum(dim=0)  # Sum over B dimension, Shape: (M, N)
 
+        compiled_decompose_k = torch.compile(decompose_func)
+        compiled_decompose_k(a, b)
         if bias is not None:
-            return lambda: decompose_func() + bias
+            return lambda: compiled_decompose_k(a, b) + bias
         else:
-            return lambda: decompose_func()
+            return lambda: compiled_decompose_k(a, b)
 
     @register_x_val(label="(M, N, K)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
