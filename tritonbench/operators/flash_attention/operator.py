@@ -460,7 +460,7 @@ class Operator(BenchmarkOperator):
         k = torch_to_jax_tensor(k)
         v = torch_to_jax_tensor(v)
         def _inner():
-            pallas_mha(q, k, v)
+            pallas_mha(q, k, v, segment_ids=None)
         return _inner
 
     @register_benchmark(enabled=False, label=f"cudnn")
