@@ -105,7 +105,9 @@ except (ImportError, IOError, AttributeError, TypeError):
 
 try:
     import tilelang
+
     from .tilelang_mha import tilelang_mha
+
     HAS_TILELANG = True
 except (ImportError, IOError, AttributeError, TypeError):
     HAS_TILELANG = False
@@ -452,13 +454,33 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(enabled=HAS_TILELANG)
     def tile(self, q, k, v):
-        o = torch.zeros_like(v)
-        func = tilelang_mha(self.BATCH, self.H, self.N_CTX, self.D_HEAD, self.causal, tune=True)
-        jit_kernel = tilelang_mha.compile(func, out_idx=[2], target="cuda")
+        # [B, H, S, D] -> [B, S, H, D]
+        q = q.transpose(1, 2).contiguous()
+        k = k.transpose(1, 2).contiguous()
+        v = v.transpose(1, 2).contiguous()
+        best_config = tilelang_mha(
+            self.BATCH,
+            self.H,
+            self.N_CTX,
+            self.D_HEAD,
+            self.causal,
+            self.dtype,
+            tune=True,
+        )[1]
+        func = tilelang_mha(
+            self.BATCH,
+            self.H,
+            self.N_CTX,
+            self.D_HEAD,
+            self.causal,
+            self.dtype,
+        )(*best_config)
+        jit_kernel = tilelang.compile(func, out_idx=[3])
 
         def _inner():
-            jit_kernel(q, k, v, o)
+            o = jit_kernel(q, k, v)
             return o
+
         return _inner
 
     @register_benchmark(enabled=False, label=f"cudnn")
