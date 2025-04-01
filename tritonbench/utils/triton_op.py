@@ -703,6 +703,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.tb_args.mode == "bwd"
             ), "We only accept test modes: fwd, bwd, fwd_bwd, or fwd_no_grad."
             self.mode = Mode.BWD
+        self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
         self.device = tb_args.device
         self.required_metrics = (
             list(set(tb_args.metrics.split(",")))

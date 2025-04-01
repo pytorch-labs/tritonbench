@@ -118,7 +118,7 @@ except (ImportError, IOError, AttributeError):
 
 # [Optional] ThunderKittens backend
 try:
-    import thunderkittens as tk
+    from .tk import tk_attn
 
     HAS_TK = True
 except (ImportError, IOError, AttributeError):
@@ -428,11 +428,11 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(enabled=not IS_FBCODE and HAS_TK)
     def tk(self, q, k, v):
-        def tk_dispatcher():
-            out = tk.mha_forward(q, k, v, self.causal)
+        def _inner():
+            out = tk_attn(q, k, v, self.causal)
             return out[0]
 
-        return tk_dispatcher
+        return _inner
 
     @register_benchmark(enabled=False, label=f"cudnn-{torch.backends.cudnn.version()}")
     def cudnn(self, q, k, v):
