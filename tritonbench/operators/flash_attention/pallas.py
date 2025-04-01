@@ -1,409 +1,696 @@
-# Copyright 2024 The JAX Authors. All Rights Reserved.
+# Copyright 2023 The JAX Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ==============================================================================
 
-import contextlib
+"""Module containing fused attention forward and backward pass."""
+
+from __future__ import annotations
+
 import dataclasses
-import enum
-import itertools
-import os
+
+import functools
+import math
+from typing import Any
 
 import jax
-
-from absl import app
-from jax import random
-from jax._src import test_util as jtu
-from jax._src.interpreters import mlir
-from jax.experimental.mosaic import gpu as mosaic_gpu
-from jax.experimental.mosaic.gpu import profiler
-from jax.experimental.mosaic.gpu.dsl import *  # noqa: F403
 import jax.numpy as jnp
 import numpy as np
-from jaxlib.mlir import ir
-from jaxlib.mlir.dialects import arith, gpu, nvgpu, nvvm, scf
+from jax import lax
+from jax.experimental import pallas as pl
+from jax.experimental.pallas import triton as plgpu
 
-# mypy: ignore-errors
-# ruff: noqa: F405
+DEFAULT_MASK_VALUE = -0.7 * float(np.finfo(np.dtype("float32")).max)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class BlockSizes:
-    q: int
-    kv: int
-    stages: int
+    """
+    Tile sizes parameterizing the attention kernel. These block sizes
+    should be tuned for the model and hardware for optimal performance.
+
+    Attributes:
+      block_q: Block size along Q sequence length for forward kernel.
+      block_k: Block size along KV sequence length for forward kernel.
+      block_kv: Block size along KV sequence length for forward kernel.
+      block_q_dkv: Block size along Q sequence length for dKV backward kernel.
+      block_kv_dkv: Block size along KV sequence length for dKV backward kernel.
+      block_q_dq: Block size along Q sequence length for dQ backward kernel.
+      block_kv_dq: Block size along KV sequence length for dQ backward kernel.
+    """
+
+    block_q: int
+    block_k: int
+
+    block_q_dkv: int | None = None
+    block_kv_dkv: int | None = None
+    block_q_dq: int | None = None
+    block_kv_dq: int | None = None
+
+    @classmethod
+    def get_default(cls):
+        return BlockSizes(
+            block_q=128,
+            block_k=128,
+            block_q_dkv=128,
+            block_kv_dkv=128,
+            block_q_dq=128,
+            block_kv_dq=128,
+        )
+
+    @property
+    def has_backward_blocks(self) -> bool:
+        """Returns True if all backward blocks are specified for the fused
+
+        dq and dk/dv backwards pass.
+        """
+        backward_blocks = [
+            self.block_q_dkv,
+            self.block_kv_dkv,
+            self.block_q_dq,
+            self.block_kv_dq,
+        ]
+
+        return all(b is not None for b in backward_blocks)
 
 
-_utils_c = c
-
-
-# TODO(apaszke): Implement a Q-scaled, base2 exp implementation.
-class ExpImplementation(enum.Enum):
-    EXACT = enum.auto()
-    APPROX = enum.auto()
-
-
-def build_kernel(
-    batch_size: int,
-    q_heads: int,
-    kv_heads: int,
-    q_seq_len: int,
-    kv_seq_len: int,
-    head_dim: int,
-    blocks: BlockSizes,
-    prof_spec: profiler.ProfilerSpec | None = None,
-    exp_impl: ExpImplementation = ExpImplementation.EXACT,
+def mha_forward_kernel(
+    q_ref,
+    k_ref,
+    v_ref,  # Input arrays
+    segment_ids_ref: jax.Array | None,  # segment_id arrays
+    o_ref: Any,  # Output
+    *residual_refs: Any,  # Residual outputs
+    num_heads: int,
+    sm_scale: float,
+    causal: bool,
+    block_q: int,
+    block_d: int,
+    block_k: int,
 ):
-    wgs_per_block = 2
+    seq_len = k_ref.shape[0]
+    start_q = pl.program_id(0)
 
-    if batch_size != 1:
-        raise NotImplementedError
-    if blocks.stages < 2:
-        raise ValueError("Kernel requires at least 2 stages.")
-    if q_heads % kv_heads:
-        raise ValueError("kv_heads must divide q_heads.")
-    if q_seq_len % (blocks.q * wgs_per_block):
-        raise ValueError
-    if kv_seq_len % blocks.kv:
-        raise ValueError
-    if blocks.q % 64:
-        raise NotImplementedError
-    if blocks.kv % 64:
-        raise NotImplementedError
-    if head_dim % 64:
-        raise NotImplementedError
-    if blocks.stages * blocks.kv > kv_seq_len:
-        raise NotImplementedError
+    # o is the buffer where we accumulate the output on sram.
+    # m_i and l_i (see FlashAttention paper) are updated during the k,v loop.
+    m_i = jnp.zeros(block_q, dtype=jnp.float32) - float("inf")
+    l_i = jnp.zeros(block_q, dtype=jnp.float32)
+    # acc is the buffer where we accumulate the output on sram.
+    o = jnp.zeros((block_q, block_d), dtype=jnp.float32)
 
-    q_shape = jax.ShapeDtypeStruct((q_heads, q_seq_len, head_dim), jnp.float16)
-    kv_shape = jax.ShapeDtypeStruct((kv_heads, kv_seq_len, head_dim), jnp.float16)
-    q_heads_per_kv_head = q_heads // kv_heads
-
-    def exp(x: FragmentedArray) -> FragmentedArray:
-        return x.exp(approx=exp_impl == ExpImplementation.APPROX)
-
-    block_partition = Partition(
-        elements=(batch_size, q_seq_len, q_heads),
-        partition=(0, 1, 2),
-        chunk_size=(1, blocks.q * wgs_per_block, 1),
+    # Load q: it will stay in L1 throughout. Indices form a matrix because we
+    # read, compute, and write all in 2d chunks. 1 element ~= 1 CUDA thread index.
+    # q tile has shape [block_q, block_d], block_d == head_dim.
+    curr_q_slice = pl.dslice(start_q * block_q, block_q)
+    q = q_ref[...]
+    q_segment_ids = (
+        None if segment_ids_ref is None else pl.load(segment_ids_ref, (curr_q_slice,))
     )
 
-    index = ir.IndexType.get()
-    f16 = ir.F16Type.get()
-    f32 = ir.F32Type.get()
+    # In FlashAttention algorithm 1 there are 2 loops: slow over tiles of kv (size
+    # (Bc == block_k here), and fast over blocks of q (size Br == block_q here).
+    # Here we only loop over blocks of kv to process entire seq_len, the loop over
+    # blocks of q is carried out by the grid.
+    def body(start_k, carry):
+        o_prev, m_prev, l_prev = carry
+        curr_k_slice = pl.dslice(start_k * block_k, block_k)
 
-    grid = block_partition.num_chunks
-    block = (wgs_per_block * 128, 1, 1)
-    tiling = (64, 64)
-    qo_scratch = jax.ShapeDtypeStruct(
-        (wgs_per_block, *tile_shape((blocks.q, head_dim), tiling)), jnp.float16
+        k = pl.load(k_ref, (curr_k_slice, slice(None)))
+        qk = pl.dot(q, k.T)  # [block_q, block_k]
+
+        # Scale logits to convert from base-2 to the natural log domain.
+        # This is based on the identity: e^x = 2^(x * log2(e)).
+        qk_scale = math.log2(math.e)
+        if sm_scale != 1.0:
+            qk_scale *= sm_scale
+        qk *= qk_scale
+
+        # Avoids Triton crash.
+        # if num_heads > 2:
+        #   qk = qk.astype(q_ref.dtype)
+        #   qk = qk.astype(jnp.float32)
+
+        if causal or segment_ids_ref is not None:
+            mask = None
+            if segment_ids_ref is not None:
+                kv_segment_ids = pl.load(segment_ids_ref, (curr_k_slice,))
+                mask = segment_mask(q_segment_ids, kv_segment_ids)
+            if causal:
+                span_q = start_q * block_q + jnp.arange(block_q)
+                span_k = start_k * block_k + jnp.arange(block_k)
+                causal_mask = span_q[:, None] >= span_k[None, :]
+                mask = (
+                    causal_mask if mask is None else jnp.logical_and(mask, causal_mask)
+                )
+            # Apply mask to qk.
+            qk = jnp.where(mask, qk, DEFAULT_MASK_VALUE)
+
+        m_curr = qk.max(axis=-1)
+        m_next = jnp.maximum(m_prev, m_curr)
+        correction = jnp.exp2(m_prev - m_next)
+        l_prev_corr = correction * l_prev
+        s_curr = jnp.exp2(
+            qk - m_next[:, None]
+        )  # Use m_next instead of m_curr to avoid a correction on l_curr
+        l_curr = s_curr.sum(axis=-1)
+        l_next = l_prev_corr + l_curr
+        o_prev_corr = correction[:, None] * o_prev
+        v = pl.load(v_ref, (curr_k_slice, pl.dslice(block_d)))
+        o_curr = pl.dot(s_curr.astype(v.dtype), v)
+
+        o_next = o_prev_corr + o_curr
+        return o_next, m_next, l_next
+
+    if causal:
+        # Ceildiv (`pl.cdiv` and `//` do not work due to type of start_q)
+        upper_bound = lax.div(block_q * (start_q + 1) + block_k - 1, block_k)
+    else:
+        upper_bound = pl.cdiv(seq_len, block_k)
+    o, m_i, l_i = lax.fori_loop(0, upper_bound, body, (o, m_i, l_i))
+
+    # We keep an unscaled version of o during the scan over seq_len. Scaling it
+    # by the last l_i gives us the correct final output. See section 3.1.1 in the
+    # FlashAttention-2 paper: https://arxiv.org/pdf/2307.08691.
+    o /= l_i[:, None]
+
+    if residual_refs:
+        lse_ref = residual_refs[0]
+        lse_ref[...] = m_i + jnp.log2(l_i)
+    # Write output to dram.
+    o_ref[...] = o.astype(o_ref.dtype)
+
+
+def segment_mask(
+    q_segment_ids: jax.Array,
+    kv_segment_ids: jax.Array,
+):
+    # [B, T, 1] or [T, 1]
+    q_segment_ids = jnp.expand_dims(q_segment_ids, axis=-1)
+    # [B, 1, S] or [1, S]
+    if kv_segment_ids.ndim == 1:
+        kv_segment_ids = jnp.expand_dims(kv_segment_ids, axis=0)
+    else:
+        kv_segment_ids = jnp.expand_dims(kv_segment_ids, axis=1)
+    return jnp.equal(q_segment_ids, kv_segment_ids).astype(jnp.bool_)
+
+
+@functools.partial(jax.custom_vjp, nondiff_argnums=[4, 5, 6, 7, 8, 9, 10, 11, 12])
+@functools.partial(
+    jax.jit,
+    static_argnames=[
+        "sm_scale",
+        "causal",
+        "block_sizes",
+        "backward_pass_impl",
+        "num_warps",
+        "num_stages",
+        "grid",
+        "interpret",
+        "debug",
+    ],
+)
+def mha(
+    q,
+    k,
+    v,
+    segment_ids: jnp.ndarray | None,
+    sm_scale: float = 1.0,
+    causal: bool = False,
+    block_sizes: BlockSizes = BlockSizes.get_default(),
+    backward_pass_impl: str = "triton",
+    num_warps: int | None = None,
+    num_stages: int = 2,
+    grid: tuple[int, ...] | None = None,
+    interpret: bool = False,
+    debug: bool = False,
+):
+    del backward_pass_impl
+    batch_size, q_seq_len, num_heads, head_dim = q.shape
+    kv_seq_len = k.shape[1]
+    block_q = min(block_sizes.block_q, q_seq_len)
+    block_k = min(block_sizes.block_k, kv_seq_len)
+    # Heuristics.
+    grid_ = grid
+    if grid_ is None:
+        grid_ = (pl.cdiv(q_seq_len, block_q), batch_size, num_heads)
+
+    num_warps_ = num_warps
+    if num_warps_ is None:
+        num_warps_ = 4 if head_dim <= 64 else 8
+    kernel = functools.partial(
+        mha_forward_kernel,
+        num_heads=num_heads,
+        sm_scale=sm_scale,
+        block_q=block_q,
+        block_k=block_k,
+        block_d=head_dim,
+        causal=causal,
     )
-    k_scratch = jax.ShapeDtypeStruct(
-        tile_shape((blocks.stages, head_dim, blocks.kv), tiling), jnp.float16
-    )
-    v_scratch = jax.ShapeDtypeStruct(
-        tile_shape((blocks.stages, blocks.kv, head_dim), tiling), jnp.float16
-    )
-    smem_scratch_shape = [
-        qo_scratch,
-        k_scratch,
-        v_scratch,
+
+    in_specs = [
+        pl.BlockSpec((None, block_q, None, head_dim), lambda i, j, k: (j, i, k, 0)),
+        pl.BlockSpec((None, kv_seq_len, None, head_dim), lambda _, j, k: (j, 0, k, 0)),
+        pl.BlockSpec((None, kv_seq_len, None, head_dim), lambda _, j, k: (j, 0, k, 0)),
     ]
-    in_shape = (q_shape, kv_shape, kv_shape)
-    out_shape = q_shape
+    in_specs.append(
+        None  # type: ignore[arg-type]
+        if segment_ids is None
+        else pl.BlockSpec((None, kv_seq_len), lambda _, j, k: (j, 0))
+    )
+    out_shape = jax.ShapeDtypeStruct(shape=q.shape, dtype=q.dtype)
+    return pl.pallas_call(
+        kernel,
+        grid=grid_,
+        in_specs=in_specs,
+        out_specs=pl.BlockSpec(
+            (None, block_q, None, head_dim), lambda i, j, k: (j, i, k, 0)
+        ),
+        compiler_params=plgpu.TritonCompilerParams(
+            num_warps=num_warps_, num_stages=num_stages
+        ),
+        out_shape=out_shape,
+        debug=debug,
+        interpret=interpret,
+        name="mha_forward",
+    )(q, k, v, segment_ids)
 
-    def c(value, ty=index):
-        return _utils_c(value, ty)
 
-    def kernel(
-        ctx: mosaic_gpu.LaunchContext,
-        q_gmem,
-        k_gmem,
-        v_gmem,
-        out_gmem,
-        smem_scratch,
-    ):
-        barriers = BarrierArray(blocks.stages + wgs_per_block)
-        schedule_barrier = BarrierArray(1, arrival_count=256)[0]
+def _mha_forward(
+    q,
+    k,
+    v,
+    segment_ids: jax.Array | None,
+    sm_scale: float,
+    causal: bool,
+    block_sizes: BlockSizes,
+    backward_pass_impl: str,
+    num_warps: int | None,
+    num_stages: int,
+    grid: Any,
+    interpret: bool,
+    debug: bool,
+):
+    del backward_pass_impl
+    batch_size, q_seq_len, num_heads, head_dim = q.shape
+    kv_seq_len = k.shape[1]
+    block_q = min(block_sizes.block_q, q_seq_len)
+    block_k = min(block_sizes.block_k, kv_seq_len)
+    # Heuristics.
+    grid_ = grid
+    if grid_ is None:
+        grid_ = (pl.cdiv(q_seq_len, block_q), batch_size, num_heads)
 
-        def perform_schedule_barrier():
-            schedule_barrier.arrive()
-            schedule_barrier.wait()
+    num_warps_ = num_warps
+    if num_warps_ is None:
+        num_warps_ = 4 if head_dim <= 64 else 8
+    kernel = functools.partial(
+        mha_forward_kernel,
+        num_heads=num_heads,
+        sm_scale=sm_scale,
+        causal=causal,
+        block_q=block_q,
+        block_k=block_k,
+        block_d=head_dim,
+    )
+    out_shape = [
+        jax.ShapeDtypeStruct(shape=q.shape, dtype=q.dtype),  # out
+        jax.ShapeDtypeStruct(
+            shape=(batch_size, num_heads, q_seq_len),
+            dtype=jnp.float32,  # lse
+        ),
+    ]
+    in_specs = [
+        pl.BlockSpec((None, block_q, None, head_dim), lambda i, j, k: (j, i, k, 0)),
+        pl.BlockSpec((None, kv_seq_len, None, head_dim), lambda _, j, k: (j, 0, k, 0)),
+        pl.BlockSpec((None, kv_seq_len, None, head_dim), lambda _, j, k: (j, 0, k, 0)),
+    ]
+    in_specs.append(
+        None  # type: ignore[arg-type]
+        if segment_ids is None
+        else pl.BlockSpec((None, kv_seq_len), lambda _, j, k: (j, 0))
+    )
+    out, lse = pl.pallas_call(
+        kernel,
+        grid=grid_,
+        in_specs=in_specs,
+        out_specs=[
+            pl.BlockSpec((None, block_q, None, head_dim), lambda i, j, k: (j, i, k, 0)),
+            pl.BlockSpec((None, None, block_q), lambda i, j, k: (j, k, i)),
+        ],
+        compiler_params=plgpu.TritonCompilerParams(
+            num_warps=num_warps_, num_stages=num_stages
+        ),
+        out_shape=out_shape,
+        debug=debug,
+        interpret=interpret,
+        name="mha_forward",
+    )(q, k, v, segment_ids)
+    return out, (q, k, v, segment_ids, out, lse)
 
-        wg_idx = warpgroup_idx(sync=True)
-        qo_smem, k_smem, v_smem = smem_scratch
-        qo_smem = memref_slice(qo_smem, arith.index_cast(index, wg_idx))
 
-        @contextlib.contextmanager
-        def only_wg(idx):
-            i32 = ir.IntegerType.get_signless(32)
-            is_wg = arith.cmpi(arith.CmpIPredicate.eq, wg_idx, c(idx, i32))
-            with ir.InsertionPoint(scf.IfOp(is_wg).then_block):
-                yield
-                scf.yield_([])
+def _preprocess_backward_kernel(out_ref, dout_ref, delta_ref):
+    # load
+    o = out_ref[...].astype(jnp.float32)
+    do = dout_ref[...].astype(jnp.float32)
+    # compute
+    delta = jnp.sum(o * do, axis=1)
+    # write-back
+    delta_ref[...] = delta.astype(delta_ref.dtype)
 
-        batch_idx, q_seq_base, q_head_idx = block_partition.get_base(
-            gpu.block_id(gpu.Dimension.x),
-            gpu.block_id(gpu.Dimension.y),
-            gpu.block_id(gpu.Dimension.z),
-        )
-        q_seq_base = arith.addi(
-            q_seq_base, arith.muli(arith.index_cast(index, wg_idx), c(blocks.q))
-        )
-        del batch_idx
 
-        q_barrier = arith.addi(c(blocks.stages), arith.index_cast(index, wg_idx))
-        with ctx.named_region("Q TMA start"):
-            ctx.async_copy(
-                src_ref=q_gmem,
-                gmem_slice=(q_head_idx, ds(q_seq_base, blocks.q)),
-                gmem_transform=mosaic_gpu.TileTransform(tiling),
-                dst_ref=qo_smem,
-                barrier=barriers[q_barrier],
-                swizzle=128,
-            )
+@jax.named_scope("preprocess_backward")
+def _preprocess_backward(out, do, lse, block_q: int, debug: bool, interpret: bool):
+    batch_size, seq_len, num_heads, head_dim = out.shape
+    out_shape = jax.ShapeDtypeStruct(lse.shape, lse.dtype)
+    delta = pl.pallas_call(
+        _preprocess_backward_kernel,
+        grid=(pl.cdiv(seq_len, block_q), batch_size, num_heads),
+        in_specs=[
+            pl.BlockSpec((None, block_q, None, head_dim), lambda i, j, k: (j, i, k, 0)),
+            pl.BlockSpec((None, block_q, None, head_dim), lambda i, j, k: (j, i, k, 0)),
+        ],
+        out_specs=pl.BlockSpec((None, None, block_q), lambda i, j, k: (j, k, i)),
+        compiler_params=plgpu.TritonCompilerParams(num_warps=4, num_stages=3),
+        out_shape=out_shape,
+        debug=debug,
+        interpret=interpret,
+        name="mha_preprocess_backward",
+    )(out, do)
+    return delta
 
-        kv_head_idx = arith.divui(q_head_idx, c(q_heads_per_kv_head))
 
-        def kv_copy_init(slot, kv_seq_base):
-            with single_thread(per_block=False):
-                txcount = c(2 * blocks.kv * head_dim * bytewidth(f16))
-                nvgpu.mbarrier_arrive_expect_tx(barriers.value, txcount, slot)
-                k_tr = (
-                    mosaic_gpu.TileTransform(tiling),
-                    mosaic_gpu.TransposeTransform((0, 2, 1, 3, 4)),
-                )
-                v_tr = mosaic_gpu.TileTransform(tiling)
-                for smem, gmem, t in ((k_smem, k_gmem, k_tr), (v_smem, v_gmem, v_tr)):
-                    ctx.async_copy(
-                        dst_ref=memref_slice(smem, slot),
-                        src_ref=gmem,
-                        gmem_slice=(kv_head_idx, ds(kv_seq_base, blocks.kv)),
-                        gmem_transform=t,
-                        barrier=barriers[slot],
-                        arrive=False,
-                        uniform=False,
-                        swizzle=128,
-                    )
+# This kernel computes dK_i, dV_i and dQ_i in parallel across the sequence
+# length.
+# Inspired by the triton tutorial: https://github.com/triton-lang/triton/blob/main/python/tutorials/06-fused-attention.py
+def mha_backward_kernel(
+    # Inputs
+    q_ref,
+    k_ref,
+    v_ref,
+    segment_ids_ref: jax.Array | None,
+    out_ref,
+    do_scaled_ref,
+    lse_ref,
+    delta_ref,
+    # Outputs
+    dq_ref,
+    dk_ref,
+    dv_ref,
+    *,
+    sm_scale: float,
+    causal: bool,
+    block_q_dkv: int,
+    block_kv_dkv: int,
+    block_q_dq: int,
+    block_kv_dq: int,
+    block_d: int,
+):
+    del out_ref  # Not needed
+    q_seq_len = q_ref.shape[0]
+    kv_seq_len = k_ref.shape[0]
 
-        loop_partition = Partition1D(kv_seq_len, chunk_size=blocks.kv)
-        with only_wg(1), ctx.named_region("KV TMA warmup"):
-            for i in range(blocks.stages - 1):
-                kv_copy_init(c(i), loop_partition.get_base(c(i)))
+    # Scan #1: dK and dV
+    #   1. Load a block of K and V of size (block_kv_dkv, head_dim) in SMEM.
+    #   2. Iterate through Q in chunks of (block_q_dkv, head_dim) to accumulate
+    #      dK and dV.
+    start_k = pl.program_id(2)
+    curr_k_slice = pl.dslice(start_k * block_kv_dkv, block_kv_dkv)
 
-        with ctx.named_region("Q TMA wait"):
-            barriers[q_barrier].wait()
+    dv = jnp.zeros([block_kv_dkv, block_d], dtype=jnp.float32)
+    dk = jnp.zeros([block_kv_dkv, block_d], dtype=jnp.float32)
 
-        m_i = FragmentedArray.splat(
-            c(-jnp.inf, f32), shape=(blocks.q,), layout=WGMMA_ROW_LAYOUT
-        )
-        l_i = FragmentedArray.splat(
-            c(0, f32), shape=(blocks.q,), layout=WGMMA_ROW_LAYOUT
-        )
-        acc = FragmentedArray.splat(
-            c(0, f32), shape=(blocks.q, head_dim), layout=WGMMA_LAYOUT
-        )
-
-        with only_wg(1):
-            perform_schedule_barrier()
-
-        with only_wg(0):
-            barriers[c(0)].wait()
-
-        @fori(c(loop_partition.num_chunks), (acc, m_i, l_i))
-        def kv_loop(kv_step, carry):
-            acc, m_i, l_i = carry
-            slot = arith.remui(kv_step, c(blocks.stages))
-
-            with ctx.named_region("QK issue"):
-                # TODO(apaszke): Support WGMMA without an initial accumulator.
-                qk_acc = WGMMAAccumulator.zero(blocks.q, blocks.kv)
-                q, k = qo_smem, memref_slice(k_smem, slot)
-                qk_acc = wgmma(qk_acc, q, k, b_order=WGMMALayout.COL_MAJOR)
-                nvvm.wgmma_commit_group_sync_aligned()
-
-            # We hide the TMA overhead by overlapping it with the QK matmul.
-            with only_wg(1), ctx.named_region("KV TMA start"):
-                tma_step = arith.addi(kv_step, c(blocks.stages - 1))
-                tma_slot = arith.remui(tma_step, c(blocks.stages))
-                tma_step_in_bounds = arith.cmpi(
-                    arith.CmpIPredicate.slt, tma_step, c(loop_partition.num_chunks)
-                )
-                if_op = scf.IfOp(tma_step_in_bounds)
-                with ir.InsertionPoint(if_op.then_block):
-                    kv_copy_init(tma_slot, loop_partition.get_base(tma_step))
-                    scf.yield_([])
-
-            perform_schedule_barrier()
-
-            with ctx.named_region("QK wait"):
-                nvvm.wgmma_wait_group_sync_aligned(0)
-                qk = qk_acc.value
-
-            with ctx.named_region("Softmax"):
-                m_ij = m_i.max(qk.reduce(arith.maximumf, axis=1))
-                alpha = exp(m_i - m_ij)
-                m_i = m_ij
-                p = exp(qk - m_ij.broadcast_minor(blocks.kv))
-                acc *= alpha.broadcast_minor(head_dim)
-                l_i *= alpha
-                l_i += p.reduce(arith.addf, axis=1)
-                p = p.astype(f16)
-
-            perform_schedule_barrier()
-
-            with ctx.named_region("PV issue"):
-                v = memref_slice(v_smem, slot)
-                acc_update = WGMMAAccumulator.from_registers(acc)
-                acc_update = wgmma(acc_update, p, v)
-                nvvm.wgmma_commit_group_sync_aligned()
-
-            # We hide the barrier overhead by overlapping it with the PV matmul.
-            with only_wg(0), ctx.named_region("KV TMA wait"):
-                wait_step = arith.addi(kv_step, c(1))
-                wait_slot = arith.remui(wait_step, c(blocks.stages))
-                wait_step_in_bounds = arith.cmpi(
-                    arith.CmpIPredicate.slt, wait_step, c(loop_partition.num_chunks)
-                )
-                with ir.InsertionPoint(scf.IfOp(wait_step_in_bounds).then_block):
-                    barriers[wait_slot].wait()
-                    scf.yield_([])
-
-            with ctx.named_region("PV wait"):
-                nvvm.wgmma_wait_group_sync_aligned(0)
-                acc = acc_update.value
-
-            return acc, m_i, l_i
-
-        with only_wg(0):
-            perform_schedule_barrier()
-
-        acc, m_i, l_i = kv_loop.results
-        del m_i
-        # TODO(apaszke): Invert and multiply to avoid expensive divisions.
-        acc /= l_i.broadcast_minor(head_dim)
-
-        with ctx.named_region("Acc store"):
-            acc.astype(f16).store_tiled(qo_smem, swizzle=128)
-            gpu.barrier()
-            nvvm.fence_proxy(
-                nvvm.ProxyKind.async_shared, space=nvvm.SharedSpace.shared_cta
-            )  # Make sure the store is visible to the TMA.
-
-        with ctx.named_region("GMEM store"):
-            ctx.async_copy(
-                src_ref=qo_smem,
-                dst_ref=out_gmem,
-                gmem_slice=(q_head_idx, ds(q_seq_base, blocks.q)),
-                gmem_transform=mosaic_gpu.TileTransform(tiling),
-                swizzle=128,
-            )
-            ctx.await_async_copy(0)
-
-    return mosaic_gpu.as_gpu_kernel(
-        kernel, grid, block, in_shape, out_shape, smem_scratch_shape, prof_spec
+    v = pl.load(v_ref, (curr_k_slice, slice(None)))
+    k = pl.load(k_ref, (curr_k_slice, slice(None)))
+    span_k = start_k * block_kv_dkv + jnp.arange(block_kv_dkv)
+    kv_segment_ids = (
+        None if segment_ids_ref is None else pl.load(segment_ids_ref, (curr_k_slice,))
     )
 
+    def inner_loop_dkdv(start_q, carry):
+        dv, dk = carry
+        curr_q_slice = pl.dslice(start_q * block_q_dkv, block_q_dkv)
 
-def benchmark_and_verify(
-    batch_size,
-    q_seq_len,
-    kv_seq_len,
-    num_q_heads,
-    num_kv_heads,
-    head_dim,
-    **kwargs,
-) -> float:
-    with mlir.make_ir_context(), ir.Location.unknown():
-        kq, kk, kv = random.split(random.key(1234), 3)
-        q = random.normal(
-            kq, (batch_size, num_q_heads, q_seq_len, head_dim), dtype=jnp.float16
-        )
-        k = random.normal(
-            kk, (batch_size, num_kv_heads, kv_seq_len, head_dim), dtype=jnp.float16
-        )
-        v = random.normal(
-            kv, (batch_size, num_kv_heads, kv_seq_len, head_dim), dtype=jnp.float16
-        )
-        f = build_kernel(
-            batch_size=batch_size,
-            q_heads=num_q_heads,
-            kv_heads=num_kv_heads,
-            q_seq_len=q_seq_len,
-            kv_seq_len=kv_seq_len,
-            head_dim=head_dim,
-            **kwargs,
-        )
-        out, runtime = profiler.measure(f, q[0], k[0], v[0])
-        out = out[None]
+        q = pl.load(q_ref, (curr_q_slice, slice(None)))
+        qk = pl.dot(q, k.T)
+        qk_scale = math.log2(math.e)
+        if sm_scale != 1.0:
+            qk_scale *= sm_scale
+        qk *= qk_scale
 
-        q = q.astype(jnp.float32)
-        k = k.astype(jnp.float32)
-        v = v.astype(jnp.float32)
-        q_reshaped = q.reshape(
-            batch_size, num_kv_heads, num_q_heads // num_kv_heads, q_seq_len, head_dim
-        )
-        logits = jnp.einsum("bxhqc,bxkc->bxhqk", q_reshaped, k)
-        m = logits.max(axis=-1)
-        unnormalized = jnp.exp(logits - m[..., None])
-        l = unnormalized.sum(axis=-1)
-        weights = unnormalized / l[..., None]
-        expected = jnp.einsum("bxhqk,bxkc->bxhqc", weights, v).reshape(*q.shape)
-        np.testing.assert_allclose(out, expected, atol=2e-3, rtol=2e-3)
-        return runtime
+        if causal or segment_ids_ref is not None:
+            mask = None
+            if segment_ids_ref is not None:
+                q_segment_ids = pl.load(segment_ids_ref, (curr_q_slice,))
+                mask = segment_mask(q_segment_ids, kv_segment_ids)
 
-
-if __name__ == "__main__":
-    batch_size = 1
-    num_q_heads = 4
-    num_kv_heads = 1
-    prof_spec = None
-    problem_it = itertools.product((4096,), (4096,), (64, 128, 256))
-    for kv_seq_len, q_seq_len, head_dim in problem_it:
-        print(
-            "===="
-            f" {kv_seq_len=:<6} {q_seq_len=:<6} {num_q_heads=:<4} {head_dim=:<6} ===="
-        )
-        param_it = itertools.product(
-            ExpImplementation,
-            (64,),
-            (64, 128, 256),
-        )
-        for exp_impl, block_q, block_kv in param_it:
-            try:
-                runtime_ms = benchmark_and_verify(
-                    batch_size,
-                    q_seq_len,
-                    kv_seq_len,
-                    num_q_heads,
-                    num_kv_heads,
-                    head_dim,
-                    prof_spec=prof_spec,
-                    exp_impl=exp_impl,
-                    blocks=BlockSizes(q=block_q, kv=block_kv, stages=2),
+            if causal:
+                span_q = start_q * block_q_dkv + jnp.arange(block_q_dkv)
+                causal_mask = span_q[:, None] >= span_k[None, :]
+                mask = (
+                    causal_mask if mask is None else jnp.logical_and(mask, causal_mask)
                 )
-            except ValueError as e:
-                if "exceeds available shared memory" in e.args[0]:
-                    continue
-                raise
-            runtime_us = runtime_ms * 1e3
-            matmul_flops = (
-                4 * q_seq_len * kv_seq_len * head_dim * num_q_heads * batch_size
+            qk = jnp.where(mask, qk, DEFAULT_MASK_VALUE)
+
+        lse = pl.load(lse_ref, (curr_q_slice,))
+        di = pl.load(delta_ref, (curr_q_slice,))
+        do = pl.load(do_scaled_ref, (curr_q_slice, slice(None)))
+
+        p = jnp.exp2(qk - lse[:, None])
+        dv = dv + pl.dot(p.astype(do.dtype).T, do)
+        dp = jnp.zeros((block_q_dkv, block_kv_dkv), dtype=jnp.float32) - di[:, None]
+        dp = dp + pl.dot(do, v.T)
+        ds = p * dp
+        if sm_scale != 1.0:
+            ds = ds * sm_scale
+        dk = dk + pl.dot(ds.astype(q_ref.dtype).T, q)
+
+        return dv, dk
+
+    lower_bound = lax.div(start_k * block_kv_dkv, block_q_dkv) if causal else 0
+    dv, dk = lax.fori_loop(
+        lower_bound, pl.cdiv(q_seq_len, block_q_dkv), inner_loop_dkdv, (dv, dk)
+    )
+    dv_ref[...] = dv.astype(dv_ref.dtype)
+    dk_ref[...] = dk.astype(dk_ref.dtype)
+
+    # Scan #2: dQ
+    #   1. Load a block of Q of size (block_q_dq, head_dim) in SMEM.
+    #   2. Iterate through K and V in chunks of (block_kv_dq, head_dim) to
+    #     accumulate dQ.
+    start_q = pl.program_id(2)
+    curr_q_slice = pl.ds(start_q * block_q_dq, block_q_dq)
+    span_q = start_q * block_q_dq + jnp.arange(block_q_dq)
+    dq = jnp.zeros([block_q_dq, block_d], dtype=jnp.float32)
+
+    q = pl.load(q_ref, (curr_q_slice, slice(None)))
+    q_segment_ids = (
+        None if segment_ids_ref is None else pl.load(segment_ids_ref, (curr_q_slice,))
+    )
+    lse = pl.load(lse_ref, (curr_q_slice,))
+    do = pl.load(do_scaled_ref, (curr_q_slice, slice(None)))
+    di = pl.load(delta_ref, (curr_q_slice,))
+
+    def inner_loop_dq(start_k, dq):
+        curr_k_slice = pl.dslice(start_k * block_kv_dq, block_kv_dq)
+        k = pl.load(k_ref, (curr_k_slice, slice(None)))
+        v = pl.load(v_ref, (curr_k_slice, slice(None)))
+
+        qk = pl.dot(q, k.T)
+        qk_scale = math.log2(math.e)
+        if sm_scale != 1.0:
+            qk_scale *= sm_scale
+        qk *= qk_scale
+
+        if causal or segment_ids_ref is not None:
+            mask = None
+            if segment_ids_ref is not None:
+                kv_segment_ids = pl.load(segment_ids_ref, (curr_k_slice,))
+                mask = segment_mask(q_segment_ids, kv_segment_ids)
+
+            if causal:
+                span_k = start_k * block_kv_dq + jnp.arange(block_kv_dq)
+                causal_mask = span_q[:, None] >= span_k[None, :]
+                mask = (
+                    causal_mask if mask is None else jnp.logical_and(mask, causal_mask)
+                )
+            qk = jnp.where(mask, qk, DEFAULT_MASK_VALUE)
+
+        p = jnp.exp2(qk - lse[:, None])
+        dp = jnp.zeros((block_q_dq, block_kv_dq), dtype=jnp.float32) - di[:, None]
+        dp = dp + pl.dot(do, v.T)
+        ds = p * dp
+        if sm_scale != 1.0:
+            ds = ds * sm_scale
+
+        dq = dq + pl.dot(ds.astype(k.dtype), k).astype(dq.dtype)
+
+        return dq
+
+    if causal:
+        upper_bound = pl.cdiv((start_q + 1) * block_q_dq, block_kv_dq)
+    else:
+        upper_bound = pl.cdiv(kv_seq_len, block_kv_dq)
+
+    dq = lax.fori_loop(0, upper_bound, inner_loop_dq, (dq))
+    dq_ref[...] = dq.astype(dq_ref.dtype)
+
+
+def _mha_backward(
+    sm_scale: float,
+    causal: bool,
+    block_sizes: BlockSizes,
+    backward_pass_impl: str,
+    num_warps: int | None,
+    num_stages: int,
+    grid: Any,
+    interpret: bool,
+    debug: bool,
+    res,
+    do,
+):
+    del num_stages, grid
+    q, k, v, segment_ids, out, lse = res
+
+    if backward_pass_impl == "xla":
+        return jax.vjp(
+            functools.partial(mha_reference, sm_scale=sm_scale, causal=causal),
+            q,
+            k,
+            v,
+            segment_ids,
+        )[1](do)
+    elif backward_pass_impl == "triton":
+        if not block_sizes.has_backward_blocks:
+            raise ValueError("Backward block sizes must all be set.")
+
+        batch_size, q_seq_len, num_heads, head_dim = q.shape
+        kv_seq_len = k.shape[1]
+        block_q = min(block_sizes.block_q, q_seq_len)
+        block_q_dkv = min(block_sizes.block_q_dkv, q_seq_len)
+        block_kv_dkv = min(block_sizes.block_kv_dkv, kv_seq_len)
+        block_q_dq = min(block_sizes.block_q_dq, q_seq_len)
+        block_kv_dq = min(block_sizes.block_kv_dq, kv_seq_len)
+
+        if q_seq_len // block_q_dq != kv_seq_len // block_kv_dkv:
+            raise ValueError(
+                "q_seq_len and kv_seq_len must be divided into the same "
+                "number of blocks for the fused backward pass."
             )
-            peak_flops = 1e15  # f16 TensorCore peak = 1000TFLOPS
-            optimal_time = matmul_flops / peak_flops * 1e6  # us
-            achieved_tc_util = optimal_time / runtime_us * 100
-            print(
-                f"exp_impl={exp_impl.name:<6} block_q={block_q:<4}block_kv={block_kv:<4}:  {runtime_us:<7.1f}us"
-                f" = {achieved_tc_util:4.1f}% TC utilization"
-            )
+
+        delta = _preprocess_backward(out, do, lse, block_q, debug, interpret)
+        out_shapes = [
+            jax.ShapeDtypeStruct(q.shape, q.dtype),
+            jax.ShapeDtypeStruct(k.shape, k.dtype),
+            jax.ShapeDtypeStruct(v.shape, v.dtype),
+        ]
+
+        in_specs = [
+            pl.BlockSpec(
+                (None, q_seq_len, None, head_dim), lambda i, j, _: (i, 0, j, 0)
+            ),
+            pl.BlockSpec(
+                (None, kv_seq_len, None, head_dim), lambda i, j, _: (i, 0, j, 0)
+            ),
+            pl.BlockSpec(
+                (None, kv_seq_len, None, head_dim), lambda i, j, _: (i, 0, j, 0)
+            ),
+            pl.BlockSpec(
+                (None, q_seq_len, None, head_dim), lambda i, j, _: (i, 0, j, 0)
+            ),
+            pl.BlockSpec(
+                (None, q_seq_len, None, head_dim), lambda i, j, _: (i, 0, j, 0)
+            ),
+            pl.BlockSpec((None, None, q_seq_len), lambda i, j, _: (i, j, 0)),
+            pl.BlockSpec((None, None, q_seq_len), lambda i, j, _: (i, j, 0)),
+        ]
+        if segment_ids is None:
+            in_specs.insert(3, None)  # type: ignore[arg-type]
+        else:
+            in_specs.insert(3, pl.BlockSpec((None, kv_seq_len), lambda i, j, _: (i, 0)))
+
+        grid = (batch_size, num_heads, pl.cdiv(kv_seq_len, block_kv_dkv))
+        num_warps_ = num_warps
+        if num_warps_ is None:
+            if (
+                block_q_dkv * block_kv_dkv < 128 * 128
+                or block_q_dq * block_kv_dq < 128 * 128
+            ):
+                num_warps_ = 4
+            else:
+                num_warps_ = 8
+
+        dq, dk, dv = pl.pallas_call(
+            functools.partial(
+                mha_backward_kernel,
+                sm_scale=sm_scale,
+                causal=causal,
+                block_q_dkv=block_q_dkv,
+                block_kv_dkv=block_kv_dkv,
+                block_q_dq=block_q_dq,
+                block_kv_dq=block_kv_dq,
+                block_d=head_dim,
+            ),
+            out_shape=out_shapes,
+            in_specs=in_specs,
+            grid=grid,
+            out_specs=[
+                pl.BlockSpec(
+                    (None, block_q_dq, None, head_dim),
+                    lambda i, j, k: (i, k, j, 0),  # dq
+                ),
+                pl.BlockSpec(
+                    (None, block_kv_dkv, None, head_dim),
+                    lambda i, j, k: (i, k, j, 0),  # dk
+                ),
+                pl.BlockSpec(
+                    (None, block_kv_dkv, None, head_dim),
+                    lambda i, j, k: (i, k, j, 0),  # dv
+                ),
+            ],
+            name="mha_backward",
+            debug=debug,
+            interpret=interpret,
+            compiler_params=plgpu.TritonCompilerParams(
+                num_warps=num_warps_, num_stages=2
+            ),
+        )(q, k, v, segment_ids, out, do, lse, delta)
+    else:
+        raise ValueError(f"Invalid backward pass implementation: {backward_pass_impl}")
+    return dq.astype(q.dtype), dk, dv, None
+
+
+mha.defvjp(_mha_forward, _mha_backward)
+
+
+@functools.partial(jax.jit, static_argnames=["sm_scale", "causal"])
+def mha_reference(
+    q,
+    k,
+    v,
+    segment_ids: jnp.ndarray | None,
+    sm_scale=1.0,
+    causal: bool = False,
+):
+    q_seq_len = q.shape[1]
+    kv_seq_len = k.shape[1]
+    logits = jnp.einsum("bqhc,bkhc->bhqk", q, k, preferred_element_type=jnp.float32)
+    mask = None
+    if segment_ids is not None:
+        mask = jnp.expand_dims(segment_mask(segment_ids, segment_ids), 1)
+        mask = jnp.broadcast_to(mask, logits.shape)
+    if causal:
+        causal_mask = jnp.tril(jnp.ones((1, 1, q_seq_len, kv_seq_len), dtype=bool))
+        causal_mask = jnp.broadcast_to(causal_mask, logits.shape)
+        mask = causal_mask if mask is None else jnp.logical_and(mask, causal_mask)
+    logits = logits if mask is None else jnp.where(mask, logits, float("-inf"))
+    weights = jax.nn.softmax(logits * sm_scale)
+    return jnp.einsum("bhqk,bkhc->bqhc", weights, v, preferred_element_type=jnp.float32)

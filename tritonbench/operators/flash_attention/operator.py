@@ -130,6 +130,18 @@ try:
 except (ImportError, IOError, AttributeError):
     tk_fwd = None
 
+# [Optional] JAX Pallas backend
+try:
+    import jax
+
+    from tritonbench.utils.jax_utils import torch_to_jax_tensor
+
+    from .pallas import mha as pallas_mha
+
+    HAS_PALLAS = True
+except (ImportError, IOError, AttributeError):
+    HAS_PALLAS = False
+
 from typing import Any, Generator, List
 
 from tritonbench.utils.input import input_filter
@@ -442,6 +454,18 @@ class Operator(BenchmarkOperator):
             return o
 
         return tk_dispatcher
+
+    @register_benchmark(enabled=HAS_PALLAS)
+    def pallas(self, q, k, v):
+        q = torch_to_jax_tensor(q)
+        k = torch_to_jax_tensor(k)
+        v = torch_to_jax_tensor(v)
+
+        def _inner():
+            pallas_mha(q, k, v, segment_ids=None)
+            jax.device_put(0.0).block_until_ready()
+
+        return _inner
 
     @register_benchmark(enabled=False, label=f"cudnn")
     def cudnn(self, q, k, v):
