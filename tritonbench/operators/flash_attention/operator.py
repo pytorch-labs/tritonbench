@@ -134,8 +134,10 @@ except (ImportError, IOError, AttributeError):
 try:
     import jax
     import jax.numpy as jnp
+
     from tritonbench.utils.jax_utils import torch_to_jax_tensor
     from .pallas import mha as pallas_mha
+
     HAS_PALLAS = True
 except (ImportError, IOError, AttributeError):
     HAS_PALLAS = False
@@ -453,15 +455,16 @@ class Operator(BenchmarkOperator):
 
         return tk_dispatcher
 
-
     @register_benchmark(enabled=HAS_PALLAS)
     def pallas(self, q, k, v):
         q = torch_to_jax_tensor(q)
         k = torch_to_jax_tensor(k)
         v = torch_to_jax_tensor(v)
+
         def _inner():
             pallas_mha(q, k, v, segment_ids=None)
-            jax.device_put(0.).block_until_ready()
+            jax.device_put(0.0).block_until_ready()
+
         return _inner
 
     @register_benchmark(enabled=False, label=f"cudnn")
