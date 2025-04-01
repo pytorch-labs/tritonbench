@@ -108,9 +108,6 @@ if __name__ == "__main__":
         "--fbgemm-all", action="store_true", help="Install FBGEMM GPU all kernels."
     )
     parser.add_argument(
-        "--colfax", action="store_true", help="Install optional Colfax CUTLASS kernels"
-    )
-    parser.add_argument(
         "--fa2", action="store_true", help="Install optional flash_attention 2 kernels"
     )
     parser.add_argument(
@@ -170,11 +167,6 @@ if __name__ == "__main__":
     if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2 from source...")
         install_fa2(compile=True)
-    if args.colfax:
-        logger.info("[tritonbench] installing colfax cutlass-kernels...")
-        from tools.cutlass_kernels.install import install_colfax_cutlass
-
-        install_colfax_cutlass()
     if args.jax or args.all:
         logger.info("[tritonbench] installing jax...")
         install_jax()

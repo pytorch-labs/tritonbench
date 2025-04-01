@@ -112,19 +112,6 @@ try:
 except (ImportError, IOError, AttributeError, TypeError):
     HAS_TILELANG = False
 
-# [Optional] colfax cutlass backend
-try:
-    if not hasattr(torch.version, "git_version"):
-        # colfax Flash Attention V2 for Hopper
-        torch.ops.load_library("//ai_codesign/gen_ai/cutlass-kernels:fmha_forward_lib")
-    else:
-        from tritonbench.utils.loader import load_library
-
-        load_library("cutlass_kernels/fmha_forward_lib.so")
-    colfax_cutlass_fmha = torch.ops.cutlass.fmha_forward
-except (ImportError, IOError, AttributeError):
-    colfax_cutlass_fmha = None
-
 # [Optional] ThunderKittens backend
 try:
     from .tk import tk_attn
@@ -424,27 +411,6 @@ class Operator(BenchmarkOperator):
         xformers_splitk_fhma = xformers_fmha.triton_splitk.FwOp
         return lambda: xformers_splitk_fhma().apply(
             fhma_input, needs_gradient=need_gradient
-        )
-
-    def colfax_cutlass_preprocess(self, q, k, v):
-        return (
-            torch.transpose(q, 1, 2),
-            torch.transpose(k, 1, 2),
-            torch.transpose(v, 1, 2),
-        )
-
-    @register_benchmark(enabled=bool(colfax_cutlass_fmha is not None))
-    def colfax_cutlass(self, q, k, v):
-        default_scale = 1.0 / math.sqrt(float(self.D_HEAD))
-        colfax_q, colfax_k, colfax_v = self.colfax_cutlass_preprocess(q, k, v)
-        return lambda: colfax_cutlass_fmha(
-            self.N_CTX,
-            self.N_CTX,
-            self.BATCH,
-            colfax_q,
-            colfax_k,
-            colfax_v,
-            default_scale,
         )
 
     @register_benchmark(enabled=not IS_FBCODE and HAS_TK)

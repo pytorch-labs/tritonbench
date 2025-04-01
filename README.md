@@ -60,6 +60,5 @@ We depend on the following projects as a source of customized Triton or CUTLASS 
 * (CUDA) [ThunderKittens](https://github.com/HazyResearch/ThunderKittens)
 
 
-
 ## License
 TritonBench is BSD 3-Clause licensed, as found in the LICENSE file.
