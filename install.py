@@ -125,10 +125,10 @@ if __name__ == "__main__":
     parser.add_argument("--tk", action="store_true", help="Install ThunderKittens")
     parser.add_argument("--liger", action="store_true", help="Install Liger-kernel")
     parser.add_argument("--xformers", action="store_true", help="Install xformers")
+    parser.add_argument("--tile", action="store_true", help="install tile lang")
     parser.add_argument(
         "--all", action="store_true", help="Install all custom kernel repos"
     )
-    parser.add_argument("--test", action="store_true", help="Run tests")
     args = parser.parse_args()
 
     if args.all and is_hip():
@@ -166,6 +166,7 @@ if __name__ == "__main__":
     if args.fbgemm or args.fbgemm_all or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
         install_fbgemm(genai=(not args.fbgemm_all))
+        test_fbgemm()
     if args.fa2 or args.all:
         logger.info("[tritonbench] installing fa2 from source...")
         install_fa2(compile=True)
@@ -182,6 +183,11 @@ if __name__ == "__main__":
         from tools.tk.install import install_tk
 
         install_tk()
+    if args.tile:
+        logger.info("[tritonbench] installing tilelang...")
+        from tools.tilelang.install import install_tile
+
+        install_tile()
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
@@ -191,6 +197,3 @@ if __name__ == "__main__":
 
         install_xformers()
     logger.info("[tritonbench] installation complete!")
-    # run tests to check installation
-    if args.test:
-        test_fbgemm()

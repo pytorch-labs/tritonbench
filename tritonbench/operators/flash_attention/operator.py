@@ -103,6 +103,13 @@ try:
 except (ImportError, IOError, AttributeError, TypeError):
     HAS_XFORMERS = False
 
+try:
+    import tilelang
+    from .tilelang_mha import tilelang_mha
+    HAS_TILELANG = True
+except (ImportError, IOError, AttributeError, TypeError):
+    HAS_TILELANG = False
+
 # [Optional] colfax cutlass backend
 try:
     if not hasattr(torch.version, "git_version"):
@@ -442,6 +449,17 @@ class Operator(BenchmarkOperator):
             return o
 
         return tk_dispatcher
+
+    @register_benchmark(enabled=HAS_TILELANG)
+    def tile(self, q, k, v):
+        o = torch.zeros_like(v)
+        func = tilelang_mha(self.BATCH, self.H, self.N_CTX, self.D_HEAD, self.causal, tune=True)
+        jit_kernel = tilelang_mha.compile(func, out_idx=[2], target="cuda")
+
+        def _inner():
+            jit_kernel(q, k, v, o)
+            return o
+        return _inner
 
     @register_benchmark(enabled=False, label=f"cudnn")
     def cudnn(self, q, k, v):

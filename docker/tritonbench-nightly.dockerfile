@@ -60,10 +60,6 @@ RUN cd /workspace/tritonbench && \
 RUN cd /workspace/tritonbench && \
     bash .ci/tritonbench/install.sh
 
-# Test Tritonbench
-RUN cd /workspace/tritonbench && \
-    bash .ci/tritonbench/test-install.sh
-
 # Remove NVIDIA driver library - they are supposed to be mapped at runtime
 RUN sudo apt-get purge -y libnvidia-compute-550
 
