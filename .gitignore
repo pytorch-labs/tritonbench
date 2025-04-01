@@ -19,3 +19,4 @@ torch_compile_debug/
 build/
 /*.csv
 *.hatchet
+autotuner.log
