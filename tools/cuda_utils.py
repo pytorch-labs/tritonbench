@@ -7,12 +7,11 @@ from pathlib import Path
 from .torch_utils import install_pytorch_nightly
 
 # defines the default CUDA version to compile against
-DEFAULT_CUDA_VERSION = "12.4"
+DEFAULT_CUDA_VERSION = "12.8"
 
 CUDA_VERSION_MAP = {
-    "12.4": {
-        "pytorch_url": "cu124",
-        "magma": "magma-cuda124",
+    "12.8": {
+        "pytorch_url": "cu128",
         "jax": "jax[cuda12]",
     },
 }
@@ -53,18 +52,6 @@ def prepare_cuda_env(cuda_version: str, dryrun=False):
         nvcc_version == cuda_version
     ), f"Expected CUDA version {cuda_version}, getting nvcc test result {nvcc_version}"
 
-    # step 3: install the correct magma version
-    install_magma_cmd = [
-        "conda",
-        "install",
-        "-y",
-        "-c",
-        "pytorch",
-        CUDA_VERSION_MAP[cuda_version]["magma"],
-    ]
-    if dryrun:
-        print(f"Installing CUDA magma: {install_magma_cmd}")
-    subprocess.check_call(install_magma_cmd, env=env)
     return env
 
 
@@ -85,11 +72,7 @@ def setup_cuda_softlink(cuda_version: str):
     os.symlink(str(cuda_path.resolve()), str(current_cuda_path.resolve()))
 
 
-def install_torch_deps(cuda_version: str):
-    # install magma
-    magma_pkg = CUDA_VERSION_MAP[cuda_version]["magma"]
-    cmd = ["conda", "install", "-y", magma_pkg, "-c", "pytorch"]
-    subprocess.check_call(cmd)
+def install_torch_deps():
     # install other dependencies
     torch_deps = [
         "requests",
@@ -150,11 +133,11 @@ if __name__ == "__main__":
     if args.setup_cuda_softlink:
         setup_cuda_softlink(cuda_version=args.cudaver)
     if args.install_torch_deps:
-        install_torch_deps(cuda_version=args.cudaver)
+        install_torch_deps()
     if args.install_torch_build_deps:
         from .torch_utils import install_torch_build_deps
 
-        install_torch_deps(cuda_version=args.cudaver)
+        install_torch_deps()
         install_torch_build_deps()
     if args.install_torch_nightly:
         pytorch_cuda_version = CUDA_VERSION_MAP[args.cudaver]["pytorch_url"]
