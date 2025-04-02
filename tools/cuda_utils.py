@@ -72,10 +72,7 @@ def setup_cuda_softlink(cuda_version: str):
     os.symlink(str(cuda_path.resolve()), str(current_cuda_path.resolve()))
 
 
-def install_torch_deps(cuda_version: str):
-    # install magma
-    magma_pkg = CUDA_VERSION_MAP[cuda_version]["magma"]
-    cmd = ["conda", "install", "-y", magma_pkg, "-c", "pytorch"]
+def install_torch_deps():
     subprocess.check_call(cmd)
     # install other dependencies
     torch_deps = [
@@ -137,11 +134,11 @@ if __name__ == "__main__":
     if args.setup_cuda_softlink:
         setup_cuda_softlink(cuda_version=args.cudaver)
     if args.install_torch_deps:
-        install_torch_deps(cuda_version=args.cudaver)
+        install_torch_deps()
     if args.install_torch_build_deps:
         from .torch_utils import install_torch_build_deps
 
-        install_torch_deps(cuda_version=args.cudaver)
+        install_torch_deps()
         install_torch_build_deps()
     if args.install_torch_nightly:
         pytorch_cuda_version = CUDA_VERSION_MAP[args.cudaver]["pytorch_url"]
