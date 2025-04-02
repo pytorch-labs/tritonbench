@@ -127,17 +127,11 @@ except (ImportError, IOError, AttributeError):
 
 # [Optional] ThunderKittens backend
 try:
-    if not hasattr(torch.version, "git_version"):
-        import h100_fwd as tk_fwd
-        import h100_fwd_causal as tk_fwd_causal
-    else:
-        # causal is not supported right now
-        from tritonbench.utils.loader import load_library
+    from .tk import tk_attn
 
-        load_library("tk/tk_attn_h100_fwd.so")
-        tk_fwd = torch.ops.tk
+    HAS_TK = True
 except (ImportError, IOError, AttributeError):
-    tk_fwd = None
+    HAS_TK = False
 
 # [Optional] JAX Pallas backend
 try:
@@ -453,16 +447,13 @@ class Operator(BenchmarkOperator):
             default_scale,
         )
 
-    @register_benchmark(enabled=not IS_FBCODE and bool(tk_fwd is not None))
+    @register_benchmark(enabled=not IS_FBCODE and HAS_TK)
     def tk(self, q, k, v):
-        o = torch.zeros_like(v)
-        l_tensor = torch.zeros_like(o).to(torch.float32)
+        def _inner():
+            out = tk_attn(q, k, v, self.causal)
+            return out[0]
 
-        def tk_dispatcher():
-            tk_fwd.attention_forward(q, k, v, o, l_tensor, causal=self.causal)
-            return o
-
-        return tk_dispatcher
+        return _inner
 
     @register_benchmark(enabled=HAS_PALLAS)
     def pallas(self, q, k, v):
@@ -507,7 +498,7 @@ class Operator(BenchmarkOperator):
 
         return _inner
 
-    @register_benchmark(enabled=False, label=f"cudnn")
+    @register_benchmark(enabled=False, label=f"cudnn-{torch.backends.cudnn.version()}")
     def cudnn(self, q, k, v):
         os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
 
