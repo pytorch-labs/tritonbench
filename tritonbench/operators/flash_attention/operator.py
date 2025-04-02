@@ -103,6 +103,15 @@ try:
 except (ImportError, IOError, AttributeError, TypeError):
     HAS_XFORMERS = False
 
+try:
+    import tilelang
+
+    from .tilelang_mha import tilelang_mha
+
+    HAS_TILELANG = True
+except (ImportError, IOError, AttributeError, TypeError):
+    HAS_TILELANG = False
+
 # [Optional] colfax cutlass backend
 try:
     if not hasattr(torch.version, "git_version"):
@@ -464,6 +473,37 @@ class Operator(BenchmarkOperator):
         def _inner():
             pallas_mha(q, k, v, segment_ids=None)
             jax.device_put(0.0).block_until_ready()
+
+        return _inner
+
+    @register_benchmark(enabled=HAS_TILELANG)
+    def tile(self, q, k, v):
+        # [B, H, S, D] -> [B, S, H, D]
+        q = q.transpose(1, 2).contiguous()
+        k = k.transpose(1, 2).contiguous()
+        v = v.transpose(1, 2).contiguous()
+        best_config = tilelang_mha(
+            self.BATCH,
+            self.H,
+            self.N_CTX,
+            self.D_HEAD,
+            self.causal,
+            self.dtype,
+            tune=True,
+        )[1]
+        func = tilelang_mha(
+            self.BATCH,
+            self.H,
+            self.N_CTX,
+            self.D_HEAD,
+            self.causal,
+            self.dtype,
+        )(*best_config)
+        jit_kernel = tilelang.compile(func, out_idx=[3])
+
+        def _inner():
+            o = jit_kernel(q, k, v)
+            return o
 
         return _inner
 
