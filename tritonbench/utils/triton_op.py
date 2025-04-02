@@ -3,12 +3,17 @@ import copy
 import csv
 import functools
 import hashlib
+import json
 import logging
 import os
 import random
 import shlex
+import shutil
+import subprocess
+import sys
 import tempfile
 import time
+
 from collections import OrderedDict
 from dataclasses import asdict, dataclass, fields
 from enum import Enum
@@ -18,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import numpy
+
 import psutil
 import tabulate
 import torch
@@ -36,6 +42,7 @@ except ImportError:
     tqdm = None
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 @dataclass
@@ -404,8 +411,6 @@ class BenchmarkOperatorResult:
         return [[_inner(cell) for cell in row] for row in table]
 
     def write_csv_to_file(self, fileobj):
-        import csv
-
         headers, table = self._table()
         table = self._post_process_table(table)
         writer = csv.writer(fileobj, delimiter=";", quoting=csv.QUOTE_MINIMAL)
@@ -413,8 +418,6 @@ class BenchmarkOperatorResult:
         writer.writerows(table)
 
     def write_csv(self, dir_path):
-        import tempfile
-
         # This is just a way to create a unique filename. It's not actually a
         # temporary file (since delete=False).
         with tempfile.NamedTemporaryFile(
@@ -428,8 +431,6 @@ class BenchmarkOperatorResult:
             return fileobj.name
 
     def write_json_to_file(self, fileobj):
-        import json
-
         json.dump(self.userbenchmark_dict, fileobj, indent=4)
 
     @property
@@ -1494,9 +1495,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         return cpu_peak_mem, gpu_peak_mem
 
     def nsys_rep(self, input_id: int, fn_name: str) -> str:
-        import subprocess
-        import sys
-
         op_task_args = [] if IS_FBCODE else [sys.executable]
         op_task_args.extend(copy.deepcopy(sys.argv))
         op_task_args = remove_cmd_parameter(op_task_args, "--op")
@@ -1549,12 +1547,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         profile_ir=False,
         extend_ncu_args: List[str] = None,
     ) -> str:
-        import shutil
-        import subprocess
-
-        # collect the ncu trace
-        import sys
-
         extend_ncu_args = extend_ncu_args or [
             "--set",
             "full",
@@ -1796,13 +1788,19 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         if len(compiled_kernels) > 0:
             ir_dir = self.get_temp_path("ir")
             ir_dir.mkdir(parents=True, exist_ok=True)
-            logger.info("Writing Triton IR to %s", ir_dir)
+            logger.info(
+                "Writing %s Triton IRs to %s",
+                str(len(compiled_kernels)),
+                ir_dir,
+            )
 
-        for kernel in compiled_kernels:
+        for kid, kernel in enumerate(compiled_kernels):
             for ir in ["ttir", "ttgir", "llir", "ptx", "amdgcn"]:
                 if ir in kernel.asm:
                     with open(
-                        ir_dir / f"{fn._name}_{kernel.name}_{input_id}.{ir}", "w"
+                        ir_dir
+                        / f"{fn._name}_{kernel.name}_k{kid}_input_x{input_id}.{ir}",
+                        "w",
                     ) as f:
                         f.write(kernel.asm[ir])
             if "cubin" in kernel.asm:
@@ -1810,7 +1808,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
                 sass = get_sass(kernel.asm["cubin"])
                 with open(
-                    ir_dir / f"{fn._name}_{kernel.name}_{input_id}.sass", "w"
+                    ir_dir / f"{fn._name}_{kernel.name}_k{kid}_x{input_id}.sass", "w"
                 ) as f:
                     f.write(sass)
 
