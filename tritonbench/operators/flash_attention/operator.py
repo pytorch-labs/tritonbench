@@ -37,20 +37,10 @@ import os
 from contextlib import nullcontext
 from itertools import chain
 
+from typing import Callable, Optional
+
 import torch
 import triton  # @manual=//triton:triton
-
-from tritonbench.utils.path_utils import add_ld_library_path, add_path, SUBMODULE_PATH
-from tritonbench.utils.triton_op import IS_FBCODE
-
-try:
-    with add_path(str(SUBMODULE_PATH.joinpath("kernels"))):
-        from kernels.flash_attention import attention as triton_op_FA2
-    HAS_KERNELS = True
-except BaseException:
-    HAS_KERNELS = False
-
-from typing import Callable, Optional
 
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
@@ -58,6 +48,9 @@ from torch.nn.functional import scaled_dot_product_attention as sdpa
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
+
+from tritonbench.utils.path_utils import add_ld_library_path
+from tritonbench.utils.triton_op import IS_FBCODE
 
 
 # [Optional] flash_attn v2
@@ -362,29 +355,6 @@ class Operator(BenchmarkOperator):
             q, k, v, self.causal, self.sm_scale, "tma_ws_persistent"
         )
 
-    @register_benchmark(enabled=HAS_KERNELS)
-    def triton_op_flash_v2(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        return lambda: triton_op_FA2(q, k, v, self.causal, self.sm_scale)
-
-    # Note that we hit "CUDA error: an illegal memory access was encountered"
-    # for quite a few configs. It was known to work with, e.g.
-    # --batch 1 --n-heads 4 --d-head 64
-    def triton_op_flash_seq_v2(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        sequence_parallel = True
-        return lambda: triton_op_FA2(
-            q, k, v, self.causal, self.sm_scale, sequence_parallel
-        )
-
     def xformers_preprocess(
         self,
         q: torch.Tensor,
@@ -665,9 +635,6 @@ class Operator(BenchmarkOperator):
                     "sdpa",
                     "flash_v2",
                     "triton_tutorial_flash_v2",
-                    "triton_op_flash_v2",
-                    # FIXME: cuda illegal meory failure with default config
-                    "triton_op_flash_seq_v2",
                     "xformers",
                     "hw_roofline",
                 ],  # possible values for `line_arg``
@@ -676,9 +643,6 @@ class Operator(BenchmarkOperator):
                     "SDPA",
                     "Flash V2",
                     "Triton Tutorial Flash V2",
-                    "Triton Op Flash V2",
-                    # FIXME: cuda illegal meory failure with default config
-                    # "Triton Op Flash (Seq Parallel) V2",
                     "XFormers",
                     "Hardware Roofline",
                 ],  # label name for the lines
@@ -688,9 +652,6 @@ class Operator(BenchmarkOperator):
                     ("green", "-"),
                     ("red", "-"),
                     ("brown", "-"),
-                    # FIXME: for "Triton Op Flash (Seq Parallel) V2", which had
-                    # cuda illegal meory failure with default config
-                    # ("orange", "-"),
                     ("purple", "-"),
                     ("black", "dashed"),
                 ],  # line styles
