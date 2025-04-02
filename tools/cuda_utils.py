@@ -73,7 +73,6 @@ def setup_cuda_softlink(cuda_version: str):
 
 
 def install_torch_deps():
-    subprocess.check_call(cmd)
     # install other dependencies
     torch_deps = [
         "requests",
