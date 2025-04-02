@@ -53,7 +53,7 @@ def prepare_cuda_env(cuda_version: str, dryrun=False):
     ), f"Expected CUDA version {cuda_version}, getting nvcc test result {nvcc_version}"
 
     # step 3: install magma (optional)
-    if "magma" in CUDA_VERSION_MAP[cuda_version]:
+    if CUDA_VERSION_MAP[cuda_version].get("magma", None):
         install_magma_cmd = [
             "conda",
             "install",
