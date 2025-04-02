@@ -12,7 +12,6 @@ DEFAULT_CUDA_VERSION = "12.8"
 CUDA_VERSION_MAP = {
     "12.8": {
         "pytorch_url": "cu128",
-        "magma": "magma-cuda128",
         "jax": "jax[cuda12]",
     },
 }
@@ -53,18 +52,19 @@ def prepare_cuda_env(cuda_version: str, dryrun=False):
         nvcc_version == cuda_version
     ), f"Expected CUDA version {cuda_version}, getting nvcc test result {nvcc_version}"
 
-    # step 3: install the correct magma version
-    install_magma_cmd = [
-        "conda",
-        "install",
-        "-y",
-        "-c",
-        "pytorch",
-        CUDA_VERSION_MAP[cuda_version]["magma"],
-    ]
-    if dryrun:
-        print(f"Installing CUDA magma: {install_magma_cmd}")
-    subprocess.check_call(install_magma_cmd, env=env)
+    # step 3: install magma (optional)
+    if "magma" in CUDA_VERSION_MAP[cuda_version]:
+        install_magma_cmd = [
+            "conda",
+            "install",
+            "-y",
+            "-c",
+            "pytorch",
+            CUDA_VERSION_MAP[cuda_version]["magma"],
+        ]
+        if dryrun:
+            print(f"Installing CUDA magma: {install_magma_cmd}")
+        subprocess.check_call(install_magma_cmd, env=env)
     return env
 
 
