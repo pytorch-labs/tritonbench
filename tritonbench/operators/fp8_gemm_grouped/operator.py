@@ -20,11 +20,11 @@ To use this benchmark, simply run the buck cmd with the desired command-line arg
 * `--group_size`: The size of the groups in the grouped GEMM operation.
 * `--llama`: TODO: Whether to use the LLaMA model shapes.
 * `--prefill`: TODO: Whether to use prefill shapes.
-* `--no_fp8_fast_accum`: TODO: Whether to disable fast accumulation for FP8.
+* `--no_fp8_fast_accum`: Whether to disable fast accumulation for FP8.
 * `--no_use_tma`: TODO: Whether to disable the use of TMA (Tensor Memory Accelerator).
 * `--use_tma`: TODO: Whether to enable the use of TMA.
 * `--no_use_persistent`: TODO: Whether to disable the use of persistent memory.
-* `--warp_specialization`: TODO: Whether to enable warp specialization.
+* `--warp_specialization`: Whether to enable warp specialization.
 
 Example usage:
 buck2 run -c fbcode.platform010_cuda_version=12.4  @mode/opt //pytorch/tritonbench:run -- --op fp8_gemm_grouped
@@ -413,7 +413,6 @@ class Operator(BenchmarkOperator):
         Returns:
             Callable: A lambda function that performs the Triton FP8 GEMM grouped operation.
         """
-
         # Return a lambda function that calls the grouped_gemm_fp8_rowwise function
         return lambda: grouped_gemm_fp8_rowwise(
             group_A,
@@ -422,6 +421,7 @@ class Operator(BenchmarkOperator):
             a_scale,
             b_scale,
             use_fast_accum=self.fp8_fast_accum,
+            _use_warp_specialization=self.warp_specialization,
         )
 
     @register_benchmark(
