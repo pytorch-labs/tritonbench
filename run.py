@@ -13,14 +13,15 @@ from typing import List
 from tritonbench.operator_loader import load_opbench_by_name_from_loader
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
+from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.gpu_utils import gpu_lockdown
 from tritonbench.utils.parser import get_parser
 from tritonbench.utils.run_utils import run_in_task
 
-from tritonbench.utils.triton_op import BenchmarkOperatorResult, IS_FBCODE
+from tritonbench.utils.triton_op import BenchmarkOperatorResult
 
 try:
-    if IS_FBCODE:
+    if is_fbcode():
         from .fb.utils import usage_report_logger  # @manual
     else:
         usage_report_logger = lambda *args, **kwargs: None
@@ -46,7 +47,7 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
                 metrics.write_csv_to_file(sys.stdout)
             else:
                 print(metrics)
-        if IS_FBCODE and args.log_scuba:
+        if is_fbcode() and args.log_scuba:
             from .fb.utils import log_benchmark  # @manual
 
             kwargs = {

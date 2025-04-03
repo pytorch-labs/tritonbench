@@ -31,10 +31,21 @@ import triton
 
 from tritonbench.components.do_bench import do_bench_wrapper, Latency
 from tritonbench.components.export import export_data
-from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
-from tritonbench.utils.env_utils import apply_precision, set_env, set_random_seed
+
+from tritonbench.utils.env_utils import (
+    apply_precision,
+    is_fbcode,
+    is_hip,
+    set_env,
+    set_random_seed,
+)
 from tritonbench.utils.input import input_cast
 from tritonbench.utils.path_utils import add_cmd_parameter, remove_cmd_parameter
+
+if is_hip():
+    from tritonbench.components.att import launch_att
+else:
+    from tritonbench.components.ncu import ncu_analyzer, nsys_analyzer
 
 try:
     from tqdm import tqdm
@@ -64,7 +75,6 @@ class BenchmarkOperatorBackend:
     ci: bool = True
 
 
-IS_FBCODE = not hasattr(torch.version, "git_version")
 DEFAULT_WARMUP = 25
 DEFAULT_RUN_ITERS = 100
 DEFAULT_QUANTILES = [0.5, 0.1, 0.9]
@@ -142,7 +152,7 @@ def do_bench_walltime(fn, warmup=25, rep=100):
 
 def gemm_shapes(prefill: bool = False):
     """Gets an extensive list of GEMM shapes for benchmarking"""
-    if not IS_FBCODE:
+    if not is_fbcode()():
         return
     from .fb.fp8_gemm_rowwise_shapes import read_shapes_for_fp8_gemm_rowwise
 
@@ -210,6 +220,8 @@ class BenchmarkOperatorMetrics:
     compile_time_by_stage: Optional[Dict[str, float]] = None
     # compile time with kineto trace
     compile_trace: Optional[str] = None
+    # att trace directory
+    att_trace: Optional[str] = None
     # ncu trace file
     ncu_trace: Optional[str] = None
     # ncu replay file
@@ -687,7 +699,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self._raw_extra_args = copy.deepcopy(extra_args)
         self.tb_args = tb_args
         self.add_production_shapes = (
-            self.tb_args.production_shapes if IS_FBCODE else False
+            self.tb_args.production_shapes if is_fbcode() else False
         )
         self.use_cuda_graphs = (
             self.tb_args.cudagraph if self.tb_args.cudagraph else self.use_cuda_graphs
@@ -711,7 +723,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if tb_args.metrics
             else self.DEFAULT_METRICS
         )
-        if "compile_time" in self.required_metrics and IS_FBCODE:
+        if "compile_time" in self.required_metrics and is_fbcode():
             self.required_metrics.append("compile_time_by_stage")
         self.extra_args = extra_args
         if self.name not in REGISTERED_X_VALS:
@@ -1187,75 +1199,81 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.compile_trace = self.compile_time(
                     input_id, fn_name, metrics, kineto_trace=True
                 )
-            if "ncu_trace" in self.required_metrics:
-                metrics.ncu_trace = self.ncu_trace(input_id, fn_name)
             # Collect NCU metrics if any required metrics match the ncu analyzer
             # metrics. Only profile with the necessary metrics to avoid excessive
             # overhead.
-            ncu_metrics = []
-            for (
-                bench_metric,
-                short_ncu_metrics,
-            ) in ncu_analyzer.bench_metric_to_short_ncu_metric.items():
-                # Only process metrics that are required
-                if bench_metric in self.required_metrics:
-                    # For each short metric name in the list of metrics for this benchmark metric
-                    for short_ncu_metric in short_ncu_metrics:
-                        # Get the full NCU metric name and add it to our list
-                        full_metric_name = ncu_analyzer.short_ncu_metric_name[
-                            short_ncu_metric
-                        ]
-                        ncu_metrics.append(full_metric_name)
-            extend_ncu_args = (
-                ["--metrics", ",".join(ncu_metrics)] if ncu_metrics else None
-            )
-            if ncu_metrics or "ncu_rep" in self.required_metrics:
-                metrics.ncu_rep = self.ncu_trace(
-                    input_id, fn_name, replay=True, extend_ncu_args=extend_ncu_args
+            if not is_hip():
+                if "ncu_trace" in self.required_metrics:
+                    metrics.ncu_trace = self.ncu_trace(input_id, fn_name)
+                ncu_metrics = []
+                for (
+                    bench_metric,
+                    short_ncu_metrics,
+                ) in ncu_analyzer.bench_metric_to_short_ncu_metric.items():
+                    # Only process metrics that are required
+                    if bench_metric in self.required_metrics:
+                        # For each short metric name in the list of metrics for this benchmark metric
+                        for short_ncu_metric in short_ncu_metrics:
+                            # Get the full NCU metric name and add it to our list
+                            full_metric_name = ncu_analyzer.short_ncu_metric_name[
+                                short_ncu_metric
+                            ]
+                            ncu_metrics.append(full_metric_name)
+                extend_ncu_args = (
+                    ["--metrics", ",".join(ncu_metrics)] if ncu_metrics else None
                 )
-            # Read and update NCU metrics if any required metrics match the NCU metrics
-            if ncu_metrics:
-                ncu_analyzer_results = ncu_analyzer.read_ncu_report(
-                    metrics.ncu_rep, self.required_metrics
-                )
-                for metric_name, metric_value in ncu_analyzer_results.items():
-                    metrics.extra_metrics[metric_name] = metric_value
-                if "arithmetic_intensity" in self.required_metrics:
-                    logger.warning(
-                        "Arithmetic intensity only supports FP32 and FP64 for now."
+                if ncu_metrics or "ncu_rep" in self.required_metrics:
+                    metrics.ncu_rep = self.ncu_trace(
+                        input_id, fn_name, replay=True, extend_ncu_args=extend_ncu_args
                     )
-            if "ncu_rep_ir" in self.required_metrics:
-                metrics.ncu_rep_ir = self.ncu_trace(
-                    input_id, fn_name, replay=True, profile_ir=True
-                )
-            nsys_metrics = []
-            for metric_name in nsys_analyzer.nsys_metrics_to_reports.keys():
-                if metric_name in self.required_metrics:
-                    nsys_metrics.append(metric_name)
-
-            if "nsys_rep" in self.required_metrics or nsys_metrics:
-                nsys_rep_path = self.nsys_rep(input_id, fn_name)
-                metrics.nsys_rep = nsys_rep_path
-                if nsys_metrics:
-                    nsys_analyzer_results = nsys_analyzer.read_nsys_report(
-                        nsys_rep_path, nsys_metrics
+                # Read and update NCU metrics if any required metrics match the NCU metrics
+                if ncu_metrics:
+                    ncu_analyzer_results = ncu_analyzer.read_ncu_report(
+                        metrics.ncu_rep, self.required_metrics
                     )
-                    for metric_name, metric_value in nsys_analyzer_results.items():
+                    for metric_name, metric_value in ncu_analyzer_results.items():
                         metrics.extra_metrics[metric_name] = metric_value
-            if "nsys_gpu_speedup" in self.required_metrics:
-                baseline_nsys_gpu_kernel_sum = (
-                    self.baseline_metrics.extra_metrics.get("nsys_gpu_kernel_sum", None)
-                    if self.baseline_metrics
-                    else None
-                )
-                current_nsys_gpu_kernel_sum = metrics.extra_metrics.get(
-                    "nsys_gpu_kernel_sum", None
-                )
-                metrics.nsys_gpu_speedup = (
-                    baseline_nsys_gpu_kernel_sum / current_nsys_gpu_kernel_sum
-                    if baseline_nsys_gpu_kernel_sum and current_nsys_gpu_kernel_sum
-                    else None
-                )
+                    if "arithmetic_intensity" in self.required_metrics:
+                        logger.warning(
+                            "Arithmetic intensity only supports FP32 and FP64 for now."
+                        )
+                if "ncu_rep_ir" in self.required_metrics:
+                    metrics.ncu_rep_ir = self.ncu_trace(
+                        input_id, fn_name, replay=True, profile_ir=True
+                    )
+                nsys_metrics = []
+                for metric_name in nsys_analyzer.nsys_metrics_to_reports.keys():
+                    if metric_name in self.required_metrics:
+                        nsys_metrics.append(metric_name)
+
+                if "nsys_rep" in self.required_metrics or nsys_metrics:
+                    nsys_rep_path = self.nsys_rep(input_id, fn_name)
+                    metrics.nsys_rep = nsys_rep_path
+                    if nsys_metrics:
+                        nsys_analyzer_results = nsys_analyzer.read_nsys_report(
+                            nsys_rep_path, nsys_metrics
+                        )
+                        for metric_name, metric_value in nsys_analyzer_results.items():
+                            metrics.extra_metrics[metric_name] = metric_value
+                if "nsys_gpu_speedup" in self.required_metrics:
+                    baseline_nsys_gpu_kernel_sum = (
+                        self.baseline_metrics.extra_metrics.get(
+                            "nsys_gpu_kernel_sum", None
+                        )
+                        if self.baseline_metrics
+                        else None
+                    )
+                    current_nsys_gpu_kernel_sum = metrics.extra_metrics.get(
+                        "nsys_gpu_kernel_sum", None
+                    )
+                    metrics.nsys_gpu_speedup = (
+                        baseline_nsys_gpu_kernel_sum / current_nsys_gpu_kernel_sum
+                        if baseline_nsys_gpu_kernel_sum and current_nsys_gpu_kernel_sum
+                        else None
+                    )
+            else:
+                if "att_trace" in self.required_metrics:
+                    metrics.att_trace = self.att_trace(input_id, fn_name)
             if "kineto_trace" in self.required_metrics:
                 metrics.kineto_trace = self.kineto_trace(input_id, fn)
             if "proton" in self.required_metrics:
@@ -1314,7 +1332,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
                 from tritonbench.components.compile_time import do_compile_time_in_task
 
-                if IS_FBCODE:
+                if is_fbcode():
                     from tritonbench.components.compile_time import (
                         fbcode_do_compile_time_in_task,
                     )
@@ -1494,8 +1512,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             cpu_peak_mem = percentage * total / 10**9
         return cpu_peak_mem, gpu_peak_mem
 
-    def nsys_rep(self, input_id: int, fn_name: str) -> str:
-        op_task_args = [] if IS_FBCODE else [sys.executable]
+    def _get_op_task_args(
+        self, input_id: str, fn_name: str, in_task_metric_name: str
+    ) -> List[str]:
+        """
+        Get arguments for running single operator backend and input in a subprocess.
+        """
+        op_task_args = [] if is_fbcode() else [sys.executable]
         op_task_args.extend(copy.deepcopy(sys.argv))
         op_task_args = remove_cmd_parameter(op_task_args, "--op")
         op_task_args = add_cmd_parameter(op_task_args, "--op", self.name)
@@ -1510,9 +1533,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 "--input-id",
                 str(input_id),
                 "--metrics",
-                "_nsys_rep_in_task",
+                in_task_metric_name,
             ]
         )
+        return op_task_args
+
+    def nsys_rep(self, input_id: int, fn_name: str) -> str:
+        op_task_args = self._get_op_task_args(input_id, fn_name, "_nsys_rep_in_task")
         nsys_output_dir = self.get_temp_path(f"nsys_traces/{fn_name}_{input_id}")
         nsys_output_dir.mkdir(parents=True, exist_ok=True)
         ext = ".nsys-rep"
@@ -1551,23 +1578,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             "--set",
             "full",
         ]
-        op_task_args = [] if IS_FBCODE else [sys.executable]
-        op_task_args.extend(copy.deepcopy(sys.argv))
-        for override_option in ["--only", "--input-id", "--num-inputs", "--metrics"]:
-            op_task_args = remove_cmd_parameter(op_task_args, override_option)
-        op_task_args.extend(
-            [
-                "--only",
-                fn_name,
-                "--num-inputs",
-                str(1),
-                "--input-id",
-                str(input_id),
-                "--metrics",
-                "_ncu_trace_in_task",
-            ]
-        )
-
+        op_task_args = self._get_op_task_args(input_id, fn_name, "_ncu_trace_in_task")
         # Disable DCGM
         disable_dyno_dcgm = [
             "sudo",
@@ -1647,6 +1658,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         subprocess.check_call(ncu_args, env=env)
         return str(ncu_output_file.resolve())
 
+    def att_trace(self, input_id: int, fn_name: str) -> str:
+        op_task_args = self._get_op_task_args(input_id, fn_name, "_ncu_trace_in_task")
+        att_output_dir = self.get_temp_path(f"att_traces/{fn_name}_{input_id}")
+        att_trace_dir = launch_att(att_output_dir, op_task_args)
+        return att_trace_dir
+
     def kineto_trace(self, input_id: int, fn: Callable) -> str:
         from tritonbench.components.kineto import do_bench_kineto
 
@@ -1700,7 +1717,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             kineto_trace_loc = op_task.get_attribute(
                 "_compile_time_kineto_trace_in_task"
             )
-            if IS_FBCODE:
+            if is_fbcode():
                 from tritonbench.components.kineto.fb.run_utils import (
                     manifold_upload_file,
                 )

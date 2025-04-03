@@ -5,12 +5,11 @@ import torch
 import triton
 import triton.language as tl
 
-from tritonbench.utils.env_utils import is_cuda
-from tritonbench.utils.triton_op import IS_FBCODE
+from tritonbench.utils.env_utils import is_cuda, is_fbcode
 
 from .triton_matmul_configs import get_full_amd_config_space
 
-if not IS_FBCODE:
+if not is_fbcode():
     import triton.tools.experimental_descriptor
 
     if is_cuda():

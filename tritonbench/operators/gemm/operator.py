@@ -12,14 +12,13 @@ from tritonbench.operators.gemm.kernels import matmul as kernels
 from tritonbench.operators.gemm.partition_k import matmul_partition_k
 from tritonbench.operators.gemm.stream_k import streamk_matmul
 from tritonbench.utils.data_utils import get_production_shapes
-from tritonbench.utils.env_utils import is_cuda, supports_tma
+from tritonbench.utils.env_utils import is_cuda, is_fbcode, supports_tma
 
 from tritonbench.utils.path_utils import REPO_PATH
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
-    IS_FBCODE,
     llama_shapes,
     register_benchmark,
     register_metric,
@@ -39,7 +38,7 @@ except ModuleNotFoundError:
 
 from tritonbench.operators.gemm.triton_matmul import matmul as triton_tutorial_matmul
 
-if IS_FBCODE:
+if is_fbcode():
     import generative_recommenders.ops.triton.triton_addmm as hstu_triton_addmm
 
     # without this set we can only pick a single config for AMD, Nvidia has 8
@@ -168,7 +167,7 @@ class Operator(BenchmarkOperator):
         else:
             self.shapes = BUILDIN_SHAPES
 
-        if IS_FBCODE and tb_args.production_shapes:
+        if is_fbcode() and tb_args.production_shapes:
             additional_shapes = get_production_shapes(
                 self.name, f"{tb_args.precision}_gemm", self.tb_args.shuffle_shapes
             )
@@ -208,7 +207,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT and supports_tma())
+    @register_benchmark(enabled=not is_fbcode() and HAS_PERSISTENT and supports_tma())
     def triton_tma_persistent_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if bias is not None:
@@ -216,7 +215,7 @@ class Operator(BenchmarkOperator):
         else:
             return lambda: matmul_tma_persistent(a, b)
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_PERSISTENT and supports_tma())
+    @register_benchmark(enabled=not is_fbcode() and HAS_PERSISTENT and supports_tma())
     def triton_tma_persistent_cached_matmul(self, a, b, bias) -> Callable:
         b = b.T.contiguous()
         if bias is not None:

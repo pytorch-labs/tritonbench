@@ -1,9 +1,9 @@
 import torch
+from tritonbench.utils.env_utils import is_fbcode
 
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
-from tritonbench.utils.triton_op import IS_FBCODE
 
-if IS_FBCODE:
+if is_fbcode():
     # Internal Import
     from generative_recommenders.common import apply_sampling, generate_sparse_seq_len
     from generative_recommenders.ops.triton.triton_hstu_attention import triton_hstu_mha

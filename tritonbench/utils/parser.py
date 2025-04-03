@@ -1,7 +1,7 @@
 import argparse
 
-from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS
-from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP, IS_FBCODE
+from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS, is_fbcode
+from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP
 
 
 def get_parser(args=None):
@@ -199,7 +199,7 @@ def get_parser(args=None):
         help="Only run with pre-defined production shapes.",
     )
 
-    if IS_FBCODE:
+    if is_fbcode():
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
         parser.add_argument(
             "--logging-group",

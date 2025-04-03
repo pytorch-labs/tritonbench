@@ -7,11 +7,11 @@ import yaml
 
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
+from tritonbench.utils.env_utils import is_fbcode
 
 from tritonbench.utils.parser import get_parser
-from tritonbench.utils.triton_op import IS_FBCODE
 
-if IS_FBCODE:
+if is_fbcode():
     import importlib
 
     fbcode_skip_file_path = "fb/skip_tests_h100_fbcode.yaml"
@@ -123,7 +123,7 @@ def make_test(operator):
             "1",
             "--test-only",
         ]
-        if IS_FBCODE:
+        if is_fbcode():
             _run_one_operator(args)
         else:
             _run_operator_in_task(op=operator, args=args)

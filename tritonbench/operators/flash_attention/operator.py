@@ -50,7 +50,7 @@ from tritonbench.kernels.triton_fused_attention import (
 )
 
 from tritonbench.utils.path_utils import add_ld_library_path
-from tritonbench.utils.triton_op import IS_FBCODE
+from tritonbench.utils.triton_op import is_fbcode
 
 
 # [Optional] flash_attn v2
@@ -383,7 +383,7 @@ class Operator(BenchmarkOperator):
             fhma_input, needs_gradient=need_gradient
         )
 
-    @register_benchmark(enabled=not IS_FBCODE and HAS_TK)
+    @register_benchmark(enabled=not is_fbcode() and HAS_TK)
     def tk(self, q, k, v):
         def _inner():
             out = tk_attn(q, k, v, self.causal)

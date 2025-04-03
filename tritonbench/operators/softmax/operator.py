@@ -3,13 +3,13 @@ from typing import Generator, List
 import torch
 import triton
 import triton.language as tl
-
 from tritonbench.utils.data_utils import get_production_shapes
+
+from tritonbench.utils.env_utils import is_fbcode
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
-    IS_FBCODE,
     register_benchmark,
     register_metric,
 )
@@ -107,7 +107,7 @@ class Operator(BenchmarkOperator):
     def get_input_iter(self):
         M = 4096
         shapes = [(M, 128 * i) for i in range(2, 100)]
-        if IS_FBCODE and self.tb_args.production_shapes:
+        if is_fbcode() and self.tb_args.production_shapes:
             additional_shapes = get_production_shapes(
                 self.name, "softmax", self.tb_args.shuffle_shapes
             )
