@@ -1,4 +1,5 @@
 import torch
+
 from tritonbench.utils.env_utils import is_fbcode
 
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
