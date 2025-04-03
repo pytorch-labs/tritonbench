@@ -1645,8 +1645,21 @@ def _attn_bwd(
     BLOCK_N2: tl.constexpr,  #
     BLK_SLICE_FACTOR: tl.constexpr,  #
     HEAD_DIM: tl.constexpr,
+    NON_NEGATIVE_STRIDE_Z: tl.constexpr,
+    NON_NEGATIVE_STRIDE_H: tl.constexpr,
+    NON_NEGATIVE_STRIDE_TOK: tl.constexpr,
+    NON_NEGATIVE_STRIDE_D: tl.constexpr,
 ):
     LN2: tl.constexpr = 0.6931471824645996  # = ln(2)
+    if NON_NEGATIVE_STRIDE_Z:
+        tl.assume(stride_z >= 0)
+    if NON_NEGATIVE_STRIDE_H:
+        tl.assume(stride_h >= 0)
+    if NON_NEGATIVE_STRIDE_TOK:
+        tl.assume(stride_tok >= 0)
+    if NON_NEGATIVE_STRIDE_D:
+        tl.assume(stride_d >= 0)
+    tl.assume(H > 0)
 
     bhid = tl.program_id(2)
     off_chz = (bhid * N_CTX).to(tl.int64)
@@ -2268,6 +2281,10 @@ class _attention_opt(torch.autograd.Function):
             HEAD_DIM=ctx.HEAD_DIM,  #
             num_warps=NUM_WARPS,  #
             num_stages=NUM_STAGES,  #
+            NON_NEGATIVE_STRIDE_Z=q.stride(0) >= 0,  #
+            NON_NEGATIVE_STRIDE_H=q.stride(1) >= 0,  #
+            NON_NEGATIVE_STRIDE_TOK=q.stride(2) >= 0,  #
+            NON_NEGATIVE_STRIDE_D=q.stride(3) >= 0,  #
         )
 
         return dq, dk, dv, None, None, None
