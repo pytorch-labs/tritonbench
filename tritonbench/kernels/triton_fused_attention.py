@@ -1069,7 +1069,7 @@ def _attn_fwd(
     tl.assume(stride_on >= 0)
     tl.assume(Z >= 0)
     tl.assume(H >= 0)
-    # tl.static_assert(BLOCK_N <= HEAD_DIM)
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
     off_hz = tl.program_id(1)
     _attn_fwd_compute(
