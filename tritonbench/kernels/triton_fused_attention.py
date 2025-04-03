@@ -432,37 +432,60 @@ configsWS = [
     ]  # (24, 240), (40, 232)]  # 32,240 hangs, 24, 240 works 40, 232 works
 ]
 # BLOCK_M: 128, BLOCK_N: 128, ENABLE_TMA: False, LOOP_SCHEDULE: default, num_warps: 8, num_ctas: 1, num_stages: 3
-configsOrig = [
-    (
-        triton.Config(
-            {
-                "BLOCK_M": BM,
-                "BLOCK_N": BN,
-                "ENABLE_TMA": False,
-                "LOOP_SCHEDULE": "default",
-            },
-            num_stages=s,
-            num_warps=w,
-            num_buffers_warp_spec=0,
-            num_consumer_groups=0,
+if torch.version.hip is None:
+    configsOrig = [
+        (
+            triton.Config(
+                {
+                    "BLOCK_M": BM,
+                    "BLOCK_N": BN,
+                    "ENABLE_TMA": False,
+                    "LOOP_SCHEDULE": "default",
+                },
+                num_stages=s,
+                num_warps=w,
+                num_buffers_warp_spec=0,
+                num_consumer_groups=0,
+            )
+            if has_warp_spec
+            else triton.Config(
+                {
+                    "BLOCK_M": BM,
+                    "BLOCK_N": BN,
+                    "ENABLE_TMA": False,
+                    "LOOP_SCHEDULE": "default",
+                },
+                num_stages=s,
+                num_warps=w,
+            )
         )
-        if has_warp_spec
-        else triton.Config(
-            {
-                "BLOCK_M": BM,
-                "BLOCK_N": BN,
-                "ENABLE_TMA": False,
-                "LOOP_SCHEDULE": "default",
-            },
-            num_stages=s,
-            num_warps=w,
+        for BM in [64, 128]
+        for BN in [64, 128]
+        for s in ([3, 4, 7])
+        for w in [4, 8]
+    ]
+else:
+    configsOrig = [
+        (
+            triton.Config(
+                {
+                    "BLOCK_M": BM,
+                    "BLOCK_N": BN,
+                    "ENABLE_TMA": False,
+                    "LOOP_SCHEDULE": "default",
+                    "waves_per_eu": wpe,
+                    "kpack": 2,
+                },
+                num_stages=s,
+                num_warps=w,
+            )
         )
-    )
-    for BM in [64, 128]
-    for BN in [64, 128]
-    for s in ([3, 4, 7] if not torch.version.hip else [2])
-    for w in [4, 8]
-]
+        for BM in [16, 32, 64, 128]
+        for BN in [16, 32, 64, 128]
+        for s in ([1, 2])
+        for w in [1, 2, 4, 8]
+        for wpe in [0, 1, 2, 3, 4]
+    ]
 # TMA, WS, and CompPipe
 configsTmaWS = [
     (
