@@ -52,22 +52,21 @@ def matmul_kernel(
     BLOCK_K: tl.constexpr,  #
     GROUP_M: tl.constexpr,  #
     ACTIVATION: tl.constexpr,  #
-    USE_BUFFER_OPS: tl.constexpr,  #
+    ENABLE_BUFFER_OPS_ASSUMES: tl.constexpr,
 ):
     """Kernel for computing the matmul C = A x B.
     A has shape (M, K), B has shape (K, N) and C has shape (M, N)
     """
-
-    if USE_BUFFER_OPS:
-        tl.assume(M > 0)
-        tl.assume(N > 0)
-        tl.assume(K > 0)
-        tl.assume(stride_am > 0)
-        tl.assume(stride_ak > 0)
-        tl.assume(stride_bk > 0)
-        tl.assume(stride_bn > 0)
-        tl.assume(stride_cm > 0)
-        tl.assume(stride_cn > 0)
+    if ENABLE_BUFFER_OPS_ASSUMES:
+        tl.assume(M >= 0)
+        tl.assume(N >= 0)
+        tl.assume(K >= 0)
+        tl.assume(stride_am >= 0)
+        tl.assume(stride_ak >= 0)
+        tl.assume(stride_bn >= 0)
+        tl.assume(stride_bk >= 0)
+        tl.assume(stride_cm >= 0)
+        tl.assume(stride_cn >= 0)
 
     # -----------------------------------------------------------
     # Map program ids `pid` to the block of C it should compute.
@@ -82,9 +81,8 @@ def matmul_kernel(
     group_size_m = min(num_pid_m - first_pid_m, GROUP_M)
     pid_m = first_pid_m + (pid % group_size_m)
     pid_n = (pid % num_pid_in_group) // group_size_m
-    if USE_BUFFER_OPS:
-        tl.assume(pid_m >= 0)
-        tl.assume(pid_n >= 0)
+    tl.assume(pid_m >= 0)
+    tl.assume(pid_n >= 0)
 
     # ----------------------------------------------------------
     # Create pointers for the first blocks of A and B.
@@ -153,7 +151,14 @@ def matmul(a, b, activation=""):
     grid = lambda META: (
         triton.cdiv(M, META["BLOCK_M"]) * triton.cdiv(N, META["BLOCK_N"]),
     )
-    use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
+    enable_buffer_ops_assumes = (
+        a.stride(0) >= 0
+        and a.stride(1) >= 0
+        and b.stride(0) >= 0
+        and b.stride(1) >= 0
+        and c.stride(0) >= 0
+        and c.stride(1) >= 0
+    )
     matmul_kernel[grid](
         a,
         b,
@@ -168,6 +173,6 @@ def matmul(a, b, activation=""):
         c.stride(0),
         c.stride(1),  #
         ACTIVATION=activation,  #
-        USE_BUFFER_OPS=use_buffer_ops,
+        ENABLE_BUFFER_OPS_ASSUMES=enable_buffer_ops_assumes,
     )
     return c

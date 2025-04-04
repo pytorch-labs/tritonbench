@@ -234,23 +234,23 @@ def _splitk_kernel(
     SPLIT_K: tl.constexpr,
     EVEN_K: tl.constexpr,
     AB_DTYPE: tl.constexpr,  #
-    USE_BUFFER_OPS: tl.constexpr,  #
+    ENABLE_BUFFER_OPS_ASSUMES: tl.constexpr,
 ):
     # matrix multiplication
     pid = tl.program_id(0)
     pid_z = tl.program_id(1)
     grid_m = tl.cdiv(M, BLOCK_M)
     grid_n = tl.cdiv(N, BLOCK_N)
-    if USE_BUFFER_OPS:
-        tl.assume(M > 0)
-        tl.assume(N > 0)
-        tl.assume(K > 0)
-        tl.assume(stride_am > 0)
-        tl.assume(stride_ak > 0)
-        tl.assume(stride_bk > 0)
-        tl.assume(stride_bn > 0)
-        tl.assume(stride_cm > 0)
-        tl.assume(stride_cn > 0)
+    if ENABLE_BUFFER_OPS_ASSUMES:
+        tl.assume(M >= 0)
+        tl.assume(N >= 0)
+        tl.assume(K >= 0)
+        tl.assume(stride_am >= 0)
+        tl.assume(stride_ak >= 0)
+        tl.assume(stride_bn >= 0)
+        tl.assume(stride_bk >= 0)
+        tl.assume(stride_cm >= 0)
+        tl.assume(stride_cn >= 0)
 
     # re-order program ID for better L2 performance
     width = GROUP_M * grid_n
@@ -258,9 +258,8 @@ def _splitk_kernel(
     group_size = min(grid_m - group_id * GROUP_M, GROUP_M)
     pid_m = group_id * GROUP_M + (pid % group_size)
     pid_n = (pid % width) // (group_size)
-    if USE_BUFFER_OPS:
-        tl.assume(pid_m >= 0)
-        tl.assume(pid_n >= 0)
+    tl.assume(pid_m >= 0)
+    tl.assume(pid_n >= 0)
     # do matrix multiplication
     rm = pid_m * BLOCK_M + tl.arange(0, BLOCK_M)
     rn = pid_n * BLOCK_N + tl.arange(0, BLOCK_N)
@@ -371,11 +370,18 @@ class _matmul(torch.autograd.Function):
         ]:
             ab_dtype = None
 
-        use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
         # launch kernel
         grid = lambda META: (
             cdiv(M, META["BLOCK_M"]) * cdiv(N, META["BLOCK_N"]),
             META["SPLIT_K"],
+        )
+        enable_buffer_ops_assumes = (
+            a.stride(0) >= 0
+            and a.stride(1) >= 0
+            and b.stride(0) >= 0
+            and b.stride(1) >= 0
+            and c.stride(0) >= 0
+            and c.stride(1) >= 0
         )
         _splitk_kernel[grid](
             a,
@@ -394,7 +400,7 @@ class _matmul(torch.autograd.Function):
             input_precision=input_precision,  #
             fp8_fast_accum=fp8_fast_accum,  #
             AB_DTYPE=ab_dtype,
-            USE_BUFFER_OPS=use_buffer_ops,
+            ENABLE_BUFFER_OPS_ASSUMES=enable_buffer_ops_assumes,
         )
         return c
 

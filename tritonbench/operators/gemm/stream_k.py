@@ -83,18 +83,18 @@ def streamk_gemm(
     EVEN_M: tl.constexpr,
     EVEN_N: tl.constexpr,
     EVEN_K: tl.constexpr,
-    USE_BUFFER_OPS: tl.constexpr,
+    ENABLE_BUFFER_OPS_ASSUMES: tl.constexpr,
 ):
-    if USE_BUFFER_OPS:
-        tl.assume(M > 0)
-        tl.assume(N > 0)
-        tl.assume(K > 0)
-    tl.assume(stride_am > 0)
-    tl.assume(stride_ak > 0)
-    tl.assume(stride_bk > 0)
-    tl.assume(stride_bn > 0)
-    tl.assume(stride_cm > 0)
-    tl.assume(stride_cn > 0)
+    if ENABLE_BUFFER_OPS_ASSUMES:
+        tl.assume(M >= 0)
+        tl.assume(N >= 0)
+        tl.assume(K >= 0)
+        tl.assume(stride_am >= 0)
+        tl.assume(stride_ak >= 0)
+        tl.assume(stride_bn >= 0)
+        tl.assume(stride_bk >= 0)
+        tl.assume(stride_cm >= 0)
+        tl.assume(stride_cn >= 0)
     if stride_bias_m:
         tl.assume(stride_bias_m >= 0)
     if stride_bias_n:
@@ -342,7 +342,14 @@ def streamk_matmul(a, b, bias=None):
         if grids % 38 == 0:
             NUM_XCDS = grids // 38
     # print("NUM_XCDS: ", grids, NUM_XCDS)
-    use_buffer_ops = os.environ.get("AMDGCN_USE_BUFFER_OPS", "0") == "1"
+    enable_buffer_ops_assumes = (
+        a.stride(0) >= 0
+        and a.stride(1) >= 0
+        and b.stride(0) >= 0
+        and b.stride(1) >= 0
+        and c.stride(0) >= 0
+        and c.stride(1) >= 0
+    )
     streamk_gemm[(grids,)](
         a,
         b,
@@ -363,7 +370,7 @@ def streamk_matmul(a, b, bias=None):
         NUM_SMS=grids,
         STREAMK_TILES=total_tiles_streamk,
         NUM_XCDS=NUM_XCDS,
-        USE_BUFFER_OPS=use_buffer_ops,
+        ENABLE_BUFFER_OPS_ASSUMES=enable_buffer_ops_assumes,
     )
 
     # print(c)
