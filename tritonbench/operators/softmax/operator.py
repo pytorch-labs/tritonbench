@@ -3,6 +3,7 @@ from typing import Generator, List
 import torch
 import triton
 import triton.language as tl
+
 from tritonbench.utils.data_utils import get_production_shapes
 
 from tritonbench.utils.env_utils import is_fbcode
