@@ -17,13 +17,14 @@ from tools.python_utils import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Install the latest pytorch nightly if does not exist
+# Install the latest pytorch nightly with default cuda version
+# if torch does not exist
 if not has_pkg("torch"):
-    from tools.cuda_utils import detect_cuda_version_with_nvcc
+    from tools.cuda_utils import DEFAULT_CUDA_VERSION
     from tools.torch_utils import install_pytorch_nightly
 
     env = os.environ
-    cuda_version = CUDA_VERSION_MAP[detect_cuda_version_with_nvcc(env)][
+    cuda_version = CUDA_VERSION_MAP[DEFAULT_CUDA_VERSION][
         "pytorch_url"
     ]
     install_pytorch_nightly(cuda_version, env)
