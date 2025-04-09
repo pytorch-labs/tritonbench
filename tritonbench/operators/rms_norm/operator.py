@@ -3,6 +3,8 @@ from typing import Callable, Generator, List, Optional, Tuple
 
 import torch
 
+from tritonbench.utils.env_utils import is_hip
+
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     register_benchmark,
@@ -13,6 +15,14 @@ try:
     from liger_kernel.transformers.rms_norm import LigerRMSNorm
 except ModuleNotFoundError:
     LigerRMSNorm = None
+
+try:
+    from .aiter import AITerRMSNorm
+
+    HAS_AITER = True
+except ModuleNotFoundError:
+    HAS_AITER = False
+
 
 # Reference: https://github.com/linkedin/Liger-Kernel/
 # blob/main/benchmark/scripts/benchmark_rms_norm.py
@@ -70,6 +80,11 @@ class Operator(BenchmarkOperator):
             )
         compiled = torch.compile(self.llama_rms_op)
         return lambda: compiled(input)
+
+    @register_benchmark(enabled=is_hip() and HAS_AITER)
+    def aiter(self, H, input) -> Callable:
+        self.aiter_rms_op = AITerRMSNorm(hidden_size=H, eps=self.eps).to(self.device)
+        return lambda: self.aiter_rms_op(input)
 
     @register_x_val(label="(M, H)")
     def get_x_val(self, example_inputs) -> Tuple[int, int]:
