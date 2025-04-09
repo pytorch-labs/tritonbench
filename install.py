@@ -192,5 +192,6 @@ if __name__ == "__main__":
     if args.aiter and is_hip():
         logger.info("[tritonbench] installing aiter...")
         from tools.aiter.install import install_aiter
+
         install_aiter()
     logger.info("[tritonbench] installation complete!")
