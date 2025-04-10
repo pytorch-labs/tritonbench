@@ -116,7 +116,7 @@ if __name__ == "__main__":
         help="Install pytorch build dependencies",
     )
     parser.add_argument(
-        "--install-torch-nightly", action="store_true", help="Install pytorch nightlies"
+        "--install-torch-nightly", action="store_true", help="Install pytorch nightly"
     )
     parser.add_argument(
         "--check-torch-nightly-version",
