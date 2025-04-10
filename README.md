@@ -58,6 +58,7 @@ We depend on the following projects as a source of customized Triton or CUTLASS 
 * (CUDA) [flash-attention](https://github.com/Dao-AILab/flash-attention)
 * (CUDA) [FBGEMM](https://github.com/pytorch/FBGEMM)
 * (CUDA) [ThunderKittens](https://github.com/HazyResearch/ThunderKittens)
+* (HIP) [AITer](https://github.com/ROCm/aiter)
 
 
 ## License
