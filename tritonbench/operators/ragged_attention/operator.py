@@ -4,8 +4,9 @@ from typing import Any, Callable, List, Optional
 
 import torch
 
-from tritonbench.utils.input import input_filter
+from tritonbench.utils.env_utils import is_fbcode
 
+from tritonbench.utils.input import input_filter
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
@@ -15,6 +16,9 @@ from tritonbench.utils.triton_op import (
 )
 
 from .hstu import get_test_inputs, triton_hstu_mha
+
+if is_fbcode():
+    from .fb.hstu import cuda_hstu_mha
 
 
 def parse_op_args(args: List[str]):
@@ -29,7 +33,7 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--has-delta-q", type=bool, default=False)
     parser.add_argument("--delta-size", type=int, default=256)
     parser.add_argument("--target-size", type=int, default=20)
-    parser.add_argument("--max-attn-len", type=int, default=256)
+    parser.add_argument("--max-attn-len", type=int, default=0)
     # set to 0 to use hstu_mha
     parser.add_argument("--min-full-attn-seq-len", type=int, default=0)
     parser.add_argument("--contextual-seq-len", type=int, default=0)
@@ -76,6 +80,23 @@ class Operator(BenchmarkOperator):
             causal=self.causal,
             num_targets=num_targets,
             max_attn_len=self.max_attn_len,
+            contextual_seq_len=self.contextual_seq_len,
+            sort_by_length=True,
+        )
+
+    @register_benchmark(enabled=is_fbcode())
+    def hstu_cuda(self, q, k, v, seq_offsets, num_targets, max_seq_len):
+        return lambda: cuda_hstu_mha(
+            max_seq_len,
+            alpha=self.alpha,
+            q=q,
+            k=k,
+            v=v,
+            seq_offsets=seq_offsets,
+            causal=self.causal,
+            num_targets=num_targets,
+            max_attn_len=self.max_attn_len,
+            min_full_attn_seq_len=self.min_full_attn_seq_len,
             contextual_seq_len=self.contextual_seq_len,
             sort_by_length=True,
         )

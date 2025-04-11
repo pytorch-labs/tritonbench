@@ -32,7 +32,6 @@ It benchmarks the following FMHA kernels:
 """
 
 import argparse
-import math
 import os
 from contextlib import nullcontext
 from itertools import chain
@@ -77,9 +76,7 @@ try:
     HAS_FLASH_V3 = True
 except (ImportError, IOError, AttributeError):
     try:
-        from ai_codesign.gen_ai.flash_attention_v2.hopper.flash_attn_interface import (
-            flash_attn_func as flash_attn_v3,
-        )
+        from fa3.hopper.flash_attn_interface import flash_attn_func as flash_attn_v3
 
         HAS_FLASH_V3 = True
     except (ImportError, IOError, AttributeError):

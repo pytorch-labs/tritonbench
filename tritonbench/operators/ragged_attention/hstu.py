@@ -5,7 +5,7 @@ from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
 if is_fbcode():
-    # Internal Import
+    # Internal Imports
     from generative_recommenders.common import apply_sampling, generate_sparse_seq_len
     from generative_recommenders.ops.triton.triton_hstu_attention import triton_hstu_mha
 else:
@@ -65,7 +65,7 @@ def get_test_inputs(
             )
     max_attn_len = max_attn_len if max_attn_len < seq_len else seq_len
     seq_offsets = torch.zeros(
-        (batch_size + 1,), dtype=torch.int64, device=torch.device("cuda")
+        (batch_size + 1,), dtype=torch.int32, device=torch.device("cuda")
     )
     seq_offsets[1:] = torch.cumsum(lengths, dim=0)
     L = int(seq_offsets[-1].item())
