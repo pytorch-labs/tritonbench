@@ -77,7 +77,6 @@ class Operator(BenchmarkOperator):
             k=k,
             v=v,
             seq_offsets=seq_offsets,
-            causal=self.causal,
             num_targets=num_targets,
             max_attn_len=self.max_attn_len,
             contextual_seq_len=self.contextual_seq_len,
