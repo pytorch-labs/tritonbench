@@ -2,10 +2,11 @@ diff --git a/config.py b/config.py
 index 0d97ed8..cedf943 100644
 --- a/config.py
 +++ b/config.py
-@@ -60,7 +60,7 @@ sources = {
+@@ -68,7 +68,7 @@ sources = {
  ### WHICH KERNELS DO WE WANT TO BUILD?
  # (oftentimes during development work you don't need to redefine them all.)
--kernels = ['attn', 'mamba2', 'hedgehog', 'fftconv', 'fused_rotary', 'based', 'fused_layernorm']
+ # kernels = ['attn', 'mamba2', 'hedgehog', 'fftconv', 'fused_rotary', 'based', 'fused_layernorm']
+-kernels = ['fp8_gemm']
 +kernels = ['attn', 'fp8_gemm']
 
  ### WHICH GPU TARGET DO WE WANT TO BUILD FOR?
