@@ -1,0 +1,18 @@
+# .pre-commit-config.yaml
+repos:
+-   repo: https://github.com/omnilib/ufmt
+    rev: v2.7.0
+    hooks:
+    -   id: ufmt
+        additional_dependencies:
+        -   ruff-api==0.1.0
+        -   black==25.1.0
+        -   usort==1.0.8.post1
+
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
