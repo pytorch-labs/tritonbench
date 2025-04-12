@@ -1,4 +1,5 @@
 import torch
+from torch.nn.attention.flex_attention import BlockMask
 from torch.utils._pytree import tree_map
 
 
@@ -19,6 +20,11 @@ def input_cast(cond, action, example_inputs):
     elif isinstance(example_inputs, torch.Tensor):
         return example_inputs
     elif isinstance(example_inputs, torch.nn.Module):
+        return example_inputs
+    elif isinstance(example_inputs, BlockMask):
+        return example_inputs
+    # FlexAttention passes around functions as inputs
+    elif callable(example_inputs):
         return example_inputs
     else:
         raise RuntimeError(f"Unsupported input type: {type(example_inputs)}")
