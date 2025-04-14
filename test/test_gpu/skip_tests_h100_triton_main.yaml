@@ -13,6 +13,7 @@ flash_attention:
   - triton_tutorial_flash_v2_tma_ws_persistent
 # the two requires full fbgemm instead of genai flavor
 fp8_gemm_rowwise:
+fp8_gemm_rowwise_grouped:
 fp8_gemm_grouped:
 fp8_attention:
   # fb-only kernel
@@ -23,6 +24,7 @@ gemm:
   # internal only kernels
   - hstu_triton_matmul
   - colfax_cutlass_matmul
+  - pt2_cutlass_matmul
 # jagged tests are slow, so disable them in OSS
 jagged_layer_norm:
 jagged_mean:
