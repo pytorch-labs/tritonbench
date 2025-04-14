@@ -39,10 +39,9 @@ except ImportError as e:
     )
     raise e
 
-# TODO how should I enable these
-# torch._dynamo.config.automatic_dynamic_shapes = False
-# torch._dynamo.config.recompile_limit = 10000
-# torch._dynamo.config.accumulated_recompile_limit = 10000
+torch._dynamo.config.automatic_dynamic_shapes = False
+torch._dynamo.config.recompile_limit = 10000
+torch._dynamo.config.accumulated_recompile_limit = 10000
 
 MOD_TYPES = [
     "noop",
@@ -299,38 +298,6 @@ class Operator(BenchmarkOperator):
         total_flops = B * Hq * (qk_flops + softmax_flops + o_flops) * (1 - sparsity)
         return total_flops
 
-    # @staticmethod
-    # def calculate_bandwidth(shape: FullShape, block_mask: BlockMask) -> float:
-    #     B, Hq, M, Hkv, N, D = shape
-    #     sparsity = results.sparsity if M == 1 else 0.0
-    #     if type == "fwd":
-    #         batch_size, q_heads, q_seq_len, kv_heads, kv_seq_len, head_dim = config.shape
-    #         query_size = (
-    #             batch_size
-    #             * q_heads
-    #             * q_seq_len
-    #             * head_dim
-    #             * torch.finfo(config.dtype).bits
-    #             / 8
-    #         )
-    #         kv_size = (
-    #             batch_size
-    #             * kv_heads
-    #             * kv_seq_len
-    #             * head_dim
-    #             * torch.finfo(config.dtype).bits
-    #             / 8
-    #             * 2
-    #         )
-    #         output_size = query_size
-    #         total_size = (
-    #             query_size + kv_size * (1 - sparsity) + output_size
-    #         ) / 1e9  # In GB
-    #         time_in_seconds = results.fwd_time / 1e6
-    #         return total_size / time_in_seconds / 1e3
-    #     else:
-    #         raise ValueError(f"Invalid type {type}")
-
     @staticmethod
     def get_full_shape(
         q: Union[torch.Tensor, Tuple[int, int, int, int]],
@@ -376,18 +343,20 @@ class Operator(BenchmarkOperator):
             "head_bias": None,
             "alibi": None,
             "sliding_window": None,
-            "document_mask": {
-                "BLOCK_N": 32,
-                "BLOCK_M": 128,
-                "fwd_num_warps": 8,
-                "fwd_num_stages": 4,
-                "BLOCK_M1": 64,
-                "BLOCK_N1": 64,
-                "BLOCK_M2": 64,
-                "BLOCK_N2": 64,
-            }
-            if torch.cuda.get_device_capability() >= (8, 0) and D <= 128
-            else None,
+            "document_mask": (
+                {
+                    "BLOCK_N": 32,
+                    "BLOCK_M": 128,
+                    "fwd_num_warps": 8,
+                    "fwd_num_stages": 4,
+                    "BLOCK_M1": 64,
+                    "BLOCK_N1": 64,
+                    "BLOCK_M2": 64,
+                    "BLOCK_N2": 64,
+                }
+                if torch.cuda.get_device_capability() >= (8, 0) and D <= 128
+                else None
+            ),
             "prefix_lm": None,
             "softcap": None,
         }
