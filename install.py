@@ -14,11 +14,21 @@ from tools.python_utils import (
     pip_install_requirements,
 )
 
-from tritonbench.utils.env_utils import is_hip
-
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Install the latest pytorch nightly with default cuda version
+# if torch does not exist
+if not has_pkg("torch"):
+    from tools.torch_utils import install_pytorch_nightly
+
+    env = os.environ
+    cuda_version = CUDA_VERSION_MAP[DEFAULT_CUDA_VERSION]["pytorch_url"]
+    install_pytorch_nightly(cuda_version, env)
+
+# requires torch
+from tritonbench.utils.env_utils import is_hip
+
 
 REPO_PATH = Path(os.path.abspath(__file__)).parent
 FBGEMM_PATH = REPO_PATH.joinpath("submodules", "FBGEMM", "fbgemm_gpu")
@@ -134,17 +144,6 @@ if __name__ == "__main__":
 
     if args.numpy or not has_pkg("numpy"):
         pip_install_requirements("requirements_numpy.txt", add_build_constraints=False)
-
-    # Install the latest pytorch nightly if does not exist
-    if not has_pkg("torch"):
-        from tools.cuda_utils import detect_cuda_version_with_nvcc
-        from tools.torch_utils import install_pytorch_nightly
-
-        env = os.environ
-        cuda_version = CUDA_VERSION_MAP[detect_cuda_version_with_nvcc(env)][
-            "pytorch_url"
-        ]
-        install_pytorch_nightly(cuda_version, env)
 
     # generate build constraints before installing anything
     deps = get_pkg_versions(TRITONBENCH_DEPS)
