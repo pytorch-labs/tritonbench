@@ -8,6 +8,8 @@ version = "0.0.1"
 dependencies = [
     "torch",
     "triton",
+    "psutil",
+    "tabulate",
 ]
 
 [tool.setuptools.packages.find]
