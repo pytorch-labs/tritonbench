@@ -6,14 +6,8 @@ from typing import Any, Callable, Generator, List, NamedTuple, Optional, Tuple, 
 
 import torch
 
-from attn_gym.masks import (
-    generate_doc_mask_mod,
-    generate_prefix_lm_mask,
-    generate_sliding_window,
-)
-from attn_gym.masks.causal import causal_mask
-from attn_gym.masks.document_mask import length_to_offsets
-from attn_gym.mods import generate_alibi_bias, generate_tanh_softcap
+# from attn_gym.masks.document_mask import length_to_offsets
+# from attn_gym.mods import generate_alibi_bias, generate_tanh_softcap
 from torch.nn.attention.flex_attention import (
     _score_mod_signature,
     BlockMask,
@@ -31,13 +25,16 @@ from tritonbench.utils.triton_op import (
     register_x_val,
 )
 
-try:
-    import attn_gym  # noqa: F401
-except ImportError as e:
-    print(
-        "attn_gym not found, to install run `pip install git+https://github.com/pytorch-labs/attention-gym.git`"
-    )
-    raise e
+from .mods import (
+    causal_mask,
+    generate_alibi_bias,
+    generate_doc_mask_mod,
+    generate_prefix_lm_mask,
+    generate_sliding_window,
+    generate_tanh_softcap,
+    length_to_offsets,
+)
+
 
 torch._dynamo.config.automatic_dynamic_shapes = False
 torch._dynamo.config.recompile_limit = 10000
