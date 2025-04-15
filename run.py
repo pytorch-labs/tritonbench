@@ -64,6 +64,8 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
 
             if "hardware" in args:
                 kwargs["hardware"] = args.hardware
+            if "triton_type" in args:
+                kwargs["triton_type"] = args.triton_type
             log_benchmark(**kwargs)
 
         if args.plot:
