@@ -7,8 +7,6 @@
 flash_attention:
   # thunderkittens cannot handle the default input shapes
   - tk
-  # triton_op_flash_v2 will segfault on triton-pytorch
-  - triton_op_flash_v2
   # triton_tutorial_*_ws kernels require triton-main
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
@@ -32,12 +30,6 @@ jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
 jagged_sum:
-ragged_attention:
-  # ../../../lib/Tools/LinearLayout.cpp:565: LinearLayout
-  # mlir::triton::LinearLayout::reshapeOuts(ArrayRef<std::pair<StringAttr, int32_t>>) const:
-  # Assertion `getTotalOutDimSize() == std::accumulate( newOutDims.begin(), newOutDims.end(),
-  # 1, [&](int32_t acc, auto &outDim) { return acc * outDim.second; })' failed.
-  - hstu
 # cpu-op for testing
 test_op:
 # TODO: decoding attention requires updated xformers and flash_attn
