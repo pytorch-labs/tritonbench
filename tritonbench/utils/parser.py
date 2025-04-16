@@ -212,6 +212,12 @@ def get_parser(args=None):
             action="store_true",
             help="whether or not to take specific production shapes as input",
         )
+        parser.add_argument(
+            "--triton-type",
+            default="stable",
+            type=str,
+            help="Set what version of Triton we are using for logging purposes.",
+        )
 
     args, extra_args = parser.parse_known_args(args)
     if args.op and args.ci:
