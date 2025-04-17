@@ -45,6 +45,3 @@ pip install -e python
 TRITONBENCH_TRITON_MAIN_COMMIT=$(git rev-parse --verify HEAD)
 echo "export TRITONBENCH_TRITON_MAIN_COMMIT=${TRITONBENCH_TRITON_MAIN_COMMIT}" >> /workspace/setup_instance.sh
 echo "export TRITONBENCH_TRITON_REPO_PATH=/workspace/triton" >> /workspace/setup_instance.sh
-
-# test main branch installation with importing experimental descriptor
-python -c "import triton.tools.experimental_descriptor"
