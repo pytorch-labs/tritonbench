@@ -30,6 +30,7 @@ jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
 jagged_sum:
+ragged_attention:
 # cpu-op for testing
 test_op:
 # TODO: decoding attention requires updated xformers and flash_attn
