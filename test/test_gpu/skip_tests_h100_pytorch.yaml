@@ -13,7 +13,6 @@ flash_attention:
   - triton_tutorial_flash_v2_tma_ws_persistent
 # the two requires full fbgemm instead of genai flavor
 fp8_gemm_rowwise:
-fp8_gemm_rowwise_grouped:
 fp8_gemm_grouped:
 fp8_attention:
   # fp8 colfax_fmha is fbcode only
