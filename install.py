@@ -170,7 +170,7 @@ if __name__ == "__main__":
     if args.jax or args.all:
         logger.info("[tritonbench] installing jax...")
         install_jax()
-    if args.tk:
+    if args.tk or args.all:
         logger.info("[tritonbench] installing thunderkittens...")
         from tools.tk.install import install_tk
 
