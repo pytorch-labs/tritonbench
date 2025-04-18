@@ -982,11 +982,14 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         return None
 
     def kernel_hash(self, fn):
-        AST = triton.compiler.ASTSource(fn=fn, signature={})
-        sorted_sig = [v for k, v in sorted(AST.signature.items())]
-        key = f"{AST.attrs.hash()}-{sorted_sig}"
-        hashed = hashlib.sha256(key.encode("utf-8")).hexdigest()
-        return hashed
+        try:
+            AST = triton.compiler.ASTSource(fn=fn, signature={})
+            sorted_sig = [v for k, v in sorted(AST.signature.items())]
+            key = f"{AST.attrs.hash()}-{sorted_sig}"
+            hashed = hashlib.sha256(key.encode("utf-8")).hexdigest()
+            return hashed
+        except:
+            return ""
 
     def enable_bf16(self):
         tensor_cond = lambda x: x.dtype == torch.float32

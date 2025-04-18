@@ -48,6 +48,7 @@ def get_nvidia_gpu_model():
         str: The model of the NVIDIA GPU
     Raises:
         subprocess.CalledProcessError: If the `nvidia-smi` command fails
+        FileNotFoundError: If the nvidia toolchain is not installed.
     """
     model = subprocess.check_output(
         ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"]
