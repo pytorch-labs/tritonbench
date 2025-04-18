@@ -4,7 +4,7 @@ from typing import Any, Callable, List, Optional
 
 import torch
 
-from tritonbench.utils.env_utils import is_fbcode
+from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda, is_fbcode
 
 from tritonbench.utils.input import input_filter
 from tritonbench.utils.triton_op import (
@@ -19,6 +19,12 @@ from .hstu import get_test_inputs, triton_hstu_mha
 
 if is_fbcode():
     from .fb.hstu import cuda_hstu_mha
+
+HAS_CUDA = False
+try:
+    HAS_CUDA = is_fbcode() and is_cuda() and get_nvidia_gpu_model() != "NVIDIA B200"
+except (FileNotFoundError, AttributeError):
+    HAS_CUDA = False
 
 
 def parse_op_args(args: List[str]):
@@ -83,7 +89,8 @@ class Operator(BenchmarkOperator):
             sort_by_length=True,
         )
 
-    @register_benchmark(enabled=is_fbcode())
+    # TODO: remove B200 hacks like these.
+    @register_benchmark(enabled=(HAS_CUDA))
     def hstu_cuda(self, q, k, v, seq_offsets, num_targets, max_seq_len):
         return lambda: cuda_hstu_mha(
             max_seq_len,
