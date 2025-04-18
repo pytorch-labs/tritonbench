@@ -25,6 +25,7 @@ HAS_TMA_DESC = "nv_tma_desc_type" in dir(tl)
 WITH_COMPPIPE = os.getenv("ENABLE_COMPPIPE")
 PEEL_LAST = os.getenv("PEEL_LAST_ITER")
 WITH_TMA = os.getenv("WITH_TMA")
+HAS_AUTO_WS = os.getenv("ENABLE_AUTO_WS")
 
 if HAS_TMA_DESC:
     print(
@@ -330,7 +331,6 @@ def _attn_fwd_inner_ws(
 # We don't run auto-tuning every time to keep the tutorial fast. Uncommenting
 # the code below and commenting out the equivalent parameters is convenient for
 # re-tuning.
-has_warp_spec = hasattr(tl, "async_task")
 schedList = ["default", "FA_firstDot", "FA_secondDot"] if WITH_COMPPIPE else ["default"]
 # TODO: incorrect result with PEEL_LAST + FA_firstDot + WarpSpec + TMA
 schedList = ["FA_secondDot"] if PEEL_LAST else schedList
@@ -350,7 +350,7 @@ configsOpt = [
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
-        if has_warp_spec
+        if HAS_AUTO_WS == "1"
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -383,7 +383,7 @@ configsTma = [
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
-        if has_warp_spec
+        if HAS_AUTO_WS == "1"
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -413,7 +413,7 @@ configsWS = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if HAS_AUTO_WS == "1"
         else triton.Config(
             {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": False, "LOOP_SCHEDULE": sched},
             num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
@@ -447,7 +447,7 @@ if torch.version.hip is None:
                 num_buffers_warp_spec=0,
                 num_consumer_groups=0,
             )
-            if has_warp_spec
+            if HAS_AUTO_WS == "1"
             else triton.Config(
                 {
                     "BLOCK_M": BM,
@@ -503,7 +503,7 @@ configsTmaWS = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if HAS_AUTO_WS == "1"
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -544,7 +544,7 @@ configsTmaWSPersistent = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if HAS_AUTO_WS == "1"
         else triton.Config(
             {
                 "BLOCK_M": BM,
