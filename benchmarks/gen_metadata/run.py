@@ -50,9 +50,9 @@ def run(args: argparse.Namespace):
     for op in operators:
         op_bench = load_opbench_by_name(op_name=op)
         DTYPE_OPERATORS[op] = op_bench.DEFAULT_PRECISION
-        if op_bench.has_baseline():
-            BASELINE_OPERATORS.append(op)
-        if op_bench.has_tflops():
+        if baseline := op_bench.has_baseline():
+            BASELINE_OPERATORS[op] = baseline
+        if op_bench.has_metric("tflops"):
             TFLOPS_OPERATORS.append(op)
         if op_bench.has_bwd():
             BACKWARD_OPERATORS.append(op)

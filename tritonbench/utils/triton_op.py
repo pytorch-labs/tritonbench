@@ -1841,3 +1841,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         if metric_name == "tflops":
             return bool(getattr(cls, "flops", None))
         return bool(getattr(cls, metric_name, None))
+
+    @classmethod
+    def has_baseline(cls) -> Optional[str]:
+        operator_name = _find_op_name_from_module_path(function.__module__)
+        return BASELINE_BENCHMARKS.get(operator_name, None)
