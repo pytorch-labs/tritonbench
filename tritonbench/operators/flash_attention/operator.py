@@ -202,7 +202,7 @@ class Operator(BenchmarkOperator):
 
         return _inner
 
-    @register_benchmark(baseline=True)
+    @register_benchmark()
     def sdpa(
         self,
         q: torch.Tensor,
@@ -253,7 +253,7 @@ class Operator(BenchmarkOperator):
         )
         return fn
 
-    @register_benchmark(enabled=HAS_FLASH_V3)
+    @register_benchmark(enabled=HAS_FLASH_V3, baseline=True)
     def flash_v3(
         self,
         q: torch.Tensor,

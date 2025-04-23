@@ -1,5 +1,6 @@
 """
-Tritonbench nightly run
+Tritonbench nightly run, dashboard: https://hud.pytorch.org/tritonbench/commit_view
+Requires the operator to support the speedup metric.
 """
 
 import argparse
@@ -8,6 +9,8 @@ import logging
 import os
 import sys
 from os.path import abspath, exists
+
+from ..common import setup_tritonbench_cwd
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -31,35 +34,38 @@ def setup_tritonbench_cwd():
 
 
 OPERATOR_BENCHMARKS = {
+    # launch latency will not be shown in the dashboard
     "launch_latency": [
-        "--op",
-        "launch_latency",
-        "--skip",
-        "nop_inductor_kernel",
-        "--metrics",
-        "latency,walltime",
+        "--op", "launch_latency",
+        "--skip", "nop_inductor_kernel",
+        "--metrics", "latency,walltime",
     ],
     "softmax": [
-        "--op",
-        "softmax",
-        "--metrics",
-        "latency,gbps",
-        "--num-inputs",
-        "6",
+        "--op", "softmax",
+        "--metrics", "speedup",
+        "--num-inputs", "6",
         "--cudagraph",
     ],
     "bf16_gemm": [
-        "--op",
-        "gemm",
-        "--only",
-        "aten_matmul,triton_tutorial_matmul",
-        "--precision",
-        "bf16",
-        "--metrics",
-        "latency,tflops",
-        "--num-inputs",
-        "4",
+        "--op", "gemm",
+        "--only", "triton_tutorial_matmul",
+        "--precision", "bf16",
+        "--metrics", "speedup",
+        "--num-inputs", "4",
         "--cudagraph",
+    ],
+    "bf16_flash_attention_fwd": [
+        "--op", "flash_attention",
+        "--only", "triton_tutorial_flash_v2_opt,flash_v3"
+        "--baseline", "flash_v3",
+        "--metrics", "tflops,speedup",
+    ],
+    "bf16_flash_attention_bwd": [
+        "--op", "flash_attention",
+        "--only", "triton_tutorial_flash_v2_opt,flash_v3"
+        "--baseline", "flash_v3",
+        "--metrics", "tflops,speedup",
+        "--bwd",
     ],
 }
 
