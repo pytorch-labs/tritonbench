@@ -168,21 +168,12 @@ def _attn_fwd_inner(
         k_offset_kn += lo
         v_offset_vk += lo
         v_offset_vn += 0
-    ON_HOST = False
     # loop over k, v and update accumulator
     for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
-            if False:
-                k = tl._experimental_descriptor_load(  # load in row major
-                    desc_k,
-                    [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0],
-                    [BLOCK_N, HEAD_DIM],
-                    Q.dtype.element_ty,
-                )
-            else:
-                k = desc_k.load([start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0])
+            k = desc_k.load([start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0])
         else:
             k_offsets_kk_vect = k_offset_kk + tl.arange(0, k_block_shape_kk)
             k_offsets_kn_vect = k_offset_kn + tl.arange(0, k_block_shape_kn)
@@ -211,25 +202,9 @@ def _attn_fwd_inner(
         # update acc
         if ENABLE_TMA:
             if fp8_v:
-                if False: #ON_HOST:
-                    v = tl._experimental_descriptor_load(  # load in row major
-                        desc_v,
-                        [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)],
-                        [HEAD_DIM, BLOCK_N],
-                        Q.dtype.element_ty,
-                    )
-                else:
-                    v = desc_v.load([(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)])
+                v = desc_v.load([(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)])
             else:
-                if False: #ON_HOST:
-                    v = tl._experimental_descriptor_load(  # load in row major
-                        desc_v,
-                        [(qvk_offset // stride_vk + start_n).to(tl.int32), 0],
-                        [BLOCK_N, HEAD_DIM],
-                        Q.dtype.element_ty,
-                    )
-                else:
-                    v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
+                v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
         else:
             v_offsets_vk_vect = v_offset_vk + tl.arange(0, v_block_shape_vk)
             v_offsets_vn_vect = v_offset_vn + tl.arange(0, v_block_shape_vn)
@@ -307,22 +282,13 @@ def _attn_fwd_inner_ws(
         k_offset_kn += lo
         v_offset_vk += lo
         v_offset_vn += 0
-    ON_HOST = False
     # loop over k, v and update accumulator
     for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         with tl.async_task([0]):
             if ENABLE_TMA:
-                if False: #ON_HOST:
-                    k = tl._experimental_descriptor_load(  # load in row major
-                        desc_k,
-                        [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0],
-                        [BLOCK_N, HEAD_DIM],
-                        Q.dtype.element_ty,
-                    )
-                else:
-                    k = desc_k.load([start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0])
+                k = desc_k.load([start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0])
             else:
                 k_offsets_kk_vect = k_offset_kk + tl.arange(0, k_block_shape_kk)
                 k_offsets_kn_vect = k_offset_kn + tl.arange(0, k_block_shape_kn)
@@ -358,25 +324,9 @@ def _attn_fwd_inner_ws(
         with tl.async_task([0]):
             if ENABLE_TMA:
                 if fp8_v:
-                    if False: #ON_HOST:
-                        v = tl._experimental_descriptor_load(  # load in row major
-                            desc_v,
-                            [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)],
-                            [HEAD_DIM, BLOCK_N],
-                            Q.dtype.element_ty,
-                        )
-                    else:
-                        v = desc_v.load([(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)])
+                    v = desc_v.load([(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)])
                 else:
-                    if False: #ON_HOST:
-                        v = tl._experimental_descriptor_load(  # load in row major
-                            desc_v,
-                            [(qvk_offset // stride_vk + start_n).to(tl.int32), 0],
-                            [BLOCK_N, HEAD_DIM],
-                            Q.dtype.element_ty,
-                        )
-                    else:
-                        v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
+                    v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
             else:
                 v_offsets_vk_vect = v_offset_vk + tl.arange(0, v_block_shape_vk)
                 v_offsets_vn_vect = v_offset_vn + tl.arange(0, v_block_shape_vn)
@@ -755,18 +705,9 @@ def _attn_fwd_compute(
     # load scales
     qk_scale = sm_scale
     qk_scale *= 1.44269504  # 1/log(2)
-    ON_HOST = False
     # load q: it will stay in SRAM throughout
     if ENABLE_TMA:
-        if False: #ON_HOST:
-            q = tl._experimental_descriptor_load(  # load in row major
-                desc_q,
-                [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0],
-                [BLOCK_M, HEAD_DIM],
-                Q.dtype.element_ty,
-            )
-        else:
-            q = desc_q.load([(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0])
+        q = desc_q.load([(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0])
     else:
         q = tl.load(
             q_base_ptr + q_offsets,
@@ -860,14 +801,7 @@ def _attn_fwd_compute(
     m_mask = off_hz * N_CTX + offs_m < N_CTX
     tl.store(m_ptrs, m_i, mask=m_mask)
     if ENABLE_TMA:
-        if False: #ON_HOST:
-            tl._experimental_descriptor_store(
-                desc_o,
-                acc.to(Out.type.element_ty),
-                [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
-            )
-        else:
-            desc_o.store([(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0], acc.to(Out.type.element_ty))
+        desc_o.store([(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0], acc.to(Out.type.element_ty))
     else:
         tl.store(
             o_base_ptr + o_offsets,
@@ -972,18 +906,9 @@ def _attn_fwd_compute_ws(
     qk_scale = sm_scale
     qk_scale *= 1.44269504  # 1/log(2)
     # load q: it will stay in SRAM throughout
-    ON_HOST = False
     with tl.async_task([0]):
         if ENABLE_TMA:
-            if False: #ON_HOST:
-                q = tl._experimental_descriptor_load(  # load in row major
-                    desc_q,
-                    [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0],
-                    [BLOCK_M, HEAD_DIM],
-                    Q.dtype.element_ty,
-                )
-            else:
-                q = desc_q.load([(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0])
+            q = desc_q.load([(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0])
         else:
             q = tl.load(q_base_ptr + q_offsets)
     # stage 1: off-band
@@ -1077,14 +1002,7 @@ def _attn_fwd_compute_ws(
         m_ptrs = M + off_hz * N_CTX + offs_m
         tl.store(m_ptrs, m_i)
         if ENABLE_TMA:
-            if False: #ON_HOST:
-                tl._experimental_descriptor_store(
-                    desc_o,
-                    acc.to(Out.type.element_ty),
-                    [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
-                )
-            else:
-                desc_o.store([(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0], acc.to(Out.type.element_ty))
+            desc_o.store([(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0], acc.to(Out.type.element_ty))
         else:
             tl.store(o_base_ptr + o_offsets, acc.to(Out.type.element_ty))
 
@@ -2151,7 +2069,7 @@ class _attention_opt(torch.autograd.Function):
         NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
 
         def grid_tma_persistent(META):
-            if META["ENABLE_TMA"] == False:
+            if META["ENABLE_TMA"] == False or HAS_TMA_DESC == False:
                 return (
                     min(
                         NUM_SMS * META["GRID_MULTIPLE"],
@@ -2355,10 +2273,6 @@ class _attention_opt(torch.autograd.Function):
                 sm_scale,
                 M,
                 o,
-                desc_q,
-                desc_k,
-                desc_v,
-                desc_o,  #
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
@@ -2423,10 +2337,6 @@ class _attention_opt(torch.autograd.Function):
                 sm_scale,
                 M,
                 o,
-                desc_q,
-                desc_k,
-                desc_v,
-                desc_o,  #
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
