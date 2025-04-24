@@ -129,11 +129,11 @@ class Operator(BenchmarkOperator):
         else:
             self.shapes = BUILDIN_SHAPES
 
-    @register_benchmark(enabled=HAS_TRITON, baseline=True)
+    @register_benchmark(enabled=HAS_TRITON)
     def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: triton_fp8_block(xq, wq, x_scale, w_scale)
 
-    @register_benchmark(enabled=HAS_CUTLASS)
+    @register_benchmark(enabled=HAS_CUTLASS, baseline=True)
     def _cutlass(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: cutlass_fp8_block(xq, wq, x_scale, w_scale)
 

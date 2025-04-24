@@ -179,7 +179,7 @@ class Operator(BenchmarkOperator):
             self.warp_specialization = False
             self.shapes = BUILDIN_SHAPES
 
-    @register_benchmark(enabled=HAS_TRITON, baseline=True)
+    @register_benchmark(enabled=HAS_TRITON)
     def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: triton_fp8_row(
             xq,
@@ -193,7 +193,9 @@ class Operator(BenchmarkOperator):
         )
 
     @register_benchmark(
-        enabled=HAS_CUTLASS_OR_CK, label="ck" if torch.version.hip else "cutlass"
+        enabled=HAS_CUTLASS_OR_CK,
+        label="ck" if torch.version.hip else "cutlass",
+        baseline=True,
     )
     def _cutlass_or_ck(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: cutlass_or_ck_fp8_row(

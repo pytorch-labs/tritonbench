@@ -398,7 +398,7 @@ class Operator(BenchmarkOperator):
         self.no_use_persistent = addmm_args.no_use_persistent
         self.warp_specialization = addmm_args.warp_specialization
 
-    @register_benchmark(enabled=HAS_TRITON, baseline=True)
+    @register_benchmark(enabled=HAS_TRITON)
     def _triton(self, group_A, group_B, m_sizes, a_scale, b_scale) -> Callable:
         """
         Returns a lambda function that performs the Triton FP8 GEMM grouped operation.
@@ -425,7 +425,9 @@ class Operator(BenchmarkOperator):
         )
 
     @register_benchmark(
-        enabled=HAS_CUTLASS_OR_CK, label="ck" if torch.version.hip else "cutlass"
+        enabled=HAS_CUTLASS_OR_CK,
+        label="ck" if torch.version.hip else "cutlass",
+        baseline=True,
     )
     def _cutlass_or_ck(self, group_A, group_B, m_sizes, a_scale, b_scale) -> Callable:
         """
