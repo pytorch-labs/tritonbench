@@ -192,6 +192,11 @@ def get_parser(args=None):
         type=str,
         help="The directory to store input or output.",
     )
+    parser.add_argument(
+        "--benchmark-name",
+        default=None,
+        help="Name of the benchmark run.",
+    )
 
     parser.add_argument(
         "--prod-shapes",

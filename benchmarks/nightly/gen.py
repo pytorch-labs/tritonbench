@@ -24,6 +24,12 @@ BASELINE_OPS = get_metadata("baseline_operators")
 BWD_OPS = get_metadata("backward_operators")
 
 
+def _has_meaningful_baseline(op: str):
+    return op in BASELINE_OPS and not (
+        BASELINE_OPS[op] in TRITON_OPS[op] and len(TRITON_OPS[op]) == 1
+    )
+
+
 def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
     out = {}
     for op in operators:
@@ -39,9 +45,7 @@ def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
         metrics = []
         if op in TFLOPS_OPS:
             metrics.append("tflops")
-        if op in BASELINE_OPS and not (
-            BASELINE_OPS[op] in TRITON_OPS[op] and len(TRITON_OPS[op]) == 1
-        ):
+        if _has_meaningful_baseline(op):
             cmd.extend(["--baseline", BASELINE_OPS[op]])
             metrics.append("speedup")
         cmd.extend(["--metrics", ",".join(metrics)])
@@ -50,7 +54,7 @@ def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
             cmd.append("--bwd")
         # add backends
         run_backends = TRITON_OPS[op]
-        if op in BASELINE_OPS and not BASELINE_OPS[op] in run_backends:
+        if _has_meaningful_baseline(op):
             run_backends.append(BASELINE_OPS[op])
         cmd.extend(["--only", ",".join(run_backends)])
         out[run_name] = {}
@@ -61,10 +65,12 @@ def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
 
 def run():
     # generate forward runs
-    forward_ops = [op for op in TRITON_OPS if op in TFLOPS_OPS]
+    forward_ops = [op for op in TRITON_OPS if _has_meaningful_baseline(op)]
     runs = gen_run(forward_ops)
     # generate backward runs
-    backward_ops = [op for op in BWD_OPS if op in TRITON_OPS and op in TFLOPS_OPS]
+    backward_ops = [
+        op for op in BWD_OPS if op in TRITON_OPS or _has_meaningful_baseline(op)
+    ]
     runs.update(gen_run(backward_ops, bwd=True))
     with open(OUTPUT_PATH, "w") as f:
         yaml.safe_dump(runs, f, sort_keys=False)

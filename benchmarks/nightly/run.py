@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 from os.path import abspath, exists
+from pathlib import Path
 from typing import Any, Dict
 
 import yaml
@@ -65,6 +66,13 @@ def reduce(run_timestamp, output_dir, output_files, args):
         aggregated_obj["github"] = get_github_env()
 
     for result_json_file in output_files:
+        logger.info(f"Loading output file: {result_json_file}.")
+        result_json_filename = Path(result_json_file).stem
+        if not os.path.exists(result_json_file) or os.path.getsize(result_json_file) == 0:
+            aggregated_obj["metrics"][f"tritonbench_{result_json_filename}-pass"] = 0
+            continue
+        # TODO: check if all inputs pass
+        aggregated_obj["metrics"][f"tritonbench_{result_json_filename}-pass"] = 1
         with open(
             result_json_file,
             "r",
@@ -82,6 +90,8 @@ def get_operator_benchmarks() -> Dict[str, Any]:
         out = {}
         with open(config_path, "r") as f:
             obj = yaml.safe_load(f)
+        if not obj:
+            return out
         for benchmark_name in obj:
             out[benchmark_name] = (
                 obj[benchmark_name]["op"],
@@ -111,7 +121,7 @@ def run():
         op_name, op_args = operator_benchmarks[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.json")
         op_args.extend(["--output-json", str(output_file.absolute())])
-        run_in_task(op=op_name, op_args=op_args)
+        run_in_task(op=op_name, op_args=op_args, benchmark_name=op_bench)
         output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(run_timestamp, output_dir, output_files, args)

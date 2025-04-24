@@ -44,7 +44,7 @@ layer_norm:
 low_mem_dropout:
   - triton_dropout
 ragged_attention:
-  - hstu_triton_ragged_attention
+  - hstu
 rms_norm:
   - liger_rms
 rope:

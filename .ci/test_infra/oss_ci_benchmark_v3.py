@@ -23,9 +23,9 @@ def parse_runners(
     runner_name: str, runner_type: str, envs: Dict[str, str]
 ) -> List[Dict[str, Any]]:
     runner_mapping = RUNNER_TYPE_MAPPING[runner_type].copy()
-    runner_mapping.update("name", runner_name)
-    runner_mapping.update("gpu_info", envs["device"])
-    runner_mapping.update("extra_info", {})
+    runner_mapping["name"] = runner_name
+    runner_mapping["gpu_info"] = envs["device"]
+    runner_mapping["extra_info"] = {}
     runner_mapping["extra_info"]["cuda_version"] = envs["cuda_version"]
     return [runner_mapping]
 
@@ -57,6 +57,11 @@ def parse_metric_id(metric_id: str) -> Tuple[str, str, str, str, str]:
         op, mode, input, backend, metric = re.match(metric_id_regex, metric_id).groups()
         out = (op, mode, input, backend, metric)
         return out
+    elif metric_id.endswith("-pass"):  # pass/fail metric
+        metric_id_regex = r"tritonbench_([0-9a-z_]+)_([a-z_]+)-pass"
+        op, mode = re.match(metric_id_regex, metric_id).groups()
+        out = (op, mode, None, None, "pass")
+        return out
     # aggregated metric
     input = None
     metric_id_regex = r"tritonbench_([0-9a-z_]+)_([a-z_]+)\[([0-9a-z_]+)\]-(.+)"
@@ -84,7 +89,12 @@ def generate_oss_ci_benchmark_v3_json(
         )
         entry["dependencies"] = parse_dependencies(benchmark_result["env"])
         op, mode, _input, backend, metric_name = parse_metric_id(metric_id)
-        metric_value = benchmark_result["metrics"][metric_id]
+        try:
+            metric_value = benchmark_result["metrics"][metric_id]
+            metric_value = float(metric_value) if metric_value else 0.0
+        except ValueError:
+            # If value error (e.g., "CUDA OOM"), override the field value to 0.0
+            metric_value = 0.0
         entry["benchmark"] = {
             "name": benchmark_result["name"],
             "mode": mode,

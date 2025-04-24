@@ -262,6 +262,7 @@ BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_m
 @dataclass
 class BenchmarkOperatorResult:
     # Print the result in a table format
+    benchmark_name: str
     op_name: str
     op_mode: str
     metrics: List[str]
@@ -457,6 +458,11 @@ class BenchmarkOperatorResult:
         headers, table = self._table()
         table = self._post_process_table(table)
         agg_data = {}
+        benchmark_name = (
+            self.benchmark_name
+            if self.benchmark_name
+            else f"{self.op_name}_{self.op_mode}"
+        )
         for row in table:
             x_val = row[0]
 
@@ -469,9 +475,13 @@ class BenchmarkOperatorResult:
                         f"{metrics_name}-{k}": value for k, value in v.items()
                     }
                 for metrics, value in metrics_dict.items():
-                    metric_name = f"tritonbench_{self.op_name}_{self.op_mode}[x_{x_val}-{provider}]_{metrics}"
+                    metric_name = (
+                        f"tritonbench_{benchmark_name}[x_{x_val}-{provider}]_{metrics}"
+                    )
                     userbenchmark_metrics_dict[metric_name] = value
-                    agg_metric_name = f"tritonbench_{self.op_name}_{self.op_mode}[{provider}]-{metrics}-avg"
+                    agg_metric_name = (
+                        f"tritonbench_{benchmark_name}[{provider}]-{metrics}-avg"
+                    )
                     if value is None:
                         continue
                     if isinstance(value, (int, float)):
@@ -896,6 +906,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             raise
         finally:
             self.output = BenchmarkOperatorResult(
+                benchmark_name=self.tb_args.benchmark_name,
                 op_name=self.name,
                 op_mode=self.mode.value,
                 metrics=self.required_metrics,
