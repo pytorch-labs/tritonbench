@@ -1,4 +1,5 @@
 # This file is for manually added nightly benchmarks
 # It will be merged with benchmarks/nightly/autogen.yaml
 launch_latency:
-  cmd: --op launch_latency --skip nop_inductor_kernel --metrics latency,walltime
+  op: launch_latency
+  args: --op launch_latency --skip nop_inductor_kernel --metrics latency,walltime

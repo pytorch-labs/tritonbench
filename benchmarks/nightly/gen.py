@@ -34,7 +34,6 @@ def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
         )
         mode = "fwd" if not bwd else "bwd"
         run_name = f"{dtype}_{op}_{mode}" if dtype else f"{op}_{mode}"
-        # add op
         cmd = ["--op", op]
         # add metrics
         metrics = []
@@ -53,9 +52,10 @@ def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
         run_backends = TRITON_OPS[op]
         if op in BASELINE_OPS and not BASELINE_OPS[op] in run_backends:
             run_backends.append(BASELINE_OPS[op])
-        cmd.extend(["--backends", ",".join(run_backends)])
+        cmd.extend(["--only", ",".join(run_backends)])
         out[run_name] = {}
-        out[run_name]["cmd"] = " ".join(cmd)
+        out[run_name]["op"] = op
+        out[run_name]["args"] = " ".join(cmd)
     return out
 
 
