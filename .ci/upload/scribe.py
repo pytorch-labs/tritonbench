@@ -70,7 +70,11 @@ class ScribeUploader:
             elif field in self.schema["int"]:
                 message["int"][field] = int(value)
             elif field in self.schema["float"]:
-                message["float"][field] = float(value)
+                try:
+                    message["float"][field] = float(value)
+                except ValueError:
+                    # If value error (e.g., "CUDA OOM"), override the field value to 0.0
+                    message["float"][field] = 0.0
             else:
                 raise ValueError(
                     "Field {} is not currently used, "
