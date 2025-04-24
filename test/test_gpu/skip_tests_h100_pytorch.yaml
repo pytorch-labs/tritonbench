@@ -7,6 +7,8 @@
 flash_attention:
   # thunderkittens cannot handle the default input shapes
   - tk
+  # tma API changed in upstream
+  - triton_tutorial_flash_v2_tma
   # triton_tutorial_*_ws kernels require triton-main
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
