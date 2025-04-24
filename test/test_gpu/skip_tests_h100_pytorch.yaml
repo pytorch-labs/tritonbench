@@ -20,6 +20,8 @@ fp8_gemm_grouped:
 fp8_attention:
   # fp8 colfax_fmha is fbcode only
   - colfax_fmha
+  # tma API changed in upstream
+  - triton_flash_v2_tma
 # fp8_fused_quant_gemm_rowwise requires fb-only kernels
 fp8_fused_quant_gemm_rowwise:
 gemm:
