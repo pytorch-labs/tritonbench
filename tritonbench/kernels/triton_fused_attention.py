@@ -173,7 +173,9 @@ def _attn_fwd_inner(
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
-            k = desc_k.load([start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0])
+            k = desc_k.load(
+                [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
+            )
         else:
             k_offsets_kk_vect = k_offset_kk + tl.arange(0, k_block_shape_kk)
             k_offsets_kn_vect = k_offset_kn + tl.arange(0, k_block_shape_kn)
@@ -202,7 +204,9 @@ def _attn_fwd_inner(
         # update acc
         if ENABLE_TMA:
             if fp8_v:
-                v = desc_v.load([(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)])
+                v = desc_v.load(
+                    [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)]
+                )
             else:
                 v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
         else:
@@ -288,7 +292,9 @@ def _attn_fwd_inner_ws(
         # -- compute qk ----
         with tl.async_task([0]):
             if ENABLE_TMA:
-                k = desc_k.load([start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0])
+                k = desc_k.load(
+                    [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
+                )
             else:
                 k_offsets_kk_vect = k_offset_kk + tl.arange(0, k_block_shape_kk)
                 k_offsets_kn_vect = k_offset_kn + tl.arange(0, k_block_shape_kn)
@@ -324,9 +330,13 @@ def _attn_fwd_inner_ws(
         with tl.async_task([0]):
             if ENABLE_TMA:
                 if fp8_v:
-                    v = desc_v.load([(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)])
+                    v = desc_v.load(
+                        [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)]
+                    )
                 else:
-                    v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
+                    v = desc_v.load(
+                        [(qvk_offset // stride_vk + start_n).to(tl.int32), 0]
+                    )
             else:
                 v_offsets_vk_vect = v_offset_vk + tl.arange(0, v_block_shape_vk)
                 v_offsets_vn_vect = v_offset_vn + tl.arange(0, v_block_shape_vn)
@@ -801,7 +811,10 @@ def _attn_fwd_compute(
     m_mask = off_hz * N_CTX + offs_m < N_CTX
     tl.store(m_ptrs, m_i, mask=m_mask)
     if ENABLE_TMA:
-        desc_o.store([(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0], acc.to(Out.type.element_ty))
+        desc_o.store(
+            [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
+            acc.to(Out.type.element_ty),
+        )
     else:
         tl.store(
             o_base_ptr + o_offsets,
@@ -908,7 +921,9 @@ def _attn_fwd_compute_ws(
     # load q: it will stay in SRAM throughout
     with tl.async_task([0]):
         if ENABLE_TMA:
-            q = desc_q.load([(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0])
+            q = desc_q.load(
+                [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0]
+            )
         else:
             q = tl.load(q_base_ptr + q_offsets)
     # stage 1: off-band
@@ -1002,7 +1017,10 @@ def _attn_fwd_compute_ws(
         m_ptrs = M + off_hz * N_CTX + offs_m
         tl.store(m_ptrs, m_i)
         if ENABLE_TMA:
-            desc_o.store([(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0], acc.to(Out.type.element_ty))
+            desc_o.store(
+                [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
+                acc.to(Out.type.element_ty),
+            )
         else:
             tl.store(o_base_ptr + o_offsets, acc.to(Out.type.element_ty))
 
@@ -2152,9 +2170,11 @@ class _attention_opt(torch.autograd.Function):
         M = torch.empty(
             (q.shape[0], q.shape[1], q.shape[2]), device=q.device, dtype=torch.float32
         )
+
         # TMA descriptors require a global memory allocation
         def alloc_fn(size: int, alignment: int, stream: Optional[int]):
             return torch.empty(size, device="cuda", dtype=torch.int8)
+
         triton.set_allocator(alloc_fn)
 
         if baseVariant == "base":
