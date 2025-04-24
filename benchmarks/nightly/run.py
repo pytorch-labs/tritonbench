@@ -68,7 +68,10 @@ def reduce(run_timestamp, output_dir, output_files, args):
     for result_json_file in output_files:
         logger.info(f"Loading output file: {result_json_file}.")
         result_json_filename = Path(result_json_file).stem
-        if not os.path.exists(result_json_file) or os.path.getsize(result_json_file) == 0:
+        if (
+            not os.path.exists(result_json_file)
+            or os.path.getsize(result_json_file) == 0
+        ):
             aggregated_obj["metrics"][f"tritonbench_{result_json_filename}-pass"] = 0
             continue
         # TODO: check if all inputs pass

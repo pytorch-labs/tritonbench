@@ -23,6 +23,10 @@ TFLOPS_OPS = get_metadata("tflops_operators")
 BASELINE_OPS = get_metadata("baseline_operators")
 BWD_OPS = get_metadata("backward_operators")
 
+EXTRA_ARGS = {
+    "flex_attention": ["--mod-type", "all"],
+}
+
 
 def _has_meaningful_baseline(op: str):
     return op in BASELINE_OPS and not (
@@ -57,6 +61,8 @@ def gen_run(operators: List[str], bwd: bool = False) -> Dict[str, Any]:
         if _has_meaningful_baseline(op):
             run_backends.append(BASELINE_OPS[op])
         cmd.extend(["--only", ",".join(run_backends)])
+        if op in EXTRA_ARGS:
+            cmd.extend(EXTRA_ARGS[op])
         out[run_name] = {}
         out[run_name]["op"] = op
         out[run_name]["args"] = " ".join(cmd)
