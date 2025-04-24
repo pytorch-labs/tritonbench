@@ -1,0 +1,37 @@
+fp16_addmm_fwd:
+  cmd: --op addmm --baseline aten_addmm --metrics tflops,speedup --backends triton_addmm,aten_addmm
+bf16xint16_gemm_fwd:
+  cmd: --op bf16xint16_gemm --metrics tflops --backends bf16xbf16
+bf16_flash_attention_fwd:
+  cmd: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --backends
+    triton_tutorial_flash_v2,triton_tutorial_flash_v2_opt,flash_v3
+bf16_flex_attention_fwd:
+  cmd: --op flex_attention --baseline eager --metrics tflops,speedup --backends compiled,eager
+fp8_attention_fwd:
+  cmd: --op fp8_attention --metrics tflops --backends triton_flash_v2_tma
+fp8_fused_quant_gemm_rowwise_fwd:
+  cmd: --op fp8_fused_quant_gemm_rowwise --metrics tflops --backends rms_norm_fused
+fp8_gemm_fwd:
+  cmd: --op fp8_gemm --baseline torch_fp8_gemm --metrics tflops,speedup --backends
+    triton_tma_persistent_fp8_gemm,torch_fp8_gemm
+fp8_gemm_blockwise_fwd:
+  cmd: --op fp8_gemm_blockwise --baseline _cutlass --metrics tflops,speedup --backends
+    _triton,_cutlass
+fp8_gemm_rowwise_fwd:
+  cmd: --op fp8_gemm_rowwise --baseline _cutlass_or_ck --metrics tflops,speedup --backends
+    _triton,_cutlass_or_ck
+int4_gemm_fwd:
+  cmd: --op int4_gemm --baseline tinygemm --metrics tflops,speedup --backends triton,tinygemm
+low_mem_dropout_fwd:
+  cmd: --op low_mem_dropout --baseline torch_dropout --metrics tflops,speedup --backends
+    triton_dropout,torch_dropout
+bf16_ragged_attention_fwd:
+  cmd: --op ragged_attention --metrics tflops --backends hstu_triton_ragged_attention
+bf16_flash_attention_bwd:
+  cmd: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --bwd --backends
+    triton_tutorial_flash_v2,triton_tutorial_flash_v2_opt,flash_v3
+bf16_flex_attention_bwd:
+  cmd: --op flex_attention --baseline eager --metrics tflops,speedup --bwd --backends
+    compiled,eager
+bf16_ragged_attention_bwd:
+  cmd: --op ragged_attention --metrics tflops --bwd --backends hstu_triton_ragged_attention
