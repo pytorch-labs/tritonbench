@@ -1,5 +1,6 @@
 """
-Tritonbench nightly run
+Tritonbench nightly run, dashboard: https://hud.pytorch.org/tritonbench/commit_view
+Requires the operator to support the speedup metric.
 """
 
 import argparse
@@ -31,6 +32,7 @@ def setup_tritonbench_cwd():
 
 
 OPERATOR_BENCHMARKS = {
+    # launch latency will not be shown in the dashboard
     "launch_latency": [
         "--op",
         "launch_latency",
@@ -43,7 +45,7 @@ OPERATOR_BENCHMARKS = {
         "--op",
         "softmax",
         "--metrics",
-        "latency,gbps",
+        "speedup",
         "--num-inputs",
         "6",
         "--cudagraph",
@@ -52,14 +54,35 @@ OPERATOR_BENCHMARKS = {
         "--op",
         "gemm",
         "--only",
-        "aten_matmul,triton_tutorial_matmul",
+        "triton_tutorial_matmul",
         "--precision",
         "bf16",
         "--metrics",
-        "latency,tflops",
+        "speedup",
         "--num-inputs",
         "4",
         "--cudagraph",
+    ],
+    "bf16_flash_attention_fwd": [
+        "--op",
+        "flash_attention",
+        "--only",
+        "triton_tutorial_flash_v2_opt,flash_v3",
+        "--baseline",
+        "flash_v3",
+        "--metrics",
+        "tflops,speedup",
+    ],
+    "bf16_flash_attention_bwd": [
+        "--op",
+        "flash_attention",
+        "--only",
+        "triton_tutorial_flash_v2_opt,flash_v3",
+        "--baseline",
+        "flash_v3",
+        "--metrics",
+        "tflops,speedup",
+        "--bwd",
     ],
 }
 

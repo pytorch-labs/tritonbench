@@ -10,6 +10,25 @@ from pathlib import Path
 
 from typing import Any, Dict, List, Tuple
 
+RUNNER_TYPE_MAPPING = {
+    "gcp-h100-runner": {
+        "name": "gcp-h100-runner",
+        "gpu_count": 1,
+        "avail_gpu_mem_in_gb": 80,
+    }
+}
+
+
+def parse_runners(
+    runner_name: str, runner_type: str, envs: Dict[str, str]
+) -> List[Dict[str, Any]]:
+    runner_mapping = RUNNER_TYPE_MAPPING[runner_type].copy()
+    runner_mapping["name"] = runner_name
+    runner_mapping["gpu_info"] = envs["device"]
+    runner_mapping["extra_info"] = {}
+    runner_mapping["extra_info"]["cuda_version"] = envs["cuda_version"]
+    return [runner_mapping]
+
 
 def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     dependencies = {
@@ -58,6 +77,11 @@ def generate_oss_ci_benchmark_v3_json(
         if metric_id.endswith("-target"):
             continue
         entry = common.copy()
+        entry["runners"] = parse_runners(
+            benchmark_result["github"]["RUNNER_NAME"],
+            benchmark_result["github"]["RUNNER_TYPE"],
+            benchmark_result["env"],
+        )
         entry["dependencies"] = parse_dependencies(benchmark_result["env"])
         op, mode, _input, backend, metric_name = parse_metric_id(metric_id)
         metric_value = benchmark_result["metrics"][metric_id]
