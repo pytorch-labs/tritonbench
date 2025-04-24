@@ -2,14 +2,14 @@
 import argparse
 import logging
 import os
+import sys
 
 import yaml
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-import os
-import sys
+
 from os.path import abspath, exists
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))

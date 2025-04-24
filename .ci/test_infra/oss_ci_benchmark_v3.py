@@ -19,13 +19,16 @@ RUNNER_TYPE_MAPPING = {
 }
 
 
-def parse_runners(runner_name: str, runner_type: str, envs: Dict[str, str]) -> List[Dict[str, Any]]:
+def parse_runners(
+    runner_name: str, runner_type: str, envs: Dict[str, str]
+) -> List[Dict[str, Any]]:
     runner_mapping = RUNNER_TYPE_MAPPING[runner_type].copy()
     runner_mapping.update("name", runner_name)
     runner_mapping.update("gpu_info", envs["device"])
     runner_mapping.update("extra_info", {})
     runner_mapping["extra_info"]["cuda_version"] = envs["cuda_version"]
     return [runner_mapping]
+
 
 def parse_dependencies(envs: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     dependencies = {
