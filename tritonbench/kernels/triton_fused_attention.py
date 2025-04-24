@@ -14,7 +14,6 @@ Extra Credits:
 import os
 import sys
 
-import numpy as np
 import torch
 
 import triton
@@ -121,12 +120,21 @@ def _attn_fwd_inner(
     l_i,
     m_i,
     q,  #
-    K_block_ptr,
-    V_block_ptr,  #
+    k_base_ptr,
+    k_offset_kk,
+    k_offset_kn,
+    k_block_shape_kk: tl.constexpr,
+    k_block_shape_kn: tl.constexpr,
+    v_base_ptr,
+    v_offset_vk,
+    v_offset_vn,
+    v_block_shape_vk: tl.constexpr,
+    v_block_shape_vn: tl.constexpr,
     desc_k,
     desc_v,
     Q,
     qvk_offset,
+    stride_kk,
     stride_kn,
     stride_vn,
     stride_vk,  #
@@ -153,8 +161,10 @@ def _attn_fwd_inner(
     else:
         lo, hi = 0, N_CTX
     if not ENABLE_TMA:
-        K_block_ptr = tl.advance(K_block_ptr, (0, lo))
-        V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
+        k_offset_kk += 0
+        k_offset_kn += lo
+        v_offset_vk += lo
+        v_offset_vn += 0
     # loop over k, v and update accumulator
     for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
@@ -167,7 +177,12 @@ def _attn_fwd_inner(
                 Q.dtype.element_ty,
             )
         else:
-            k = tl.load(K_block_ptr)
+            k_offsets_kk_vect = k_offset_kk + tl.arange(0, k_block_shape_kk)
+            k_offsets_kn_vect = k_offset_kn + tl.arange(0, k_block_shape_kn)
+            k_offsets = (stride_kk * k_offsets_kk_vect[:, None]) + (
+                stride_kn * k_offsets_kn_vect[None, :]
+            )
+            k = tl.load(k_base_ptr + k_offsets)
         if ENABLE_TMA:
             k = tl.trans(k)
         qk = tl.dot(q, k)
@@ -203,7 +218,12 @@ def _attn_fwd_inner(
                     Q.dtype.element_ty,
                 )
         else:
-            v = tl.load(V_block_ptr)
+            v_offsets_vk_vect = v_offset_vk + tl.arange(0, v_block_shape_vk)
+            v_offsets_vn_vect = v_offset_vn + tl.arange(0, v_block_shape_vn)
+            v_offsets = (stride_vk * v_offsets_vk_vect[:, None]) + (
+                stride_vn * v_offsets_vn_vect[None, :]
+            )
+            v = tl.load(v_base_ptr + v_offsets)
         if fp8_v:
             if ENABLE_TMA:
                 v = tl.trans(v)
@@ -214,8 +234,10 @@ def _attn_fwd_inner(
         # update m_i and l_i
         m_i = m_ij
         if not ENABLE_TMA:
-            V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
-            K_block_ptr = tl.advance(K_block_ptr, (0, BLOCK_N))
+            v_offset_vk += BLOCK_N
+            v_offset_vn += 0
+            k_offset_kk += 0
+            k_offset_kn += BLOCK_N
     return acc, l_i, m_i
 
 
@@ -225,12 +247,23 @@ def _attn_fwd_inner_ws(
     l_i,
     m_i,
     q,  #
-    K_block_ptr,
-    V_block_ptr,  #
+    k_base_ptr,
+    k_offset_kk,
+    k_offset_kn,
+    k_block_shape_kk: tl.constexpr,
+    k_block_shape_kn: tl.constexpr,
+    k_shape_kn,
+    v_base_ptr,
+    v_offset_vk,
+    v_offset_vn,
+    v_block_shape_vk: tl.constexpr,
+    v_block_shape_vn: tl.constexpr,
+    v_shape_vk,
     desc_k,
     desc_v,
     Q,
     qvk_offset,
+    stride_kk,
     stride_kn,
     stride_vn,
     stride_vk,  #
@@ -257,8 +290,10 @@ def _attn_fwd_inner_ws(
     else:
         lo, hi = 0, N_CTX
     if not ENABLE_TMA:
-        K_block_ptr = tl.advance(K_block_ptr, (0, lo))
-        V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
+        k_offset_kk += 0
+        k_offset_kn += lo
+        v_offset_vk += lo
+        v_offset_vn += 0
     # loop over k, v and update accumulator
     for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
@@ -272,7 +307,17 @@ def _attn_fwd_inner_ws(
                     Q.dtype.element_ty,
                 )
             else:
-                k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
+                k_offsets_kk_vect = k_offset_kk + tl.arange(0, k_block_shape_kk)
+                k_offsets_kn_vect = k_offset_kn + tl.arange(0, k_block_shape_kn)
+                k_offsets = (stride_kk * k_offsets_kk_vect[:, None]) + (
+                    stride_kn * k_offsets_kn_vect[None, :]
+                )
+                k_mask = k_offsets_kn_vect[None, :] < k_shape_kn
+                k = tl.load(
+                    k_base_ptr + k_offsets,
+                    mask=k_mask,
+                    other=0.0,
+                )
         with tl.async_task([1, 2]):
             if ENABLE_TMA:
                 k = tl.trans(k)
@@ -310,7 +355,17 @@ def _attn_fwd_inner_ws(
                         Q.dtype.element_ty,
                     )
             else:
-                v = tl.load(V_block_ptr, boundary_check=(0,), padding_option="zero")
+                v_offsets_vk_vect = v_offset_vk + tl.arange(0, v_block_shape_vk)
+                v_offsets_vn_vect = v_offset_vn + tl.arange(0, v_block_shape_vn)
+                v_offsets = (stride_vk * v_offsets_vk_vect[:, None]) + (
+                    stride_vn * v_offsets_vn_vect[None, :]
+                )
+                v_mask = v_offsets_vk_vect[None, :] < v_shape_vk
+                v = tl.load(
+                    v_base_ptr + v_offsets,
+                    mask=v_mask,
+                    other=0.0,
+                )
         with tl.async_task([1, 2]):
             if fp8_v:
                 if ENABLE_TMA:
@@ -322,8 +377,10 @@ def _attn_fwd_inner_ws(
             # update m_i and l_i
             m_i = m_ij
         if not ENABLE_TMA:
-            V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
-            K_block_ptr = tl.advance(K_block_ptr, (0, BLOCK_N))
+            v_offset_vk += BLOCK_N
+            v_offset_vn += 0
+            k_offset_kk += 0
+            k_offset_kn += BLOCK_N
     return acc, l_i, m_i
 
 
@@ -626,45 +683,45 @@ def _attn_fwd_compute(
     off_h = off_hz % H
     qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
 
-    K_block_ptr = None
-    V_block_ptr = None
-    Q_block_ptr = None
-    O_block_ptr = None
+    k_base_ptr = None
+    k_offset_kk = None
+    k_offset_kn = None
+    k_block_shape_kk: tl.constexpr = HEAD_DIM
+    k_block_shape_kn: tl.constexpr = BLOCK_N
+    v_base_ptr = None
+    v_offset_vk = None
+    v_offset_vn = None
+    v_block_shape_vk: tl.constexpr = BLOCK_N
+    v_block_shape_vn: tl.constexpr = HEAD_DIM
+    q_base_ptr = None
+    q_offsets = None
+    q_mask = None
+    o_base_ptr = None
+    o_offsets = None
+    o_mask = None
+
     if not ENABLE_TMA:
         # block pointers
-        Q_block_ptr = tl.make_block_ptr(
-            base=Q + qvk_offset,
-            shape=(N_CTX, HEAD_DIM),
-            strides=(stride_qm, stride_qk),
-            offsets=(start_m * BLOCK_M, 0),
-            block_shape=(BLOCK_M, HEAD_DIM),
-            order=(1, 0),
+        q_base_ptr = Q + qvk_offset
+        q_offsets_qm = (start_m * BLOCK_M) + tl.arange(0, BLOCK_M)
+        q_offsets_qk = 0 + tl.arange(0, HEAD_DIM)
+        q_offsets = (stride_qm * q_offsets_qm[:, None]) + (
+            stride_qk * q_offsets_qk[None, :]
         )
-        v_order: tl.constexpr = (0, 1) if V.dtype.element_ty == tl.float8e5 else (1, 0)
-        V_block_ptr = tl.make_block_ptr(
-            base=V + qvk_offset,
-            shape=(N_CTX, HEAD_DIM),
-            strides=(stride_vk, stride_vn),
-            offsets=(0, 0),
-            block_shape=(BLOCK_N, HEAD_DIM),
-            order=v_order,
+        q_mask = q_offsets_qm[:, None] < N_CTX
+        v_base_ptr = V + qvk_offset
+        v_offset_vk = 0
+        v_offset_vn = 0
+        k_base_ptr = K + qvk_offset
+        k_offset_kk = 0
+        k_offset_kn = 0
+        o_base_ptr = Out + qvk_offset
+        o_offsets_om = (start_m * BLOCK_M) + tl.arange(0, BLOCK_M)
+        o_offsets_on = 0 + tl.arange(0, HEAD_DIM)
+        o_offsets = (stride_om * o_offsets_om[:, None]) + (
+            stride_on * o_offsets_on[None, :]
         )
-        K_block_ptr = tl.make_block_ptr(
-            base=K + qvk_offset,
-            shape=(HEAD_DIM, N_CTX),
-            strides=(stride_kk, stride_kn),
-            offsets=(0, 0),
-            block_shape=(HEAD_DIM, BLOCK_N),
-            order=(0, 1),
-        )
-        O_block_ptr = tl.make_block_ptr(
-            base=Out + qvk_offset,
-            shape=(N_CTX, HEAD_DIM),
-            strides=(stride_om, stride_on),
-            offsets=(start_m * BLOCK_M, 0),
-            block_shape=(BLOCK_M, HEAD_DIM),
-            order=(1, 0),
-        )
+        o_mask = o_offsets_om[:, None] < N_CTX
     # initialize offsets
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
     offs_n = tl.arange(0, BLOCK_N)
@@ -684,7 +741,11 @@ def _attn_fwd_compute(
             Q.dtype.element_ty,
         )
     else:
-        q = tl.load(Q_block_ptr, boundary_check=(0,), padding_option="zero")
+        q = tl.load(
+            q_base_ptr + q_offsets,
+            mask=q_mask,
+            other=0.0,
+        )
     # stage 1: off-band
     # For causal = True, STAGE = 3 and _attn_fwd_inner gets 1 as its STAGE
     # For causal = False, STAGE = 1, and _attn_fwd_inner gets 3 as its STAGE
@@ -694,12 +755,21 @@ def _attn_fwd_compute(
             l_i,
             m_i,
             q,
-            K_block_ptr,
-            V_block_ptr,  #
+            k_base_ptr,
+            k_offset_kk,
+            k_offset_kn,
+            k_block_shape_kk,
+            k_block_shape_kn,
+            v_base_ptr,
+            v_offset_vk,
+            v_offset_vn,
+            v_block_shape_vk,
+            v_block_shape_vn,
             desc_k,
             desc_v,
             Q,
             qvk_offset,
+            stride_kk,
             stride_kn,
             stride_vn,
             stride_vk,  #
@@ -725,12 +795,21 @@ def _attn_fwd_compute(
             l_i,
             m_i,
             q,
-            K_block_ptr,
-            V_block_ptr,  #
+            k_base_ptr,
+            k_offset_kk,
+            k_offset_kn,
+            k_block_shape_kk,
+            k_block_shape_kn,
+            v_base_ptr,
+            v_offset_vk,
+            v_offset_vn,
+            v_block_shape_vk,
+            v_block_shape_vn,
             desc_k,
             desc_v,
             Q,
             qvk_offset,
+            stride_kk,
             stride_kn,
             stride_vn,
             stride_vk,  #
@@ -760,7 +839,11 @@ def _attn_fwd_compute(
             [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
         )
     else:
-        tl.store(O_block_ptr, acc.to(Out.type.element_ty), boundary_check=(0,))
+        tl.store(
+            o_base_ptr + o_offsets,
+            acc.to(Out.type.element_ty),
+            o_mask,
+        )
 
 
 @triton.jit
@@ -809,44 +892,44 @@ def _attn_fwd_compute_ws(
     off_h = off_hz % H
     qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
 
-    K_block_ptr = None
-    V_block_ptr = None
-    Q_block_ptr = None
-    O_block_ptr = None
+    k_base_ptr = None
+    k_offset_kk = None
+    k_offset_kn = (None,)
+    k_block_shape_kk: tl.constexpr = HEAD_DIM
+    k_block_shape_kn: tl.constexpr = BLOCK_N
+    k_shape_kn = None
+    v_base_ptr = None
+    v_offset_vk = None
+    v_offset_vn = None
+    v_block_shape_vk: tl.constexpr = BLOCK_N
+    v_block_shape_vn: tl.constexpr = HEAD_DIM
+    v_shape_vk = None
+    q_base_ptr = None
+    q_offsets = None
+    o_base_ptr = None
+    o_offsets = None
+
     if not ENABLE_TMA:
         # block pointers
-        Q_block_ptr = tl.make_block_ptr(
-            base=Q + qvk_offset,
-            shape=(N_CTX, HEAD_DIM),
-            strides=(stride_qm, stride_qk),
-            offsets=(start_m * BLOCK_M, 0),
-            block_shape=(BLOCK_M, HEAD_DIM),
-            order=(1, 0),
+        q_base_ptr = Q + qvk_offset
+        q_offsets_qm = (start_m * BLOCK_M) + tl.arange(0, BLOCK_M)
+        q_offsets_qk = 0 + tl.arange(0, HEAD_DIM)
+        q_offsets = (stride_qm * q_offsets_qm[:, None]) + (
+            stride_qk * q_offsets_qk[None, :]
         )
-        v_order: tl.constexpr = (0, 1) if V.dtype.element_ty == tl.float8e5 else (1, 0)
-        V_block_ptr = tl.make_block_ptr(
-            base=V + qvk_offset,
-            shape=(N_CTX, HEAD_DIM),
-            strides=(stride_vk, stride_vn),
-            offsets=(0, 0),
-            block_shape=(BLOCK_N, HEAD_DIM),
-            order=v_order,
-        )
-        K_block_ptr = tl.make_block_ptr(
-            base=K + qvk_offset,
-            shape=(HEAD_DIM, N_CTX),
-            strides=(stride_kk, stride_kn),
-            offsets=(0, 0),
-            block_shape=(HEAD_DIM, BLOCK_N),
-            order=(0, 1),
-        )
-        O_block_ptr = tl.make_block_ptr(
-            base=Out + qvk_offset,
-            shape=(N_CTX, HEAD_DIM),
-            strides=(stride_om, stride_on),
-            offsets=(start_m * BLOCK_M, 0),
-            block_shape=(BLOCK_M, HEAD_DIM),
-            order=(1, 0),
+        v_base_ptr = V + qvk_offset
+        v_offset_vk = 0
+        v_offset_vn = 0
+        v_shape_vk = N_CTX
+        k_base_ptr = K + qvk_offset
+        k_offset_kk = 0
+        k_offset_kn = 0
+        k_shape_kn = N_CTX
+        o_base_ptr = Out + qvk_offset
+        o_offsets_om = (start_m * BLOCK_M) + tl.arange(0, BLOCK_M)
+        o_offsets_on = 0 + tl.arange(0, HEAD_DIM)
+        o_offsets = (stride_om * o_offsets_om[:, None]) + (
+            stride_on * o_offsets_on[None, :]
         )
     # initialize offsets
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
@@ -868,7 +951,7 @@ def _attn_fwd_compute_ws(
                 Q.dtype.element_ty,
             )
         else:
-            q = tl.load(Q_block_ptr)
+            q = tl.load(q_base_ptr + q_offsets)
     # stage 1: off-band
     # For causal = True, STAGE = 3 and _attn_fwd_inner gets 1 as its STAGE
     # For causal = False, STAGE = 1, and _attn_fwd_inner gets 3 as its STAGE
@@ -878,12 +961,23 @@ def _attn_fwd_compute_ws(
             l_i,
             m_i,
             q,
-            K_block_ptr,
-            V_block_ptr,  #
+            k_base_ptr,
+            k_offset_kk,
+            k_offset_kn,
+            k_block_shape_kk,
+            k_block_shape_kn,
+            k_shape_kn,
+            v_base_ptr,
+            v_offset_vk,
+            v_offset_vn,
+            v_block_shape_vk,
+            v_block_shape_vn,
+            v_shape_vk,
             desc_k,
             desc_v,
             Q,
             qvk_offset,
+            stride_kk,
             stride_kn,
             stride_vn,
             stride_vk,  #
@@ -909,12 +1003,23 @@ def _attn_fwd_compute_ws(
             l_i,
             m_i,
             q,
-            K_block_ptr,
-            V_block_ptr,  #
+            k_base_ptr,
+            k_offset_kk,
+            k_offset_kn,
+            k_block_shape_kk,
+            k_block_shape_kn,
+            k_shape_kn,
+            v_base_ptr,
+            v_offset_vk,
+            v_offset_vn,
+            v_block_shape_vk,
+            v_block_shape_vn,
+            v_shape_vk,
             desc_k,
             desc_v,
             Q,
             qvk_offset,
+            stride_kk,
             stride_kn,
             stride_vn,
             stride_vk,  #
@@ -944,7 +1049,7 @@ def _attn_fwd_compute_ws(
                 [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
             )
         else:
-            tl.store(O_block_ptr, acc.to(Out.type.element_ty))
+            tl.store(o_base_ptr + o_offsets, acc.to(Out.type.element_ty))
 
 
 @triton.autotune(list(filter(keep, configsWS)), key=["N_CTX"])
