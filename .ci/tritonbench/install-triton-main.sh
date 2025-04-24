@@ -38,7 +38,8 @@ rm -rf "${TRITON_PKG_DIR}"
 
 # install main triton
 pip install ninja cmake wheel pybind11; # build-time dependencies
-pip install -e python
+pip install -r python/requirements.txt
+pip install -e .
 
 # setup Triton repo related envs
 # these envs will be used in nightly runs and other benchmarks
