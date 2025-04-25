@@ -1176,6 +1176,24 @@ def _attn_fwd(
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
 ):
+    tl.assume(stride_qz >= 0)
+    tl.assume(stride_qh >= 0)
+    tl.assume(stride_qm >= 0)
+    tl.assume(stride_qk >= 0)
+    tl.assume(stride_kz >= 0)
+    tl.assume(stride_kh >= 0)
+    tl.assume(stride_kn >= 0)
+    tl.assume(stride_kk >= 0)
+    tl.assume(stride_vz >= 0)
+    tl.assume(stride_vh >= 0)
+    tl.assume(stride_vk >= 0)
+    tl.assume(stride_vn >= 0)
+    tl.assume(stride_oz >= 0)
+    tl.assume(stride_oh >= 0)
+    tl.assume(stride_om >= 0)
+    tl.assume(stride_on >= 0)
+    tl.assume(Z >= 0)
+    tl.assume(H >= 0)
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
     off_hz = tl.program_id(1)
@@ -1750,20 +1768,12 @@ def _attn_bwd(
     BLOCK_N2: tl.constexpr,  #
     BLK_SLICE_FACTOR: tl.constexpr,  #
     HEAD_DIM: tl.constexpr,
-    NON_NEGATIVE_STRIDE_Z: tl.constexpr,
-    NON_NEGATIVE_STRIDE_H: tl.constexpr,
-    NON_NEGATIVE_STRIDE_TOK: tl.constexpr,
-    NON_NEGATIVE_STRIDE_D: tl.constexpr,
 ):
     LN2: tl.constexpr = 0.6931471824645996  # = ln(2)
-    if NON_NEGATIVE_STRIDE_Z:
-        tl.assume(stride_z >= 0)
-    if NON_NEGATIVE_STRIDE_H:
-        tl.assume(stride_h >= 0)
-    if NON_NEGATIVE_STRIDE_TOK:
-        tl.assume(stride_tok >= 0)
-    if NON_NEGATIVE_STRIDE_D:
-        tl.assume(stride_d >= 0)
+    tl.assume(stride_z >= 0)
+    tl.assume(stride_h >= 0)
+    tl.assume(stride_tok >= 0)
+    tl.assume(stride_d >= 0)
     tl.assume(H > 0)
 
     bhid = tl.program_id(2)
@@ -2386,10 +2396,6 @@ class _attention_opt(torch.autograd.Function):
             HEAD_DIM=ctx.HEAD_DIM,  #
             num_warps=NUM_WARPS,  #
             num_stages=NUM_STAGES,  #
-            NON_NEGATIVE_STRIDE_Z=q.stride(0) >= 0,  #
-            NON_NEGATIVE_STRIDE_H=q.stride(1) >= 0,  #
-            NON_NEGATIVE_STRIDE_TOK=q.stride(2) >= 0,  #
-            NON_NEGATIVE_STRIDE_D=q.stride(3) >= 0,  #
         )
 
         return dq, dk, dv, None, None, None
