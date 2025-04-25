@@ -73,8 +73,8 @@ class ScribeUploader:
                 try:
                     message["float"][field] = float(value)
                 except ValueError:
-                    # If value error (e.g., "CUDA OOM"), override the field value to 0.0
-                    message["float"][field] = 0.0
+                    # If value error (e.g., "CUDA OOM"), override the field value to NaN
+                    message["float"][field] = float("nan")
             else:
                 raise ValueError(
                     "Field {} is not currently used, "

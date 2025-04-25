@@ -91,10 +91,10 @@ def generate_oss_ci_benchmark_v3_json(
         op, mode, _input, backend, metric_name = parse_metric_id(metric_id)
         try:
             metric_value = benchmark_result["metrics"][metric_id]
-            metric_value = float(metric_value) if metric_value else 0.0
+            metric_value = float(metric_value) if metric_value else float("nan")
         except ValueError:
-            # If value error (e.g., "CUDA OOM"), override the field value to 0.0
-            metric_value = 0.0
+            # If value error (e.g., "CUDA OOM"), override the field value to NaN
+            metric_value = float("nan")
         entry["benchmark"] = {
             "name": benchmark_result["name"],
             "mode": mode,
