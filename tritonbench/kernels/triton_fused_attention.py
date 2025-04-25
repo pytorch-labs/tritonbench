@@ -370,11 +370,12 @@ def _attn_fwd_inner_ws(
 # We don't run auto-tuning every time to keep the tutorial fast. Uncommenting
 # the code below and commenting out the equivalent parameters is convenient for
 # re-tuning.
-has_warp_spec = hasattr(tl, "async_task")
+EXPLICIT_WARP_SPEC = hasattr(tl, "async_task")
+HAS_NEW_TMA = hasattr(triton, "set_allocator")
 schedList = ["default", "FA_firstDot", "FA_secondDot"] if WITH_COMPPIPE else ["default"]
 # TODO: incorrect result with PEEL_LAST + FA_firstDot + WarpSpec + TMA
 schedList = ["FA_secondDot"] if PEEL_LAST else schedList
-tmaList = [True] if WITH_TMA else [False]
+tmaList = [True] if WITH_TMA and HAS_NEW_TMA else [False]
 # no WS, no TMA, with CompPipe
 configsOpt = [
     (
@@ -390,7 +391,7 @@ configsOpt = [
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -423,7 +424,7 @@ configsTma = [
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -453,7 +454,7 @@ configsWS = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": False, "LOOP_SCHEDULE": sched},
             num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
@@ -487,7 +488,7 @@ if torch.version.hip is None:
                 num_buffers_warp_spec=0,
                 num_consumer_groups=0,
             )
-            if has_warp_spec
+            if EXPLICIT_WARP_SPEC
             else triton.Config(
                 {
                     "BLOCK_M": BM,
@@ -543,7 +544,7 @@ configsTmaWS = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -584,7 +585,7 @@ configsTmaWSPersistent = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -2175,7 +2176,8 @@ class _attention_opt(torch.autograd.Function):
         def alloc_fn(size: int, alignment: int, stream: Optional[int]):
             return torch.empty(size, device="cuda", dtype=torch.int8)
 
-        triton.set_allocator(alloc_fn)
+        if HAS_NEW_TMA:
+            triton.set_allocator(alloc_fn)
 
         if baseVariant == "base":
             _attn_fwd[grid_tma](
