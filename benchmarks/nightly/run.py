@@ -9,6 +9,12 @@ import logging
 import os
 import sys
 from os.path import abspath, exists
+from pathlib import Path
+from typing import Any, Dict
+
+import yaml
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -29,62 +35,6 @@ def setup_tritonbench_cwd():
         os.chdir(tritonbench_dir)
         sys.path.append(tritonbench_dir)
     return original_dir
-
-
-OPERATOR_BENCHMARKS = {
-    # launch latency will not be shown in the dashboard
-    "launch_latency": [
-        "--op",
-        "launch_latency",
-        "--skip",
-        "nop_inductor_kernel",
-        "--metrics",
-        "latency,walltime",
-    ],
-    "softmax": [
-        "--op",
-        "softmax",
-        "--metrics",
-        "speedup",
-        "--num-inputs",
-        "6",
-        "--cudagraph",
-    ],
-    "bf16_gemm": [
-        "--op",
-        "gemm",
-        "--only",
-        "triton_tutorial_matmul",
-        "--precision",
-        "bf16",
-        "--metrics",
-        "speedup",
-        "--num-inputs",
-        "4",
-        "--cudagraph",
-    ],
-    "bf16_flash_attention_fwd": [
-        "--op",
-        "flash_attention",
-        "--only",
-        "triton_tutorial_flash_v2_opt,flash_v3",
-        "--baseline",
-        "flash_v3",
-        "--metrics",
-        "tflops,speedup",
-    ],
-    "bf16_flash_attention_bwd": [
-        "--op",
-        "flash_attention",
-        "--only",
-        "triton_tutorial_flash_v2_opt,flash_v3",
-        "--baseline",
-        "flash_v3",
-        "--metrics",
-        "tflops,speedup",
-        "--bwd",
-    ],
-}
 
 
 def reduce(run_timestamp, output_dir, output_files, args):
@@ -116,6 +66,16 @@ def reduce(run_timestamp, output_dir, output_files, args):
         aggregated_obj["github"] = get_github_env()
 
     for result_json_file in output_files:
+        logger.info(f"Loading output file: {result_json_file}.")
+        result_json_filename = Path(result_json_file).stem
+        if (
+            not os.path.exists(result_json_file)
+            or os.path.getsize(result_json_file) == 0
+        ):
+            aggregated_obj["metrics"][f"tritonbench_{result_json_filename}-pass"] = 0
+            continue
+        # TODO: check if all inputs pass
+        aggregated_obj["metrics"][f"tritonbench_{result_json_filename}-pass"] = 1
         with open(
             result_json_file,
             "r",
@@ -126,6 +86,25 @@ def reduce(run_timestamp, output_dir, output_files, args):
     with open(result_json_path, "w") as fp:
         json.dump(aggregated_obj, fp, indent=4)
     return result_json_path
+
+
+def get_operator_benchmarks() -> Dict[str, Any]:
+    def _load_benchmarks(config_path: str) -> Dict[str, Any]:
+        out = {}
+        with open(config_path, "r") as f:
+            obj = yaml.safe_load(f)
+        if not obj:
+            return out
+        for benchmark_name in obj:
+            out[benchmark_name] = (
+                obj[benchmark_name]["op"],
+                obj[benchmark_name]["args"].split(" "),
+            )
+        return out
+
+    out = _load_benchmarks(os.path.join(CURRENT_DIR, "manual.yaml"))
+    out.update(_load_benchmarks(os.path.join(CURRENT_DIR, "autogen.yaml")))
+    return out
 
 
 def run():
@@ -140,11 +119,12 @@ def run():
     run_timestamp, output_dir = setup_output_dir("nightly")
     # Run each operator
     output_files = []
-    for op_bench in OPERATOR_BENCHMARKS:
-        op_args = OPERATOR_BENCHMARKS[op_bench]
+    operator_benchmarks = get_operator_benchmarks()
+    for op_bench in operator_benchmarks:
+        op_name, op_args = operator_benchmarks[op_bench]
         output_file = output_dir.joinpath(f"{op_bench}.json")
         op_args.extend(["--output-json", str(output_file.absolute())])
-        run_in_task(op=op_bench, op_args=op_args)
+        run_in_task(op=op_name, op_args=op_args, benchmark_name=op_bench)
         output_files.append(output_file)
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(run_timestamp, output_dir, output_files, args)

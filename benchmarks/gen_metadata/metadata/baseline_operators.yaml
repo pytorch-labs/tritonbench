@@ -9,9 +9,9 @@ embedding: torch_embedding
 flash_attention: flash_v3
 flex_attention: eager
 fp8_gemm: torch_fp8_gemm
-fp8_gemm_blockwise: _triton
-fp8_gemm_rowwise: _triton
-fp8_gemm_rowwise_grouped: _triton
+fp8_gemm_blockwise: _cutlass
+fp8_gemm_rowwise: _cutlass_or_ck
+fp8_gemm_rowwise_grouped: _cutlass_or_ck
 fused_linear_cross_entropy: torch_lm_head_ce
 fused_linear_jsd: torch_lm_head_jsd
 gather_gemv: test_eager

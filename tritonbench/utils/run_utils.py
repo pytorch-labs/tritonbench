@@ -85,7 +85,9 @@ def get_github_env() -> Dict[str, str]:
     return out
 
 
-def run_in_task(op: str, op_args: Optional[List[str]] = None) -> None:
+def run_in_task(
+    op: str, op_args: Optional[List[str]] = None, benchmark_name: Optional[str] = None
+) -> None:
     op_task_cmd = [] if is_fbcode() else [sys.executable]
     if not op_args:
         copy_sys_argv = copy.deepcopy(sys.argv)
@@ -96,11 +98,16 @@ def run_in_task(op: str, op_args: Optional[List[str]] = None) -> None:
         op_task_cmd.extend(copy_sys_argv)
     else:
         op_task_cmd.extend(op_args)
+        if benchmark_name:
+            op_args.extend(["--benchmark-name", benchmark_name])
+        else:
+            benchmark_name = op
+
     # In OSS, we assume always using the run.py benchmark driver
     if not is_fbcode() and not op_task_cmd[1] == "run.py":
         op_task_cmd.insert(1, "run.py")
     try:
-        print("[tritonbench] Running benchmark: " + " ".join(op_task_cmd))
+        print(f"[tritonbench] Running {benchmark_name}: " + " ".join(op_task_cmd))
         subprocess.check_call(
             op_task_cmd, stdout=sys.stdout, stderr=sys.stderr, cwd=REPO_PATH
         )
