@@ -17,14 +17,14 @@ from tritonbench.utils.triton_op import (
 
 from .hstu import get_test_inputs, triton_hstu_mha
 
-if is_fbcode():
-    from .fb.hstu import cuda_hstu_mha
-
 HAS_CUDA = False
 try:
     HAS_CUDA = is_fbcode() and is_cuda() and get_nvidia_gpu_model() != "NVIDIA B200"
 except (FileNotFoundError, AttributeError):
     HAS_CUDA = False
+
+if HAS_CUDA:
+    from .fb.hstu import cuda_hstu_mha
 
 
 def parse_op_args(args: List[str]):
