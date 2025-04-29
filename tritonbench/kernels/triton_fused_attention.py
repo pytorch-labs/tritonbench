@@ -14,6 +14,8 @@ Extra Credits:
 import os
 import sys
 
+from typing import Optional
+
 import numpy as np
 import torch
 
@@ -50,12 +52,13 @@ class TmaAutoTuneHelper:
     TMA_SIZE = 128
 
     def __init__(self):
-        self.fill_1d_tma_descriptor_inner = (
-            triton.runtime.driver.active.utils.fill_1d_tma_descriptor
-        )
-        self.fill_2d_tma_descriptor_inner = (
-            triton.runtime.driver.active.utils.fill_2d_tma_descriptor
-        )
+        if HAS_TMA_DESC:
+            self.fill_1d_tma_descriptor_inner = (
+                triton.runtime.driver.active.utils.fill_1d_tma_descriptor
+            )
+            self.fill_2d_tma_descriptor_inner = (
+                triton.runtime.driver.active.utils.fill_2d_tma_descriptor
+            )
         if HAS_TMA_DESC:
             self.descriptors = {}
         else:
@@ -160,11 +163,8 @@ def _attn_fwd_inner(
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
-            k = tl._experimental_descriptor_load(  # load in row major
-                desc_k,
-                [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0],
-                [BLOCK_N, HEAD_DIM],
-                Q.dtype.element_ty,
+            k = desc_k.load(
+                [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
             )
         else:
             k = tl.load(K_block_ptr)
@@ -189,19 +189,11 @@ def _attn_fwd_inner(
         # update acc
         if ENABLE_TMA:
             if fp8_v:
-                v = tl._experimental_descriptor_load(  # load in row major
-                    desc_v,
-                    [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)],
-                    [HEAD_DIM, BLOCK_N],
-                    Q.dtype.element_ty,
+                v = desc_v.load(
+                    [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)]
                 )
             else:
-                v = tl._experimental_descriptor_load(  # load in row major
-                    desc_v,
-                    [(qvk_offset // stride_vk + start_n).to(tl.int32), 0],
-                    [BLOCK_N, HEAD_DIM],
-                    Q.dtype.element_ty,
-                )
+                v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
         else:
             v = tl.load(V_block_ptr)
         if fp8_v:
@@ -265,11 +257,8 @@ def _attn_fwd_inner_ws(
         # -- compute qk ----
         with tl.async_task([0]):
             if ENABLE_TMA:
-                k = tl._experimental_descriptor_load(  # load in row major
-                    desc_k,
-                    [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0],
-                    [BLOCK_N, HEAD_DIM],
-                    Q.dtype.element_ty,
+                k = desc_k.load(
+                    [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
                 )
             else:
                 k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
@@ -296,18 +285,12 @@ def _attn_fwd_inner_ws(
         with tl.async_task([0]):
             if ENABLE_TMA:
                 if fp8_v:
-                    v = tl._experimental_descriptor_load(  # load in row major
-                        desc_v,
-                        [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)],
-                        [HEAD_DIM, BLOCK_N],
-                        Q.dtype.element_ty,
+                    v = desc_v.load(
+                        [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)]
                     )
                 else:
-                    v = tl._experimental_descriptor_load(  # load in row major
-                        desc_v,
-                        [(qvk_offset // stride_vk + start_n).to(tl.int32), 0],
-                        [BLOCK_N, HEAD_DIM],
-                        Q.dtype.element_ty,
+                    v = desc_v.load(
+                        [(qvk_offset // stride_vk + start_n).to(tl.int32), 0]
                     )
             else:
                 v = tl.load(V_block_ptr, boundary_check=(0,), padding_option="zero")
@@ -330,11 +313,12 @@ def _attn_fwd_inner_ws(
 # We don't run auto-tuning every time to keep the tutorial fast. Uncommenting
 # the code below and commenting out the equivalent parameters is convenient for
 # re-tuning.
-has_warp_spec = hasattr(tl, "async_task")
+EXPLICIT_WARP_SPEC = hasattr(tl, "async_task")
+HAS_NEW_TMA = hasattr(triton, "set_allocator") and hasattr(tl, "make_tensor_descriptor")
 schedList = ["default", "FA_firstDot", "FA_secondDot"] if WITH_COMPPIPE else ["default"]
 # TODO: incorrect result with PEEL_LAST + FA_firstDot + WarpSpec + TMA
 schedList = ["FA_secondDot"] if PEEL_LAST else schedList
-tmaList = [True] if WITH_TMA else [False]
+tmaList = [True] if WITH_TMA and HAS_NEW_TMA else [False]
 # no WS, no TMA, with CompPipe
 configsOpt = [
     (
@@ -350,7 +334,7 @@ configsOpt = [
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -383,7 +367,7 @@ configsTma = [
             num_buffers_warp_spec=0,
             num_consumer_groups=0,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -413,7 +397,7 @@ configsWS = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {"BLOCK_M": BM, "BLOCK_N": BN, "ENABLE_TMA": False, "LOOP_SCHEDULE": sched},
             num_stages=2 if sched == "FA_firstDot" or sched == "FA_secondDot" else 0,
@@ -447,7 +431,7 @@ if torch.version.hip is None:
                 num_buffers_warp_spec=0,
                 num_consumer_groups=0,
             )
-            if has_warp_spec
+            if EXPLICIT_WARP_SPEC
             else triton.Config(
                 {
                     "BLOCK_M": BM,
@@ -503,7 +487,7 @@ configsTmaWS = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -544,7 +528,7 @@ configsTmaWSPersistent = [
             reg_dec_producer=dec,
             reg_inc_consumer=inc,
         )
-        if has_warp_spec
+        if EXPLICIT_WARP_SPEC
         else triton.Config(
             {
                 "BLOCK_M": BM,
@@ -677,12 +661,7 @@ def _attn_fwd_compute(
     qk_scale *= 1.44269504  # 1/log(2)
     # load q: it will stay in SRAM throughout
     if ENABLE_TMA:
-        q = tl._experimental_descriptor_load(  # load in row major
-            desc_q,
-            [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0],
-            [BLOCK_M, HEAD_DIM],
-            Q.dtype.element_ty,
-        )
+        q = desc_q.load([(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0])
     else:
         q = tl.load(Q_block_ptr, boundary_check=(0,), padding_option="zero")
     # stage 1: off-band
@@ -754,10 +733,9 @@ def _attn_fwd_compute(
     m_mask = off_hz * N_CTX + offs_m < N_CTX
     tl.store(m_ptrs, m_i, mask=m_mask)
     if ENABLE_TMA:
-        tl._experimental_descriptor_store(
-            desc_o,
-            acc.to(Out.type.element_ty),
+        desc_o.store(
             [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
+            acc.to(Out.type.element_ty),
         )
     else:
         tl.store(O_block_ptr, acc.to(Out.type.element_ty), boundary_check=(0,))
@@ -861,11 +839,8 @@ def _attn_fwd_compute_ws(
     # load q: it will stay in SRAM throughout
     with tl.async_task([0]):
         if ENABLE_TMA:
-            q = tl._experimental_descriptor_load(  # load in row major
-                desc_q,
-                [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0],
-                [BLOCK_M, HEAD_DIM],
-                Q.dtype.element_ty,
+            q = desc_q.load(
+                [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0]
             )
         else:
             q = tl.load(Q_block_ptr)
@@ -938,10 +913,9 @@ def _attn_fwd_compute_ws(
         m_ptrs = M + off_hz * N_CTX + offs_m
         tl.store(m_ptrs, m_i)
         if ENABLE_TMA:
-            tl._experimental_descriptor_store(
-                desc_o,
-                acc.to(Out.type.element_ty),
+            desc_o.store(
                 [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
+                acc.to(Out.type.element_ty),
             )
         else:
             tl.store(O_block_ptr, acc.to(Out.type.element_ty))
@@ -1226,10 +1200,6 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     sm_scale,
     M,
     Out,  #
-    desc_q,
-    desc_k,
-    desc_v,
-    desc_o,
     stride_qz,
     stride_qh,
     stride_qm,
@@ -1260,6 +1230,42 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
     off_hz = tl.program_id(1)
+
+    if ENABLE_TMA:
+        desc_k = tl.make_tensor_descriptor(
+            K,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_N, HEAD_DIM],
+        )
+        if V.dtype == torch.float8_e5m2:
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                shape=[Z * H * HEAD_DIM, N_CTX],
+                strides=[N_CTX, 1],
+                block_shape=[HEAD_DIM, BLOCK_N],
+            )
+        else:
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                shape=[Z * H * N_CTX, HEAD_DIM],
+                strides=[HEAD_DIM, 1],
+                block_shape=[BLOCK_N, HEAD_DIM],
+            )
+
+        desc_q = tl.make_tensor_descriptor(
+            Q,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_M, HEAD_DIM],
+        )
+        desc_o = tl.make_tensor_descriptor(
+            Out,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_M, HEAD_DIM],
+        )
+
     _attn_fwd_compute(
         Q,
         K,
@@ -1310,10 +1316,6 @@ def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     sm_scale,
     M,
     Out,  #
-    desc_q,
-    desc_k,
-    desc_v,
-    desc_o,
     stride_qz,
     stride_qh,
     stride_qm,
@@ -1344,6 +1346,42 @@ def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
     off_hz = tl.program_id(1)
+
+    if ENABLE_TMA:
+        desc_k = tl.make_tensor_descriptor(
+            K,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_N, HEAD_DIM],
+        )
+        if V.dtype == torch.float8_e5m2:
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                shape=[Z * H * HEAD_DIM, N_CTX],
+                strides=[N_CTX, 1],
+                block_shape=[HEAD_DIM, BLOCK_N],
+            )
+        else:
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                shape=[Z * H * N_CTX, HEAD_DIM],
+                strides=[HEAD_DIM, 1],
+                block_shape=[BLOCK_N, HEAD_DIM],
+            )
+
+        desc_q = tl.make_tensor_descriptor(
+            Q,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_M, HEAD_DIM],
+        )
+        desc_o = tl.make_tensor_descriptor(
+            Out,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_M, HEAD_DIM],
+        )
+
     _attn_fwd_compute_ws(
         Q,
         K,
@@ -1394,10 +1432,6 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     sm_scale,
     M,
     Out,  #
-    desc_q,
-    desc_k,
-    desc_v,
-    desc_o,
     stride_qz,
     stride_qh,
     stride_qm,
@@ -1440,6 +1474,42 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
         tiles_per_sm += 1
 
     tile_idx = prog_id
+
+    if ENABLE_TMA:
+        desc_k = tl.make_tensor_descriptor(
+            K,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_N, HEAD_DIM],
+        )
+        if V.dtype == torch.float8_e5m2:
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                shape=[Z * H * HEAD_DIM, N_CTX],
+                strides=[N_CTX, 1],
+                block_shape=[HEAD_DIM, BLOCK_N],
+            )
+        else:
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                shape=[Z * H * N_CTX, HEAD_DIM],
+                strides=[HEAD_DIM, 1],
+                block_shape=[BLOCK_N, HEAD_DIM],
+            )
+
+        desc_q = tl.make_tensor_descriptor(
+            Q,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_M, HEAD_DIM],
+        )
+        desc_o = tl.make_tensor_descriptor(
+            Out,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_M, HEAD_DIM],
+        )
+
     for _ in range(0, tiles_per_sm):
         # This has much better cache locality than
         #     pid = tile_idx // (Z * H)
@@ -1849,7 +1919,7 @@ class _attention_opt(torch.autograd.Function):
         BATCH, H, N_CTX = q.shape[0], q.shape[1], q.shape[2]
 
         # no autotune with fixed BLOCK_N
-        if torch.version.hip is None:
+        if HAS_TMA_DESC is True and torch.version.hip is None:
             desc_helper = TmaAutoTuneHelper()
             desc_helper.init_tma_descriptor("k")
             desc_helper.init_tma_descriptor("v")
@@ -1859,7 +1929,7 @@ class _attention_opt(torch.autograd.Function):
             desc_helper = None
 
         def grid_tma(META):
-            if META["ENABLE_TMA"] == False:
+            if META["ENABLE_TMA"] is False or HAS_TMA_DESC is False:
                 return (
                     # grid partitioning: num_consumer_groups * BLOCK_M
                     # data partitioning: BLOCK_M
@@ -1926,7 +1996,7 @@ class _attention_opt(torch.autograd.Function):
         NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
 
         def grid_tma_persistent(META):
-            if META["ENABLE_TMA"] == False:
+            if META["ENABLE_TMA"] is False or HAS_TMA_DESC is False:
                 return (
                     min(
                         NUM_SMS * META["GRID_MULTIPLE"],
@@ -2009,6 +2079,14 @@ class _attention_opt(torch.autograd.Function):
         M = torch.empty(
             (q.shape[0], q.shape[1], q.shape[2]), device=q.device, dtype=torch.float32
         )
+
+        # TMA descriptors require a global memory allocation
+        def alloc_fn(size: int, alignment: int, stream: Optional[int]):
+            return torch.empty(size, device="cuda", dtype=torch.int8)
+
+        if HAS_NEW_TMA:
+            triton.set_allocator(alloc_fn)
+
         if baseVariant == "base":
             _attn_fwd[grid_tma](
                 q,
@@ -2125,10 +2203,6 @@ class _attention_opt(torch.autograd.Function):
                 sm_scale,
                 M,
                 o,
-                desc_q,
-                desc_k,
-                desc_v,
-                desc_o,  #
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
@@ -2161,10 +2235,6 @@ class _attention_opt(torch.autograd.Function):
                 sm_scale,
                 M,
                 o,
-                desc_q,
-                desc_k,
-                desc_v,
-                desc_o,  #
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
@@ -2197,10 +2267,6 @@ class _attention_opt(torch.autograd.Function):
                 sm_scale,
                 M,
                 o,
-                desc_q,
-                desc_k,
-                desc_v,
-                desc_o,  #
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
