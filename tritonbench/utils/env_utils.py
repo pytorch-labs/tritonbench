@@ -40,6 +40,23 @@ def is_cuda() -> bool:
     return torch.version.cuda is not None
 
 
+def get_nvidia_gpu_model() -> str:
+    """
+    Retrieves the model of the NVIDIA GPU being used.
+    Will return the name of the first GPU listed.
+    Returns:
+        str: The model of the NVIDIA GPU or empty str if not found.
+    """
+    try:
+        model = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"]
+        )
+        return model.decode().strip().split("\n")[0]
+    except OSError:
+        logging.warning("nvidia-smi not found. Returning empty str.")
+        return ""
+
+
 def is_hip() -> bool:
     return torch.version.hip is not None
 

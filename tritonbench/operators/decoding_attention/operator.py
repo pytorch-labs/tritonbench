@@ -98,14 +98,15 @@ class _Shape:
 
 
 def _generate_shapes():
-    HEAD_Q = 8
+    # llama4 128e: head_q = 5
+    HEAD_Q = 5
     HEAD_KV = 1
     HEAD_D = 128
-    max_len_kv = 8192
+    max_len_kv = 32768
 
-    SEQ_LEN_KVs = [1024, 2048, 4096, 8190]
+    SEQ_LEN_KVs = [1024, 2048, 4096, 8190, 32760]
     SEQ_LEN_Qs = [1, 4]
-    BATCHs = [32, 64]
+    BATCHs = [16, 32, 64, 128]
 
     return [
         _Shape(
@@ -155,7 +156,7 @@ def _pack_xformer_input(
 class Operator(BenchmarkOperator):
     DEFAULT_PRECISION = "bf16"
 
-    DEFAULT_METRICS = ["latency", "tflops", "gbps", "speedup"]
+    DEFAULT_METRICS = ["latency", "speedup"]
 
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
@@ -353,6 +354,54 @@ class Operator(BenchmarkOperator):
             op=fmha.triton_splitk.FwOp,
         ).view(q.shape)
 
+    @register_benchmark(enabled=HAS_XFORMERS)
+    def triton_splitk_fp8kv(
+        self,
+        q: torch.Tensor,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_seqlens: torch.Tensor,
+    ) -> Callable:
+        _, _, num_q_heads, _ = q.shape
+        batch_size, max_sequence_length, _, _ = k_cache.shape
+        _q, _k, _v, attn_bias = _pack_xformer_input(q, k_cache, v_cache, cache_seqlens)
+
+        _k = _k.to(torch.uint8).view(torch.int32)
+        _v = _v.to(torch.uint8).view(torch.int32)
+
+        k_fp8_scales_shifts = torch.zeros(
+            batch_size * max_sequence_length,
+            dtype=torch.int32,
+            device="cuda",
+        )
+        v_fp8_scales_shifts = torch.zeros(
+            batch_size * max_sequence_length,
+            dtype=torch.int32,
+            device="cuda",
+        )
+
+        def _to_expanded_shape(x: torch.Tensor) -> torch.Tensor:
+            return x.view(1, batch_size * max_sequence_length, 1, -1).expand(
+                1, batch_size * max_sequence_length, num_q_heads, -1
+            )
+
+        packed_k_fp8_scales_shifts = _to_expanded_shape(k_fp8_scales_shifts).squeeze(-1)
+        packed_v_fp8_scales_shifts = _to_expanded_shape(v_fp8_scales_shifts).squeeze(-1)
+
+        inp = fmha.triton_splitk.InputsFp8(
+            query=_q,
+            key=_k,
+            value=_v,
+            attn_bias=attn_bias,
+            k_fp8_scale_shift=packed_k_fp8_scales_shifts,
+            v_fp8_scale_shift=packed_v_fp8_scales_shifts,
+        )
+
+        return lambda: fmha._memory_efficient_attention_forward(
+            inp,
+            op=fmha.triton_splitk.FwOp,
+        ).view(q.shape)
+
     @register_benchmark(enabled=HAS_FLASH_V3)
     def fa3_kvcache_fp8qkv(
         self,
@@ -361,20 +410,27 @@ class Operator(BenchmarkOperator):
         v_cache: torch.Tensor,
         cache_seqlens: torch.Tensor,
     ) -> Callable:
+        batch, _, head_kv, _ = k_cache.shape
         _q = q.to(torch.float8_e4m3fn)
         _k_cache = k_cache.to(torch.float8_e4m3fn)
         _v_cache = v_cache.to(torch.float8_e4m3fn)
+
+        _dummy_descale = torch.ones([batch, head_kv], device=q.device)
+
         return lambda: flash_attn_v3.flash_attn_with_kvcache(
             q=_q,
             k_cache=_k_cache,
             v_cache=_v_cache,
             cache_seqlens=cache_seqlens,
             causal=CAUSAL,
+            q_descale=torch.ones_like(_dummy_descale),
+            k_descale=torch.ones_like(_dummy_descale),
+            v_descale=torch.ones_like(_dummy_descale),
             pack_gqa=True,
             num_splits=0,
         )
 
-    @register_benchmark(enabled=True)
+    @register_benchmark(enabled=False)
     def fbgemm_gqa_fp8kv(
         self,
         q: torch.Tensor,

@@ -34,6 +34,17 @@ AMD_MI300X = {
     "int8": 20900 // 8,
 }
 
+# NVIDIA B200 GPU Datasheet:
+# TODO: Get the B200 data when it is released. This is H100 data copied over to enable the benchmarks.
+NV_B200 = {
+    "fp32": 989 // 2,
+    "tf32": 989 // 2,
+    "bf16": 1979 // 2,
+    "fp16": 1979 // 2,
+    "fp8": 3958 // 2,
+    "int8": 3958 // 2,
+}
+
 
 HW_ROOFLINE_SPECS: Dict[
     bool, Dict[str, Dict[str, float]]
@@ -43,6 +54,7 @@ HW_ROOFLINE_SPECS: Dict[
         "NVIDIA A100-PG509-200": NV_A100,
         "NVIDIA H100": NV_H100,
         "AMD MI300X": AMD_MI300X,
+        "NVIDIA B200": NV_B200,
     },
     False: {
         # https://www.nvidia.com/en-gb/data-center/h100

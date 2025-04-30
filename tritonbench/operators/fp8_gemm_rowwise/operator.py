@@ -7,6 +7,8 @@ import triton
 
 from tritonbench.utils.data_utils import get_production_shapes
 
+from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda, is_hip
+
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
@@ -61,6 +63,10 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     return parsed_args
 
 
+HAS_TRITON = False
+HAS_CUTLASS_OR_CK = False
+HAS_CUBLAS = False
+
 try:
     from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import (
         get_fp8_constants as get_fp8_constants,
@@ -79,8 +85,11 @@ try:
     import fbgemm_gpu.experimental.gen_ai  # noqa: F401
 
     cutlass_or_ck_fp8_row = torch.ops.fbgemm.f8f8bf16_rowwise
-    HAS_CUTLASS_OR_CK = True
-except (ImportError, AttributeError):
+    # TODO: remove these b200 hacks.
+    HAS_CUTLASS_OR_CK = is_hip() or (
+        is_cuda() and get_nvidia_gpu_model() != "NVIDIA B200"
+    )
+except (ImportError, AttributeError, FileNotFoundError):
     HAS_CUTLASS_OR_CK = False
 
 try:
@@ -89,12 +98,9 @@ try:
     cublas_fp8_row = torch.ops.fbgemm.f8f8bf16_cublas
     from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import scale_fp8_row
 
-    HAS_CUBLAS = True
-except (
-    ImportError,
-    IOError,
-    AttributeError,
-):
+    # TODO: remove these b200 hacks.
+    HAS_CUBLAS = is_cuda() and get_nvidia_gpu_model() != "NVIDIA B200"
+except (ImportError, IOError, AttributeError, FileNotFoundError):
     HAS_CUBLAS = False
 
 
@@ -164,7 +170,16 @@ class Operator(BenchmarkOperator):
         self.no_use_persistent = addmm_args.no_use_persistent
         self.warp_specialization = addmm_args.warp_specialization
 
-    @register_benchmark(enabled=HAS_TRITON, baseline=True)
+        # This is the only config currently tested in b200.
+        # TODO: Remove it when the other variants are supported.
+        if is_cuda() and get_nvidia_gpu_model() == "NVIDIA B200":
+            self.fp8_fast_accum = True
+            self.use_tma = True
+            self.no_use_persistent = False
+            self.warp_specialization = False
+            self.shapes = BUILDIN_SHAPES
+
+    @register_benchmark(enabled=HAS_TRITON)
     def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: triton_fp8_row(
             xq,
@@ -178,7 +193,9 @@ class Operator(BenchmarkOperator):
         )
 
     @register_benchmark(
-        enabled=HAS_CUTLASS_OR_CK, label="ck" if torch.version.hip else "cutlass"
+        enabled=HAS_CUTLASS_OR_CK,
+        label="ck" if torch.version.hip else "cutlass",
+        baseline=True,
     )
     def _cutlass_or_ck(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: cutlass_or_ck_fp8_row(

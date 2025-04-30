@@ -7,6 +7,8 @@ import fbgemm_gpu.experimental.gen_ai  # noqa: F401
 import torch
 import triton
 
+from tritonbench.utils.env_utils import is_cuda
+
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
@@ -27,26 +29,32 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     return args
 
 
-try:
-    from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import (
-        matmul_fp8_block as triton_fp8_block,
-    )
-
-    HAS_TRITON = True
-except:
-    HAS_TRITON = False
-
-
-HAS_CUTLASS = True
-try:
-    cutlass_fp8_block = torch.ops.llama_cpp.fp8_blockwise_matmul
-except:
+HAS_TRITON = False
+if is_cuda():
     try:
-        import fbgemm_gpu.experimental.gen_ai
+        from fbgemm_gpu.experimental.gemm.triton_gemm.fp8_gemm import (
+            matmul_fp8_block as triton_fp8_block,
+        )
 
-        cutlass_fp8_block = torch.ops.fbgemm.f8f8bf16_blockwise
+        HAS_TRITON = True
     except:
-        HAS_CUTLASS = False
+        HAS_TRITON = False
+# The triton_fp8_block is unsupported on non-NVIDIA GPUs.
+# TODO: add support for AMD.
+
+HAS_CUTLASS = False
+if is_cuda():
+    try:
+        cutlass_fp8_block = torch.ops.llama_cpp.fp8_blockwise_matmul
+        HAS_CUTLASS = True
+    except:
+        try:
+            import fbgemm_gpu.experimental.gen_ai
+
+            cutlass_fp8_block = torch.ops.fbgemm.f8f8bf16_blockwise
+            HAS_CUTLASS = True
+        except:
+            HAS_CUTLASS = False
 
 
 BUILDIN_SHAPES = [
@@ -129,11 +137,11 @@ class Operator(BenchmarkOperator):
         else:
             self.shapes = BUILDIN_SHAPES
 
-    @register_benchmark(enabled=HAS_TRITON, baseline=True)
+    @register_benchmark(enabled=HAS_TRITON)
     def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: triton_fp8_block(xq, wq, x_scale, w_scale)
 
-    @register_benchmark(enabled=HAS_CUTLASS)
+    @register_benchmark(enabled=HAS_CUTLASS, baseline=True)
     def _cutlass(self, xq, wq, x_scale, w_scale) -> Callable:
         return lambda: cutlass_fp8_block(xq, wq, x_scale, w_scale)
 
