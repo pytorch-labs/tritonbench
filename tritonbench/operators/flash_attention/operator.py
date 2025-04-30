@@ -140,7 +140,10 @@ from tritonbench.utils.triton_utils import has_warp_spec
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=4, help="Batch size")
-    parser.add_argument("--seq-len", type=int, default=None, help="Sequence length")
+    parser.add_argument("--seq-len", type=int, default=None, help="Sequence length q")
+    parser.add_argument(
+        "--seq-len-kv", type=int, default=None, help="Sequence length kv"
+    )
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
     parser.add_argument("--d-head", type=int, default=64, help="specify head dimension")
     parser.add_argument(
@@ -173,6 +176,9 @@ class Operator(BenchmarkOperator):
         args = parse_op_args(self.extra_args)
         self.BATCH = args.batch
         self.SEQ_LEN = args.seq_len
+        self.SEQ_LEN_KV = (
+            args.seq_len_kv if args.seq_len_kv is not None else args.seq_len
+        )
         self.H = args.n_heads
         self.D_HEAD = args.d_head
         self.N_CTX = None
@@ -476,7 +482,8 @@ class Operator(BenchmarkOperator):
     ) -> float:
         q, k, v = example_inputs
         BATCH, H, N_CTX, D_HEAD = q.shape
-        flops_per_matmul = 2.0 * BATCH * H * N_CTX * N_CTX * D_HEAD
+        _, _, N_CTX_KV, _ = k.shape
+        flops_per_matmul = 2.0 * BATCH * H * N_CTX * N_CTX_KV * D_HEAD
         flops = 2 * flops_per_matmul
         if self.causal:
             flops *= 0.5
@@ -505,15 +512,19 @@ class Operator(BenchmarkOperator):
         def get_ctx_vals():
             if self.SEQ_LEN:
                 SEQ_LEN = self.SEQ_LEN
-                for _i in range(self.tb_args.num_inputs):
-                    yield (BATCH, self.H, SEQ_LEN, self.D_HEAD)
-                    SEQ_LEN *= 2
+                SEQ_LEN_KV = self.SEQ_LEN_KV
+                if self.tb_args.num_inputs is None:
+                    yield (BATCH, H, SEQ_LEN, SEQ_LEN_KV, D_HEAD)
+                else:
+                    for _i in range(self.tb_args.num_inputs):
+                        yield (BATCH, self.H, SEQ_LEN, SEQ_LEN_KV, self.D_HEAD)
+                        SEQ_LEN *= 2
                 return
             for i in range(SEQ_LEN_LOG2, 15):
                 N_CTX = 2**i
                 # BATCH = 16384 // N_CTX
                 # H = 2048 // D_HEAD
-                yield (BATCH, H, N_CTX, D_HEAD)
+                yield (BATCH, H, N_CTX, N_CTX, D_HEAD)
 
         ctx_vals = get_ctx_vals()
 
@@ -525,7 +536,7 @@ class Operator(BenchmarkOperator):
             shapes = ctx_vals
         requires_grad = True
         for shape in shapes:
-            BATCH, H, N_CTX, D_HEAD = shape
+            BATCH, H, N_CTX, N_CTX_KV, D_HEAD = shape
             q = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
                 dtype=self.dtype,
@@ -533,13 +544,13 @@ class Operator(BenchmarkOperator):
                 requires_grad=requires_grad,
             )
             k = torch.randn(
-                (BATCH, H, N_CTX, D_HEAD),
+                (BATCH, H, N_CTX_KV, D_HEAD),
                 dtype=self.dtype,
                 device=self.device,
                 requires_grad=requires_grad,
             )
             v = torch.randn(
-                (BATCH, H, N_CTX, D_HEAD),
+                (BATCH, H, N_CTX_KV, D_HEAD),
                 dtype=self.dtype,
                 device=self.device,
                 requires_grad=requires_grad,
@@ -579,11 +590,12 @@ class Operator(BenchmarkOperator):
         ]
         return chain(additional_shapes)
 
-    @register_x_val(label="(Batch, Heads, SeqLen, Dhead)")
+    @register_x_val(label="(Batch, Heads, SeqLen, SeqLen_KV, Dhead)")
     def get_x_val(self, example_inputs) -> float:
         q, k, v = example_inputs
         B, H, S, D = q.shape
-        return (B, H, S, D)
+        _, _, S_KV, _ = k.shape
+        return (B, H, S, S_KV, D)
 
     def plot(self):
         y_metric_name = "tflops"
@@ -623,8 +635,8 @@ class Operator(BenchmarkOperator):
                 args={},  # values for function arguments not in `x_names` and `y_name`
             )
         )
-        def _plot(N_CTX, provider):
-            tflops = self.output.get_y_vals(N_CTX, provider, y_metric_name)
+        def _plot(N_CTX, N_CTX_KV, provider):
+            tflops = self.output.get_y_vals(N_CTX, N_CTX_KV, provider, y_metric_name)
             return tflops
 
         _plot.run(
