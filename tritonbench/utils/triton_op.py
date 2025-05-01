@@ -752,6 +752,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     # Run the post initialization
     def __post__init__(self):
+        if self.tb_args.input_loader:
+            from tritonbench.data.fb.input_loader import get_input_loader
+
+            self.get_input_iter = get_input_loader(
+                self, self.name, self.tb_args.input_loader
+            )
         self._available_num_inputs = self.count_example_inputs()
         if self._num_inputs is None:
             self._num_inputs = self._available_num_inputs - self._input_id
