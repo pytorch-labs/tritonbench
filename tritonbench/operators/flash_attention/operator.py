@@ -47,6 +47,7 @@ from torch.nn.functional import scaled_dot_product_attention as sdpa
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
+from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
 
 from tritonbench.utils.path_utils import add_ld_library_path
 from tritonbench.utils.triton_op import is_fbcode
@@ -68,19 +69,52 @@ HAS_CUDA_124 = (
     torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
 )
 
-# [Optional] flash_attn v3
-try:
-    torch_lib_path = os.path.join(os.path.dirname(__file__), "lib")
-    with add_ld_library_path(torch_lib_path):
-        from flash_attn_interface import flash_attn_func as flash_attn_v3
-    HAS_FLASH_V3 = True
-except (ImportError, IOError, AttributeError):
-    try:
-        from fa3.hopper.flash_attn_interface import flash_attn_func as flash_attn_v3
+IS_B200 = is_cuda() and get_nvidia_gpu_model() == "NVIDIA B200"
 
+# only enabling the variants known to be working on B200 (trunk).
+if not IS_B200:
+    # [Optional] flash_attn v3
+    try:
+        torch_lib_path = os.path.join(os.path.dirname(__file__), "lib")
+        with add_ld_library_path(torch_lib_path):
+            from flash_attn_interface import flash_attn_func as flash_attn_v3
         HAS_FLASH_V3 = True
     except (ImportError, IOError, AttributeError):
-        HAS_FLASH_V3 = False
+        try:
+            from fa3.hopper.flash_attn_interface import flash_attn_func as flash_attn_v3
+
+            HAS_FLASH_V3 = True
+        except (ImportError, IOError, AttributeError):
+            HAS_FLASH_V3 = False
+
+    try:
+        import tilelang
+
+        from .tilelang_mha import tilelang_mha
+
+        HAS_TILELANG = True
+    except (ImportError, IOError, AttributeError, TypeError):
+        HAS_TILELANG = False
+
+    # [Optional] ThunderKittens backend
+    try:
+        from .tk import tk_attn
+
+        HAS_TK = True
+    except (ImportError, IOError, AttributeError):
+        HAS_TK = False
+
+    # [Optional] JAX Pallas backend
+    try:
+        import jax
+
+        from tritonbench.utils.jax_utils import torch_to_jax_tensor
+
+        from .pallas import mha as pallas_mha
+
+        HAS_PALLAS = True
+    except (ImportError, IOError, AttributeError):
+        HAS_PALLAS = False
 
 # [Optional] xformers backend
 try:
@@ -92,35 +126,6 @@ try:
     HAS_XFORMERS = True
 except (ImportError, IOError, AttributeError, TypeError):
     HAS_XFORMERS = False
-
-try:
-    import tilelang
-
-    from .tilelang_mha import tilelang_mha
-
-    HAS_TILELANG = True
-except (ImportError, IOError, AttributeError, TypeError):
-    HAS_TILELANG = False
-
-# [Optional] ThunderKittens backend
-try:
-    from .tk import tk_attn
-
-    HAS_TK = True
-except (ImportError, IOError, AttributeError):
-    HAS_TK = False
-
-# [Optional] JAX Pallas backend
-try:
-    import jax
-
-    from tritonbench.utils.jax_utils import torch_to_jax_tensor
-
-    from .pallas import mha as pallas_mha
-
-    HAS_PALLAS = True
-except (ImportError, IOError, AttributeError):
-    HAS_PALLAS = False
 
 from typing import Any, Generator, List
 
@@ -259,20 +264,6 @@ class Operator(BenchmarkOperator):
         )
         return fn
 
-    @register_benchmark(enabled=HAS_FLASH_V3, baseline=True)
-    def flash_v3(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        # [B, H, S, D] -> [B, S, H, D]
-        q = q.transpose(1, 2).contiguous()
-        k = k.transpose(1, 2).contiguous()
-        v = v.transpose(1, 2).contiguous()
-        fn = lambda: flash_attn_v3(q, k, v, self.sm_scale, self.causal)
-        return fn
-
     @register_benchmark()
     def triton_tutorial_flash_v2(
         self,
@@ -307,42 +298,6 @@ class Operator(BenchmarkOperator):
         # autotune TMA/CompPipe
         return lambda: triton_tutorial_FA2_opt(
             q, k, v, self.causal, self.sm_scale, "tma"
-        )
-
-    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
-    def triton_tutorial_flash_v2_ws(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        # autotune WarpSpec/CompPipe
-        return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "ws"
-        )
-
-    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
-    def triton_tutorial_flash_v2_tma_ws(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        # autotune TMA/WarpSpec/CompPipe
-        return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "tma_ws"
-        )
-
-    @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
-    def triton_tutorial_flash_v2_tma_ws_persistent(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        # autotune TMA/WarpSpec/CompPipe/Persistent
-        return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "tma_ws_persistent"
         )
 
     def xformers_preprocess(
@@ -386,76 +341,130 @@ class Operator(BenchmarkOperator):
             fhma_input, needs_gradient=need_gradient
         )
 
-    @register_benchmark(enabled=not is_fbcode() and HAS_TK)
-    def tk(self, q, k, v):
-        def _inner():
-            out = tk_attn(q, k, v, self.causal)
-            return out[0]
+    if not IS_B200:
 
-        return _inner
+        @register_benchmark(enabled=HAS_FLASH_V3)
+        def flash_v3(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # [B, H, S, D] -> [B, S, H, D]
+            q = q.transpose(1, 2).contiguous()
+            k = k.transpose(1, 2).contiguous()
+            v = v.transpose(1, 2).contiguous()
+            fn = lambda: flash_attn_v3(q, k, v, self.sm_scale, self.causal)
+            return fn
 
-    @register_benchmark(enabled=HAS_PALLAS)
-    def pallas(self, q, k, v):
-        q = torch_to_jax_tensor(q)
-        k = torch_to_jax_tensor(k)
-        v = torch_to_jax_tensor(v)
+        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
+        def triton_tutorial_flash_v2_ws(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # autotune WarpSpec/CompPipe
+            return lambda: triton_tutorial_FA2_opt(
+                q, k, v, self.causal, self.sm_scale, "ws"
+            )
 
-        def _inner():
-            pallas_mha(q, k, v, segment_ids=None)
-            jax.device_put(0.0).block_until_ready()
+        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
+        def triton_tutorial_flash_v2_tma_ws(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # autotune TMA/WarpSpec/CompPipe
+            return lambda: triton_tutorial_FA2_opt(
+                q, k, v, self.causal, self.sm_scale, "tma_ws"
+            )
 
-        return _inner
+        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
+        def triton_tutorial_flash_v2_tma_ws_persistent(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # autotune TMA/WarpSpec/CompPipe/Persistent
+            return lambda: triton_tutorial_FA2_opt(
+                q, k, v, self.causal, self.sm_scale, "tma_ws_persistent"
+            )
 
-    @register_benchmark(enabled=HAS_TILELANG)
-    def tile(self, q, k, v):
-        # [B, H, S, D] -> [B, S, H, D]
-        q = q.transpose(1, 2).contiguous()
-        k = k.transpose(1, 2).contiguous()
-        v = v.transpose(1, 2).contiguous()
-        best_config = tilelang_mha(
-            self.BATCH,
-            self.H,
-            self.N_CTX,
-            self.D_HEAD,
-            self.causal,
-            self.dtype,
-            tune=True,
-        )[1]
-        func = tilelang_mha(
-            self.BATCH,
-            self.H,
-            self.N_CTX,
-            self.D_HEAD,
-            self.causal,
-            self.dtype,
-        )(*best_config)
-        jit_kernel = tilelang.compile(func, out_idx=[3])
+        @register_benchmark(enabled=not is_fbcode() and HAS_TK)
+        def tk(self, q, k, v):
+            def _inner():
+                out = tk_attn(q, k, v, self.causal)
+                return out[0]
 
-        def _inner():
-            o = jit_kernel(q, k, v)
-            return o
+            return _inner
 
-        return _inner
+        @register_benchmark(enabled=HAS_PALLAS)
+        def pallas(self, q, k, v):
+            q = torch_to_jax_tensor(q)
+            k = torch_to_jax_tensor(k)
+            v = torch_to_jax_tensor(v)
 
-    @register_benchmark(enabled=False, label=f"cudnn-{torch.backends.cudnn.version()}")
-    def cudnn(self, q, k, v):
-        os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
+            def _inner():
+                pallas_mha(q, k, v, segment_ids=None)
+                jax.device_put(0.0).block_until_ready()
 
-        def sdpa_flash_attention(q, k, v):
-            with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
-                return sdpa(
-                    q,
-                    k,
-                    v,
-                    is_causal=self.causal,
-                    scale=self.sm_scale,
-                )
+            return _inner
 
-        return lambda: sdpa_flash_attention(
-            q,
-            k,
-            v,
+        @register_benchmark(enabled=HAS_TILELANG)
+        def tile(self, q, k, v):
+            # [B, H, S, D] -> [B, S, H, D]
+            q = q.transpose(1, 2).contiguous()
+            k = k.transpose(1, 2).contiguous()
+            v = v.transpose(1, 2).contiguous()
+            best_config = tilelang_mha(
+                self.BATCH,
+                self.H,
+                self.N_CTX,
+                self.D_HEAD,
+                self.causal,
+                self.dtype,
+                tune=True,
+            )[1]
+            func = tilelang_mha(
+                self.BATCH,
+                self.H,
+                self.N_CTX,
+                self.D_HEAD,
+                self.causal,
+                self.dtype,
+            )(*best_config)
+            jit_kernel = tilelang.compile(func, out_idx=[3])
+
+            def _inner():
+                o = jit_kernel(q, k, v)
+                return o
+
+            return _inner
+
+        @register_benchmark(
+            enabled=False, label=f"cudnn-{torch.backends.cudnn.version()}"
         )
+        def cudnn(self, q, k, v):
+            os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
+
+            def sdpa_flash_attention(q, k, v):
+                with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
+                    return sdpa(
+                        q,
+                        k,
+                        v,
+                        is_causal=self.causal,
+                        scale=self.sm_scale,
+                    )
+
+            return lambda: sdpa_flash_attention(
+                q,
+                k,
+                v,
+            )
 
     @register_benchmark()
     def flex_attention(self, q, k, v):
