@@ -53,14 +53,6 @@ if is_fbcode():
 else:
     HAS_HAMMER = False
 
-try:
-    torch.ops.load_library(
-        "//pytorch/tritonbench/tritonbench/operators/gemm/cutlass:colfax_gemm_lib"
-    )
-    colfax_gemm = torch.ops.cutlass.colfax_gemm
-except (ImportError, IOError, AttributeError) as e:
-    colfax_gemm = None
-
 BUILDIN_SHAPES = [
     (256, 256, 256, None),
     (384, 384, 384, None),
@@ -272,14 +264,6 @@ class Operator(BenchmarkOperator):
             return lambda: hstu_triton_matmul_kernel(a, b) + bias
         else:
             return lambda: hstu_triton_matmul_kernel(a, b)
-
-    @register_benchmark(enabled=bool(colfax_gemm) and torch.version.cuda != "12.4")
-    def colfax_cutlass_matmul(self, a, b, bias) -> Callable:
-        assert colfax_gemm, f"colfax_gemm operator is not available."
-        if bias is not None:
-            return lambda: colfax_gemm(a, b, alpha=1.0, beta=1.0) + bias
-        else:
-            return lambda: colfax_gemm(a, b, alpha=1.0, beta=1.0)
 
     @register_benchmark()
     def pt2_triton_matmul(self, a, b, bias) -> Callable:
