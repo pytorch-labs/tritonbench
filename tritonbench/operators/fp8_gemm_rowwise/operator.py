@@ -177,7 +177,11 @@ class Operator(BenchmarkOperator):
             self.use_tma = True
             self.no_use_persistent = False
             self.warp_specialization = False
-            self.shapes = BUILDIN_SHAPES
+            self.shapes = (
+                gemm_shapes(addmm_args.prefill)
+                if (addmm_args.llama)
+                else BUILDIN_SHAPES
+            )
 
     @register_benchmark(enabled=HAS_TRITON)
     def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
