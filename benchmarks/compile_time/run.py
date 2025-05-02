@@ -119,7 +119,7 @@ def reduce(run_timestamp, output_dir, output_files, args):
     return result_json_path
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--ci", action="store_true", help="Running in GitHub Actions CI mode."
@@ -151,3 +151,8 @@ if __name__ == "__main__":
     # Reduce all operator CSV outputs to a single output json
     result_json_file = reduce(run_timestamp, output_dir, output_files, args)
     logger.info(f"[compile_time] logging result json file to {result_json_file}.")
+
+
+if __name__ == "__main__":
+    # Do not add code here, it won't be run. Add them to the function called below.
+    main()  # pragma: no cover

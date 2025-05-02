@@ -47,7 +47,7 @@ def load_data_from_pickle_file(pickle_file_path) -> Any:
     return data
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--a", help="Side A of the output.")
     parser.add_argument("--b", help="Side B of the output.")
@@ -64,3 +64,8 @@ if __name__ == "__main__":
         check_tensor_numeric(data_a, data_b)
         print("OK")
     print("A and B numerically match.")
+
+
+if __name__ == "__main__":
+    # Do not add code here, it won't be run. Add them to the function called below.
+    main()  # pragma: no cover

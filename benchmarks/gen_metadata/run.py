@@ -100,7 +100,7 @@ def run(args: argparse.Namespace):
             out.write(HEADER_TEMPLATE.format(DESCRIPTION=description) + yaml_str)
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output",
@@ -110,3 +110,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     run(args)
+
+
+if __name__ == "__main__":
+    # Do not add code here, it won't be run. Add them to the function called below.
+    main()  # pragma: no cover
