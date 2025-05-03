@@ -86,6 +86,7 @@ def triton_jagged_sum_kernel_simple_fused_sum_then_buffer(
 
 
 @triton.autotune(
+# <<<<START_AUTOTUNE_SECTION>>>>
     configs=[
         triton.Config(
             {
@@ -102,6 +103,7 @@ def triton_jagged_sum_kernel_simple_fused_sum_then_buffer(
             NUM_STAGES,  # number of stages
         )
     ],
+# <<<<END_AUTOTUNE_SECTION>>>>
     key=["M"],
 )
 @triton.jit

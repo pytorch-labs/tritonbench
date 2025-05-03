@@ -1141,7 +1141,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             fn = self._get_bm_func(fn_name)
             if baseline:
                 self.baseline_fn = fn
-            if {"latency", "tflops", "speedup", "compile_time"} & set(
+            if {"latency", "gbps", "tflops", "speedup", "compile_time"} & set(
                 self.required_metrics
             ):
                 metrics.latency = do_bench_wrapper(

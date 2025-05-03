@@ -178,6 +178,7 @@ if torch.version.hip is not None:
         ),
     ]
 else:
+# <<<<START_AUTOTUNE_SECTION>>>>
     configs = [
         triton.Config(
             {
@@ -260,7 +261,7 @@ else:
             num_warps=2,
         ),
     ]
-
+# <<<<END_AUTOTUNE_SECTION>>>>
 
 def init_to_zero(name):
     return lambda nargs: nargs[name].zero_()
