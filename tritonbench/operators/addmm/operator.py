@@ -13,7 +13,6 @@ except ModuleNotFoundError:
     from .hstu import triton_addmm
 
 from tritonbench.operators.gemm.stream_k import streamk_matmul
-from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
@@ -110,6 +109,19 @@ class Operator(BenchmarkOperator):
             max_autotune=True,
             max_autotune_gemm_backends="TRITON",
             autotune_fallback_to_aten=False,
+        ):
+            f = lambda a, mat1, mat2: torch.addmm(a, mat1, mat2)
+            compiled = torch.compile(f, dynamic=False)
+            compiled(a, mat1, mat2)
+        return lambda: compiled(a, mat1, mat2)
+
+    @register_benchmark(enabled=False)
+    def pt2_addmm_maxautotune(self, a, mat1, mat2) -> Callable:
+        torch._dynamo.reset()
+        with inductor_config.patch(
+            max_autotune=True,
+            max_autotune_gemm_backends="ATEN,TRITON",
+            autotune_num_choices_displayed=None,
         ):
             f = lambda a, mat1, mat2: torch.addmm(a, mat1, mat2)
             compiled = torch.compile(f, dynamic=False)
