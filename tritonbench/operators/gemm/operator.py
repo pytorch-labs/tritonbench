@@ -282,6 +282,22 @@ class Operator(BenchmarkOperator):
 
         return lambda: compiled(a, b)
 
+    @register_benchmark(enabled=False)
+    def pt2_matmul_maxautotune(self, a, b, bias) -> Callable:
+        torch._dynamo.reset()
+        with inductor_config.patch(
+            max_autotune=True,
+            max_autotune_gemm_backends="ATEN,TRITON",
+        ):
+            if bias is not None:
+                f = lambda a, b: a.matmul(b) + bias
+            else:
+                f = lambda a, b: a.matmul(b)
+            compiled = torch.compile(f, dynamic=False)
+            compiled(a, b)
+
+        return lambda: compiled(a, b)
+
     @register_benchmark()
     def streamk_matmul(self, a, b, bias) -> Callable:
         if bias is not None:
