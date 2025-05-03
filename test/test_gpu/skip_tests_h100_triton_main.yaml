@@ -5,8 +5,6 @@
 #  op-name: to skip an entire operator
 #  op-name:\n\t- impl-name to skip an impl
 flash_attention:
-  # thunderkittens cannot handle the default input shapes
-  - tk
   # _ws kernels require Triton with warp specialization
   - triton_tutorial_flash_v2_ws
   - triton_tutorial_flash_v2_tma_ws
