@@ -828,6 +828,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 for _dryrun_input_id in range(self._input_id):
                     self.example_inputs = self.get_example_inputs()
             for input_id in input_id_range:
+                self._cur_input_id = input_id
                 self.example_inputs = self.get_example_inputs()
                 if self.reset_dynamo:
                     torch._dynamo.reset()
@@ -836,7 +837,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     proton.activate(self._proton_session_id)
                     proton.enter_scope(f"x_val_{x_val}")
                     proton.deactivate(self._proton_session_id)
-                self._cur_input_id = input_id
                 if self.example_inputs is None:
                     logger.warning(
                         f"The input generator get_input_iter() has depleted at id {input_id}. Available number of "
