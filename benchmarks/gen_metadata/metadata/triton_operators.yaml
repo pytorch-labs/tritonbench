@@ -1,59 +1,62 @@
 addmm:
-  - triton_addmm
+  triton_addmm:
+    - _addmm_fwd
 bf16xint16_gemm:
-  - bf16xbf16
+  bf16xbf16:
 cross_entropy:
-  - liger_cross_entropy_loss
+  liger_cross_entropy_loss:
 embedding:
-  - liger_embedding
+  liger_embedding:
 flash_attention:
-  - triton_tutorial_flash_v2
-  - triton_tutorial_flash_v2_opt
+  triton_tutorial_flash_v2:
+  triton_tutorial_flash_v2_opt:
 flex_attention:
-  - compiled
+  compiled:
 fp8_attention:
-  - triton_flash_v2_tma
+  triton_flash_v2_tma:
 fp8_fused_quant_gemm_rowwise:
-  - rms_norm_fused
+  rms_norm_fused:
 fp8_gemm:
-  - triton_tma_persistent_fp8_gemm
+  triton_tma_persistent_fp8_gemm:
 fp8_gemm_blockwise:
-  - _triton
+  _triton:
 fp8_gemm_rowwise:
-  - _triton
+  _triton:
 fp8_gemm_rowwise_grouped:
-  - _triton
+  _triton:
 fused_linear_cross_entropy:
-  - liger_lm_head_ce
+  liger_lm_head_ce:
 fused_linear_jsd:
-  - liger_lm_head_jsd
+  liger_lm_head_jsd:
 geglu:
-  - liger_geglu
+  liger_geglu:
 gemm:
-  - triton_tutorial_matmul
+  triton_tutorial_matmul:
 grouped_gemm:
-  - triton
+  triton:
 int4_gemm:
-  - triton
+  triton:
 jsd:
-  - liger_jsd
+  liger_jsd:
 kl_div:
-  - liger_kl_div
+  liger_kl_div:
 layer_norm:
-  - liger_layer_norm
+  liger_layer_norm:
 low_mem_dropout:
-  - triton_dropout
+  triton_dropout:
 ragged_attention:
-  - hstu
+  hstu:
+    - _ragged_hstu_attn_bwd
+    - _ragged_hstu_attn_fwd
 rms_norm:
-  - liger_rms
+  liger_rms:
 rope:
-  - liger_rotary_pos_emb
+  liger_rotary_pos_emb:
 softmax:
-  - triton_softmax
+  triton_softmax:
 swiglu:
-  - liger_swiglu
+  liger_swiglu:
 template_attention:
-  - test_no_exp2
+  test_no_exp2:
 welford:
-  - test_welford
+  test_welford:
