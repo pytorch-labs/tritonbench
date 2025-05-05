@@ -1,0 +1,26 @@
+gemm:
+  - aten::mm
+  - aten::linear
+  - aten::matmul
+addmm:
+  - aten::addmm
+bmm:
+  - aten::bmm
+mul:
+  - aten::mul
+add:
+  - aten::_add
+sum:
+  - aten::sum
+index_add:
+  - aten::index_add
+index_select:
+  - aten::index_select
+index_put:
+  - aten::_index_put_impl_
+softmax:
+  - aten::softmax
+  - aten::_softmax
+flash_attention:
+  - aten::scaled_dot_product_attention
+  - aten::_efficient_attention_forward
