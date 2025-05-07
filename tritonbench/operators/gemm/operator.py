@@ -395,7 +395,7 @@ class Operator(BenchmarkOperator):
         return (torch.randn(*args, **kwargs) + 1) / scale
 
     def get_input_iter(self) -> Generator:
-        for shape in self.shapes:
+        for shape_id, shape in enumerate(self.shapes):
             if len(shape) == 4:
                 m, n, k, bias = shape
             elif len(shape) == 3:
@@ -418,6 +418,13 @@ class Operator(BenchmarkOperator):
                 bias = torch.randn(
                     (bias), device=self.device, dtype=self.dtype
                 ).requires_grad_(False)
+            if hasattr(self, "strides"):
+                strides = self.strides[shape_id]
+                assert (
+                    len(strides) == 2
+                ), f"Can only have 2 strides from input, get: {strides}"
+                a = a.as_strided(size=a.size(), stride=strides[0])
+                w = w.as_strided(size=w.size(), stride=strides[1])
             yield a, w, bias
 
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
