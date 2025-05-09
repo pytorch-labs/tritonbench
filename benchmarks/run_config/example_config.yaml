@@ -1,0 +1,3 @@
+benchmarks:
+  - benchmark_name: bf16_ragged_attention_fwd
+    args: --op ragged_attention --only hstu --num-inputs 1 --input-id 2 --metrics tflops --cudagraph --simple-output

@@ -66,3 +66,6 @@ RUN sudo apt-get purge -y libnvidia-compute-550
 # Clone the pytorch env as triton-main env, then compile triton main from source
 RUN cd /workspace/tritonbench && \
     BASE_CONDA_ENV=${CONDA_ENV} CONDA_ENV=${CONDA_ENV_TRITON_MAIN} bash .ci/tritonbench/install-triton-main.sh
+
+# Set run command
+CMD ["bash", "/workspace/tritonbench/docker/entrypoint.sh"]

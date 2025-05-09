@@ -266,6 +266,7 @@ class BenchmarkOperatorResult:
     op_name: str
     op_mode: str
     metrics: List[str]
+    simple_mode: bool
     # Tuple: (x_val, Dict[impl_name, BenchmarkOperatorMetrics])
     result: List[Tuple[Any, Dict[str, BenchmarkOperatorMetrics]]]
     _result_dict: Optional[Dict[Number, Dict[str, BenchmarkOperatorMetrics]]] = None
@@ -378,9 +379,18 @@ class BenchmarkOperatorResult:
                         )
                     col_num += 1
             table.append(row)
-        avg_row = ["average"] + [
-            x / len(self.result) if isinstance(x, Number) else None for x in avg_row
-        ]
+
+        if self.simple_mode:
+            # do not print header if in simple output mode
+            avg_row = [
+                str(x / len(self.result)) if isinstance(x, Number) else None
+                for x in avg_row
+            ]
+            avg_row = [",".join(avg_row)]
+        else:
+            avg_row = ["average"] + [
+                x / len(self.result) if isinstance(x, Number) else None for x in avg_row
+            ]
         table.append(avg_row)
         return headers, table
 
@@ -916,6 +926,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 op_name=self.name,
                 op_mode=self.mode.value,
                 metrics=self.required_metrics,
+                simple_mode=self.tb_args.simple_output,
                 result=metrics,
             )
 

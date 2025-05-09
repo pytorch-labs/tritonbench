@@ -10,6 +10,8 @@ from pathlib import Path
 
 from typing import Dict, List, Optional
 
+import yaml
+
 from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
 from tritonbench.utils.path_utils import (
@@ -85,11 +87,25 @@ def get_github_env() -> Dict[str, str]:
     return out
 
 
+def run_config(config_file: str):
+    assert Path(config_file).exists(), f"Config file {config_file} must exist."
+    with open(config_file, "r") as fp:
+        config = yaml.safe_load(fp)
+    benchmarks = config["benchmarks"]
+    for benchmark in benchmarks:
+        op_args = benchmark["args"].split(" ")
+        benchmark_name = benchmark["benchmark_name"]
+        run_in_task(op=None, op_args=op_args, benchmark_name=benchmark_name)
+
+
 def run_in_task(
-    op: str, op_args: Optional[List[str]] = None, benchmark_name: Optional[str] = None
+    op: Optional[str],
+    op_args: Optional[List[str]] = None,
+    benchmark_name: Optional[str] = None,
 ) -> None:
     op_task_cmd = [] if is_fbcode() else [sys.executable]
     if not op_args:
+        assert op, "If op_args is none, op must not be None."
         copy_sys_argv = copy.deepcopy(sys.argv)
         copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--op")
         copy_sys_argv = remove_cmd_parameter(copy_sys_argv, "--isolate")
@@ -102,6 +118,10 @@ def run_in_task(
             op_args.extend(["--benchmark-name", benchmark_name])
         else:
             benchmark_name = op
+
+    # Remove "TRITONBENCH_RUN_CONFIG" env
+    if "TRITONBENCH_RUN_CONFIG" in os.environ:
+        del os.environ["TRITONBENCH_RUN_CONFIG"]
 
     # In OSS, we assume always using the run.py benchmark driver
     if not is_fbcode() and not op_task_cmd[1] == "run.py":
