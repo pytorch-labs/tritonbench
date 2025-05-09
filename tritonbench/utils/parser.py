@@ -203,6 +203,11 @@ def get_parser(args=None):
         action="store_true",
         help="Only run with pre-defined production shapes.",
     )
+    parser.add_argument(
+        "--simple-output",
+        action="store_true",
+        help="Only print the simple output.",
+    )
 
     if is_fbcode():
         parser.add_argument(
