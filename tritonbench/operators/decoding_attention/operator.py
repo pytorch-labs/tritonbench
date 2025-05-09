@@ -64,6 +64,13 @@ from tritonbench.utils.triton_op import (
     register_x_val,
 )
 
+# [AMD only] aiter backend
+HAS_AITER = True
+try:
+    import aiter_ops
+except (ImportError, IOError, AttributeError):
+    HAS_AITER = False
+
 
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
@@ -81,6 +88,15 @@ def parse_op_args(args: List[str]):
 
 
 from dataclasses import astuple, dataclass
+
+
+"""
+- Runbook
+- Nvidia:
+buck2 run @mode/opt @mode/inplace -c fbcode.enable_gpu_sections=true -c fbcode.nvcc_arch=h100a -c fbcode.platform010_cuda_version=12.4 //pytorch/tritonbench:run -- --op decoding_attention --cudagraph --csv
+- AMD:
+buck2 run @mode/opt-amd-gpu @mode/inplace -c fbcode.enable_gpu_sections=true -c fbcode.rocm_arch=mi300 //pytorch/tritonbench:run -- --op decoding_attention --cudagraph --csv
+"""
 
 
 @dataclass
@@ -151,6 +167,95 @@ def _pack_xformer_input(
     k = k.expand(-1, -1, head_q, -1).view(1, -1, head_q, k.shape[-1])
     v = v.expand(-1, -1, head_q, -1).view(1, -1, head_q, v.shape[-1])
     return q, k, v, attn_bias
+
+
+def get_dtype_max(dtype):
+    try:
+        dtypeMax = torch.finfo(dtype).max
+    except:
+        dtypeMax = torch.iinfo(dtype).max
+    return dtypeMax
+
+
+def pertoken_quant(x, y_scale_dtype=torch.float, x_scale=None, quant_dtype=torch.int8):
+    if x_scale is None:
+        hidden_states = x
+    else:
+        # smooth quant
+        hidden_states = x.to(x_scale) * x_scale
+    # [m, 1]
+    per_token_amax, _ = torch.max(input=torch.abs(hidden_states), dim=-1, keepdim=True)
+
+    dtypeMax = get_dtype_max(quant_dtype)
+
+    per_token_scale = per_token_amax.to(dtype=torch.float32) / dtypeMax
+    per_token_scale[per_token_scale == 0] = 1
+
+    # quant hidden_states
+    y = (hidden_states / per_token_scale).to(dtype=quant_dtype)
+    y_scale = per_token_scale.to(y_scale_dtype)
+    return y, y_scale
+
+
+def pertoken_quant_kvcache_symm(
+    # [num_blocks, num_heads, head_size // x, block_size, x]
+    k_cache: torch.Tensor,
+    # [num_blocks, num_heads, head_size, block_size]
+    v_cache: torch.Tensor,
+    quant_dtype: torch.dtype,  # e.g. torch.float8_e4m3fnuz
+    scale_dtype: torch.dtype = torch.float32,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    num_blocks = k_cache.shape[0]
+    num_heads = k_cache.shape[1]
+    head_dim = v_cache.shape[2]
+    block_size = v_cache.shape[3]
+    total_tokens = num_blocks * block_size
+
+    k_cache_permute = (
+        k_cache.permute(0, 1, 3, 2, 4)
+        .reshape(num_blocks, num_heads, block_size, -1)
+        .contiguous()
+    )
+    v_cache_permute = (
+        v_cache.permute(0, 1, 3, 2)
+        .reshape(num_blocks, num_heads, block_size, -1)
+        .contiguous()
+    )
+
+    k_quant, k_scale_asm = pertoken_quant(
+        k_cache_permute, scale_dtype, quant_dtype=quant_dtype
+    )
+    v_quant, v_scale_asm = pertoken_quant(
+        v_cache_permute, scale_dtype, quant_dtype=quant_dtype
+    )
+
+    # NOTE: quant_x and original x could be different
+    quant_x = 16 // quant_dtype.itemsize
+
+    k_quant = (
+        k_quant.view(num_blocks, num_heads, block_size, head_dim // quant_x, quant_x)
+        .permute(0, 1, 3, 2, 4)
+        .contiguous()
+    )
+    k_scale = k_scale_asm.permute(1, 0, 2, 3).contiguous().view(num_heads, total_tokens)
+    v_quant = (
+        v_quant.view(num_blocks, num_heads, block_size, head_dim)
+        .permute(0, 1, 3, 2)
+        .contiguous()
+    )
+    v_scale = v_scale_asm.permute(1, 0, 2, 3).contiguous().view(num_heads, total_tokens)
+
+    return k_quant, k_scale, v_quant, v_scale, k_scale_asm, v_scale_asm
+
+
+def asm_V_shuffle(VC):
+    # [num_blocks, num_kv_heads, head_size, block_size]
+    x = 16 // VC.element_size()
+    num_blocks, num_kv_heads, head_size, block_size = VC.shape
+    VC = VC.view(num_blocks, num_kv_heads, head_size, block_size // x, x)
+    # [num_blocks, num_kv_heads, block_size/X, head_size, X]
+    VC = VC.permute(0, 1, 3, 2, 4).contiguous()
+    return VC
 
 
 class Operator(BenchmarkOperator):
@@ -452,4 +557,75 @@ class Operator(BenchmarkOperator):
             kv_cache_quant_num_groups=kv_cache_quant_num_groups,
             use_tensor_cores=True,
             cache_logical_dtype_int=1,  # FP8 = 1
+        )
+
+    @register_benchmark(enabled=HAS_AITER)
+    def aiter_paged_fp8kv(
+        self,
+        q: torch.Tensor,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_seqlens: torch.Tensor,
+    ) -> Callable:
+        ori_dtype = q.dtype
+        dtype = torch.float8_e4m3fnuz
+
+        num_seqs = k_cache.shape[0]
+        max_seq_len = k_cache.shape[1]
+        block_size = 16
+        max_num_blocks_per_seq = (max_seq_len + block_size - 1) // block_size
+        num_blocks = max_num_blocks_per_seq * num_seqs
+        head_size = k_cache.shape[3]
+        num_heads = k_cache.shape[2]
+
+        x = 16 // ori_dtype.itemsize
+        k_cache_shape = (num_blocks, num_heads, head_size // x, block_size, x)
+        v_cache_shape = (num_blocks, num_heads, head_size, block_size)
+        _k_cache = torch.rand(k_cache_shape, dtype=ori_dtype, device=self.device)
+        _v_cache = torch.rand(v_cache_shape, dtype=ori_dtype, device=self.device)
+
+        k_quant, k_scale, v_quant, v_scale, k_scale_asm, v_scale_asm = (
+            pertoken_quant_kvcache_symm(
+                _k_cache, _v_cache, dtype, scale_dtype=torch.float32
+            )
+        )
+
+        # total_tokens = num_blocks * block_size
+        # k_scale = torch.ones(
+        #     (num_heads, total_tokens), dtype=torch.float32, device=self.device
+        # )
+        # v_scale = torch.ones_like(k_scale)
+
+        available_blocks = list(range(num_blocks))  # Blocks 0 to num_blocks-1
+        # available_blocks = [0] * num_blocks
+        block_tables_list = []
+        for _ in range(num_seqs):
+            block_tables = available_blocks[:max_num_blocks_per_seq]
+            available_blocks = available_blocks[max_num_blocks_per_seq:]
+            block_tables_list.append(block_tables)
+
+        block_tables = torch.tensor(
+            block_tables_list, dtype=torch.int, device=self.device
+        )
+
+        num_query_heads = q.shape[2]
+        num_kv_heads = num_heads
+        uniform_range = (-1, 1)
+        query = torch.empty_strided(
+            (num_seqs, num_query_heads, head_size),
+            ((num_query_heads + 2 * num_kv_heads) * head_size, head_size, 1),
+            dtype=ori_dtype,
+            device=self.device,
+        )
+        query.uniform_(*uniform_range)
+
+        return lambda: aiter_ops.pa_fwd_asm(
+            query.contiguous(),
+            k_quant,
+            asm_V_shuffle(v_quant),
+            block_tables,
+            cache_seqlens,
+            max_num_blocks_per_seq,
+            k_scale_asm,
+            v_scale_asm,
         )
