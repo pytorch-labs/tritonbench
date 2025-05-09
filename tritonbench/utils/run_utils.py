@@ -4,12 +4,13 @@ import os
 import subprocess
 import sys
 import time
-import yaml
 
 from datetime import datetime
 from pathlib import Path
 
 from typing import Dict, List, Optional
+
+import yaml
 
 from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
@@ -85,6 +86,7 @@ def get_github_env() -> Dict[str, str]:
     out["RUNNER_OS"] = os.environ["RUNNER_OS"]
     return out
 
+
 def run_config(config_file: str):
     assert Path(config_file).exists(), f"Config file {config_file} must exist."
     with open(config_file, "r") as fp:
@@ -95,8 +97,11 @@ def run_config(config_file: str):
         benchmark_name = benchmark["benchmark_name"]
         run_in_task(op=None, op_args=op_args, benchmark_name=benchmark_name)
 
+
 def run_in_task(
-    op: Optional[str], op_args: Optional[List[str]] = None, benchmark_name: Optional[str] = None
+    op: Optional[str],
+    op_args: Optional[List[str]] = None,
+    benchmark_name: Optional[str] = None,
 ) -> None:
     op_task_cmd = [] if is_fbcode() else [sys.executable]
     if not op_args:
@@ -116,7 +121,7 @@ def run_in_task(
 
     # Remove "TRITONBENCH_RUN_CONFIG" env
     if "TRITONBENCH_RUN_CONFIG" in os.environ:
-         del os.environ["TRITONBENCH_RUN_CONFIG"]
+        del os.environ["TRITONBENCH_RUN_CONFIG"]
 
     # In OSS, we assume always using the run.py benchmark driver
     if not is_fbcode() and not op_task_cmd[1] == "run.py":

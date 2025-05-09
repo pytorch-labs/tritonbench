@@ -16,7 +16,7 @@ from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.gpu_utils import gpu_lockdown
 from tritonbench.utils.parser import get_parser
-from tritonbench.utils.run_utils import run_in_task, run_config
+from tritonbench.utils.run_utils import run_config, run_in_task
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult
 
