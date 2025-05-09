@@ -161,7 +161,7 @@ class Operator(BenchmarkOperator):
         return (m, n, k)
 
     def get_input_iter(self) -> Generator:
-        for shape in self.shapes:
+        for shape_id, shape in enumerate(self.shapes):
             m, k, n = shape
             a = torch.randn(
                 (m, n), device=self.device, dtype=self.dtype
@@ -174,6 +174,14 @@ class Operator(BenchmarkOperator):
             ).requires_grad_(False)
             if self.col_major:
                 mat2 = mat2.T.contiguous().T
+            if hasattr(self, "strides"):
+                strides = self.strides[shape_id]
+                assert (
+                    len(strides) == 3
+                ), f"Can only have 3 strides from input, get: {strides}"
+                a = a.as_strided(size=a.size(), stride=strides[0])
+                mat1 = mat1.as_strided(size=mat1.size(), stride=strides[1])
+                mat2 = mat2.as_strided(size=mat2.size(), stride=strides[2])
             yield a, mat1, mat2
 
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
