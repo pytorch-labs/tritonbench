@@ -545,7 +545,11 @@ class Operator(BenchmarkOperator):
             shapes = ctx_vals
         requires_grad = True
         for shape in shapes:
-            BATCH, H, N_CTX, N_CTX_KV, D_HEAD = shape
+            if len(shape) == 5:
+                BATCH, H, N_CTX, N_CTX_KV, D_HEAD = shape
+            else:
+                BATCH, H, N_CTX, D_HEAD = shape
+                N_CTX_KV = N_CTX
             q = torch.randn(
                 (BATCH, H, N_CTX, D_HEAD),
                 dtype=self.dtype,
