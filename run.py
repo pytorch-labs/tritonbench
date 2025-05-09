@@ -16,7 +16,7 @@ from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.gpu_utils import gpu_lockdown
 from tritonbench.utils.parser import get_parser
-from tritonbench.utils.run_utils import run_in_task
+from tritonbench.utils.run_utils import run_in_task, run_config
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult
 
@@ -96,15 +96,13 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
 def run(args: List[str] = []):
     if args == []:
         args = sys.argv[1:]
+    if config := os.environ.get("TRITONBENCH_RUN_CONFIG", None):
+        run_config(config)
+
     # Log the tool usage
     usage_report_logger(benchmark_name="tritonbench")
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
-    if args.ci:
-        from .ci import run_ci  # @manual
-
-        run_ci()
-        return
 
     if args.op:
         ops = args.op.split(",")

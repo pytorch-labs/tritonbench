@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+import yaml
 
 from datetime import datetime
 from pathlib import Path
@@ -84,9 +85,17 @@ def get_github_env() -> Dict[str, str]:
     out["RUNNER_OS"] = os.environ["RUNNER_OS"]
     return out
 
+def run_config(config_file: str):
+    assert Path(config_file).exists(), f"Config file {config_file} must exist."
+    with open(config_file, "r") as fp:
+        config = yaml.safe_load(fp)
+    benchmarks = config["benchmarks"].split(" ")
+    for benchmark in benchmarks:
+        benchmark_name = benchmark["benchmark_name"]
+        run_in_task(op=None, op_args=benchmark["args"], benchmark_name=benchmark_name)
 
 def run_in_task(
-    op: str, op_args: Optional[List[str]] = None, benchmark_name: Optional[str] = None
+    op: Optional[str], op_args: Optional[List[str]] = None, benchmark_name: Optional[str] = None
 ) -> None:
     op_task_cmd = [] if is_fbcode() else [sys.executable]
     if not op_args:
