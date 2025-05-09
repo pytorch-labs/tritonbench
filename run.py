@@ -98,6 +98,7 @@ def run(args: List[str] = []):
         args = sys.argv[1:]
     if config := os.environ.get("TRITONBENCH_RUN_CONFIG", None):
         run_config(config)
+        return
 
     # Log the tool usage
     usage_report_logger(benchmark_name="tritonbench")

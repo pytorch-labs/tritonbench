@@ -114,6 +114,10 @@ def run_in_task(
         else:
             benchmark_name = op
 
+    # Remove "TRITONBENCH_RUN_CONFIG" env
+    if "TRITONBENCH_RUN_CONFIG" in os.environ:
+         del os.environ["TRITONBENCH_RUN_CONFIG"]
+
     # In OSS, we assume always using the run.py benchmark driver
     if not is_fbcode() and not op_task_cmd[1] == "run.py":
         op_task_cmd.insert(1, "run.py")
