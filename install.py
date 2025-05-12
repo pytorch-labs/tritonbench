@@ -62,7 +62,7 @@ def install_fbgemm(genai=True):
             sys.executable,
             "setup.py",
             "install",
-            "--package_variant=genai",
+            "--build-target=genai",
             "-DTORCH_CUDA_ARCH_LIST=8.0;9.0;9.0a",
         ]
     else:
@@ -70,7 +70,7 @@ def install_fbgemm(genai=True):
             sys.executable,
             "setup.py",
             "install",
-            "--package_variant=cuda",
+            "--build-target=cuda",
             "-DTORCH_CUDA_ARCH_LIST=8.0;9.0;9.0a",
         ]
     subprocess.check_call(cmd, cwd=str(FBGEMM_PATH.resolve()))

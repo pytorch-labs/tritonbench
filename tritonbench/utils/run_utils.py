@@ -91,11 +91,11 @@ def run_config(config_file: str):
     assert Path(config_file).exists(), f"Config file {config_file} must exist."
     with open(config_file, "r") as fp:
         config = yaml.safe_load(fp)
-    benchmarks = config["benchmarks"]
-    for benchmark in benchmarks:
-        op_args = benchmark["args"].split(" ")
-        benchmark_name = benchmark["benchmark_name"]
-        run_in_task(op=None, op_args=op_args, benchmark_name=benchmark_name)
+    for benchmark_name in config:
+        benchmark_config = config[benchmark_name]
+        op_name = benchmark_config["op"]
+        op_args = benchmark_config["args"].split(" ")
+        run_in_task(op=op_name, op_args=op_args, benchmark_name=benchmark_name)
 
 
 def run_in_task(
