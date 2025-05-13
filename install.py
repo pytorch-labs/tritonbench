@@ -136,6 +136,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fa3", action="store_true", help="Install optional flash_attention 3 kernels"
     )
+    parser.add_argument(
+        "--cutlass", action="store_true", help="Install optional CUTLASS Python DSL"
+    )
     parser.add_argument("--jax", action="store_true", help="Install jax nightly")
     parser.add_argument("--tk", action="store_true", help="Install ThunderKittens")
     parser.add_argument("--liger", action="store_true", help="Install Liger-kernel")
