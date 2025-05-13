@@ -14,6 +14,14 @@ from tools.python_utils import (
     pip_install_requirements,
 )
 
+from tools.flash_attn.install import install_fa3
+from tools.cutlass.install import install_cutlass
+from tools.tk.install import install_tk
+from tools.tilelang.install import install_tile
+from tools.xformers.install import install_xformers
+from tools.aiter.install import install_aiter
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -157,8 +165,6 @@ if __name__ == "__main__":
     if args.fa3 or args.all:
         # we need to install fa3 above all other dependencies
         logger.info("[tritonbench] installing fa3...")
-        from tools.flash_attn.install import install_fa3
-
         install_fa3()
     if args.fbgemm or args.fbgemm_all or args.all:
         logger.info("[tritonbench] installing FBGEMM...")
@@ -172,25 +178,20 @@ if __name__ == "__main__":
         install_jax()
     if args.tk or args.all:
         logger.info("[tritonbench] installing thunderkittens...")
-        from tools.tk.install import install_tk
-
         install_tk()
+    if args.cutlass or args.all:
+        logger.info("[tritonbench] installing cutlass Python DSL...")
+        install_cutlass()
     if args.tile:
         logger.info("[tritonbench] installing tilelang...")
-        from tools.tilelang.install import install_tile
-
         install_tile()
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
     if args.xformers:
         logger.info("[tritonbench] installing xformers...")
-        from tools.xformers.install import install_xformers
-
         install_xformers()
     if args.aiter and is_hip():
         logger.info("[tritonbench] installing aiter...")
-        from tools.aiter.install import install_aiter
-
         install_aiter()
     logger.info("[tritonbench] installation complete!")
