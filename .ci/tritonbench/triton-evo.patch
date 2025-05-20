@@ -1,0 +1,19 @@
+diff --git a/third_party/nvidia/backend/compiler.py b/third_party/nvidia/backend/compiler.py
+index 58264f29d..6c0209871 100644
+--- a/third_party/nvidia/backend/compiler.py
++++ b/third_party/nvidia/backend/compiler.py
+@@ -384,6 +384,14 @@ class CUDABackend(BaseBackend):
+             fmad = [] if opt.enable_fp_fusion else ['--fmad=false']
+             arch = sm_arch_from_capability(capability)
+             opt_level = ['--opt-level', '0'] if knobs.nvidia.disable_ptxas_opt else []
++            if not knobs.nvidia.disable_ptxas_opt and (ptxas_knobs := os.environ.get("PTXAS_KNOBS", None)):
++                dna_abs_path = os.path.abspath(ptxas_knobs)
++                if not os.path.exists(dna_abs_path):
++                    raise FileNotFoundError(f"PTXAS_KNOBS file not found at {dna_abs_path}")
++                if dna_abs_path.endswith(".txt") or dna_abs_path.endswith(".json"):
++                    opt_level = ["--plain-text-controls", f"--apply-controls={dna_abs_path}"]
++                else:
++                    opt_level = [f"--apply-controls={dna_abs_path}"]
+             ptxas_cmd = [ptxas, *line_info, *fmad, '-v', *opt_level, f'--gpu-name={arch}', fsrc.name, '-o', fbin]
+             try:
+                 subprocess.run(ptxas_cmd, check=True, close_fds=False, stderr=flog)

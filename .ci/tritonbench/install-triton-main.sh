@@ -37,6 +37,8 @@ pip uninstall -y triton
 rm -rf "${TRITON_PKG_DIR}"
 
 # install main triton
+# Patch triton with evo-enablement
+patch -p1 < /workspace/tritonbench/.ci/tritonbench/triton-evo.patch
 pip install ninja cmake wheel pybind11; # build-time dependencies
 pip install -r python/requirements.txt
 pip install -e .
