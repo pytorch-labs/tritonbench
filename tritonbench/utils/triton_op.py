@@ -1160,6 +1160,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     warmup,
                     rep,
                     grad_to_none=self.get_grad_to_none(self.example_inputs),
+                    device=self.device,
                     use_cuda_graphs=self.use_cuda_graphs,
                     bypass_fail=self.tb_args.bypass_fail,
                 )

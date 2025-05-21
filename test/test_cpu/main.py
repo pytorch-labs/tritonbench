@@ -7,14 +7,36 @@ from tritonbench.utils.parser import get_parser
 
 
 class TestTritonbenchCpu(unittest.TestCase):
-    def _get_test_op(self):
-        parser = get_parser(["--device", "cpu", "--op", "test_op"])
-        tb_args, extra_args = parser.parse_known_args(
-            ["--device", "cpu", "--op", "test_op"]
-        )
+    def _get_test_op(self, op_name="test_op", extra_args=[]):
+        parser = get_parser(["--device", "cpu", "--op", op_name])
+        args = ["--device", "cpu", "--op", op_name]
+        if extra_args:
+            args.extend(extra_args)
+        tb_args, extra_args = parser.parse_known_args(args)
         Operator = load_opbench_by_name(tb_args.op)
         test_op = Operator(tb_args, extra_args)
         return test_op
+
+    def test_cpu_layer_norm(self):
+        layer_norm_op = self._get_test_op(
+            "layer_norm",
+            extra_args=[
+                "--only",
+                "torch_layer_norm,torch_compile_layer_norm",
+                "--metrics",
+                "latency,accuracy",
+                "--num-inputs",
+                "1",
+            ],
+        )
+        layer_norm_op.run()
+        benchmark_output = layer_norm_op.output
+        headers, table = benchmark_output._table()
+        self.assertIn("torch_layer_norm-latency", headers)
+        self.assertIn("torch_compile_layer_norm-latency", headers)
+        self.assertIn("torch_compile_layer_norm-accuracy", headers)
+        # accuracy metric should be True in the table
+        self.assertEqual(True, table[0][-1])
 
     def test_cpu_metric_x_only_true(
         self,

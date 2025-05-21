@@ -43,7 +43,9 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--device",
+        "-d",
         default="cuda",
+        choices=["cuda", "cpu"],
         help="Device to benchmark.",
     )
     parser.add_argument(

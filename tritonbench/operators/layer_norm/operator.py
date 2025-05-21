@@ -72,14 +72,14 @@ class Operator(BenchmarkOperator):
             x = -2.3 + 0.5 * torch.randn(
                 x_shape,
                 dtype=self.dtype,
-                device="cuda",
+                device=self.device,
             )
             x.requires_grad_()
             weight = torch.rand(
-                w_shape, dtype=self.dtype, device="cuda", requires_grad=True
+                w_shape, dtype=self.dtype, device=self.device, requires_grad=True
             )
             bias = torch.rand(
-                w_shape, dtype=self.dtype, device="cuda", requires_grad=True
+                w_shape, dtype=self.dtype, device=self.device, requires_grad=True
             )
             yield (x, w_shape, weight, bias, eps)
 

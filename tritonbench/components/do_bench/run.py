@@ -1,9 +1,12 @@
 import statistics
+import time
 
 from typing import List, Optional
 
 import torch
 import triton
+
+NS_TO_MS = 1e-6
 
 
 class Latency:
@@ -108,27 +111,90 @@ class Latency:
             raise ValueError(f"Unsupported latency output mode: {mode}")
 
 
+def _summarize_statistics(times, quantiles, return_mode):
+    if quantiles is not None:
+        ret = torch.quantile(times, torch.tensor(quantiles, dtype=torch.float)).tolist()
+        if len(ret) == 1:
+            ret = ret[0]
+        return ret
+    if return_mode == "all":
+        return times.tolist()
+    return getattr(torch, return_mode)(times).item()
+
+
+def _do_bench_cpu(
+    fn, warmup, rep=20, grad_to_none=None, quantiles=None, return_mode="mean"
+):
+    """Measure latency of a function on CPU."""
+    assert return_mode in ["min", "max", "mean", "median", "all"]
+    fn()
+    # Estimate the runtime of the function
+    t0 = time.time_ns()
+    for _ in range(5):
+        fn()
+    t1 = time.time_ns()
+    estimate_ms = (t1 - t0) * NS_TO_MS / 5
+
+    # compute number of warmup and repeat
+    if estimate_ms == 0:
+        n_repeat = 1000
+        n_warmup = 1000
+    else:
+        n_warmup = max(1, int(warmup / estimate_ms))
+        n_repeat = max(1, int(rep / estimate_ms))
+    # Warm-up
+    for _ in range(n_warmup):
+        fn()
+    times_ms = []
+    # Benchmark
+    for _i in range(n_repeat):
+        # we don't want `fn` to accumulate gradient values
+        # if it contains a backward pass. So we clear the
+        # provided gradients
+        if grad_to_none is not None:
+            for x in grad_to_none:
+                x.grad = None
+        # record time of `fn`
+        t0 = time.time_ns()
+        fn()
+        t1 = time.time_ns()
+        times_ms.append((t1 - t0) * NS_TO_MS)
+    times = torch.tensor(times_ms, dtype=torch.float)
+    return _summarize_statistics(times, quantiles, return_mode)
+
+
 def do_bench_wrapper(
     fn,
     warmup,
     rep,
     grad_to_none,
+    device: str = "cuda",
     use_cuda_graphs: bool = False,
     bypass_fail: bool = False,
 ) -> Optional[Latency]:
     """Wrapper to triton's do_bench to gain latency."""
-    if use_cuda_graphs:
-        with torch.cuda.stream(torch.cuda.Stream()):
+    try:
+        if device == "cpu":
             return Latency(
-                times=triton.testing.do_bench_cudagraph(
+                times=_do_bench_cpu(
                     fn,
+                    warmup=warmup,
                     rep=rep,
                     return_mode="all",
                     grad_to_none=grad_to_none,
                 )
             )
-    else:
-        try:
+        elif use_cuda_graphs:
+            with torch.cuda.stream(torch.cuda.Stream()):
+                return Latency(
+                    times=triton.testing.do_bench_cudagraph(
+                        fn,
+                        rep=rep,
+                        return_mode="all",
+                        grad_to_none=grad_to_none,
+                    )
+                )
+        else:
             return Latency(
                 times=triton.testing.do_bench(
                     fn,
@@ -138,7 +204,7 @@ def do_bench_wrapper(
                     grad_to_none=grad_to_none,
                 )
             )
-        except Exception as e:
-            if not bypass_fail:
-                raise e
-            return None
+    except Exception as e:
+        if not bypass_fail:
+            raise e
+        return None
