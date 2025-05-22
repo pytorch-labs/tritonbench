@@ -9,7 +9,7 @@ index 58264f29d..6c0209871 100644
 +            if not knobs.nvidia.disable_ptxas_opt and (ptxas_options := os.environ.get("PTXAS_OPTIONS", None)):
 +                kernel_name = os.environ.get("PTXAS_OPTIONS_KERNEL", None)
 +                if not kernel_name or kernel_name == metadata["name"]:
-+                    opt_level = [ptxas_options.split(" ")]
++                    opt_level = ptxas_options.split(" ")
              ptxas_cmd = [ptxas, *line_info, *fmad, '-v', *opt_level, f'--gpu-name={arch}', fsrc.name, '-o', fbin]
              try:
                  subprocess.run(ptxas_cmd, check=True, close_fds=False, stderr=flog)
