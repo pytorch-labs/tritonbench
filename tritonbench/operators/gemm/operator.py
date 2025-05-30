@@ -373,7 +373,7 @@ class Operator(BenchmarkOperator):
         a, w, bias = example_inputs
         m, k = a.size()
         k, n = w.size()
-        if not bias == None:
+        if bias is not None:
             flops = m * k * 2 * n + 2 * m * n
         else:
             flops = m * k * 2 * n

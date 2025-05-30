@@ -26,6 +26,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     parser.add_argument("--m", type=int)
     parser.add_argument("--n", type=int)
     parser.add_argument("--k", type=int)
+    parser.add_argument("--bias", action="store_true", default=False)
     parser.add_argument("--llama", action="store_true")
     parser.add_argument("--prefill", default=False, action="store_true")
     parser.add_argument(
@@ -165,6 +166,7 @@ class Operator(BenchmarkOperator):
             extras = get_production_shapes(self.name, "fp32_gemm")
             if len(extras):
                 self.shapes.extend(extras)
+        self.bias = addmm_args.bias
         self.fp8_fast_accum = addmm_args.fp8_fast_accum
         self.use_tma = addmm_args.use_tma
         self.no_use_persistent = addmm_args.no_use_persistent
@@ -184,12 +186,13 @@ class Operator(BenchmarkOperator):
             )
 
     @register_benchmark(enabled=HAS_TRITON)
-    def _triton(self, xq, wq, x_scale, w_scale) -> Callable:
+    def _triton(self, xq, wq, x_scale, w_scale, bias) -> Callable:
         return lambda: triton_fp8_row(
             xq,
             wq,
             x_scale,
             w_scale,
+            bias=bias,
             fp8_fast_accum=self.fp8_fast_accum,
             tma_persistent=self.use_tma,
             no_use_persistent=self.no_use_persistent,
@@ -201,16 +204,36 @@ class Operator(BenchmarkOperator):
         label="ck" if torch.version.hip else "cutlass",
         baseline=True,
     )
-    def _cutlass_or_ck(self, xq, wq, x_scale, w_scale) -> Callable:
-        return lambda: cutlass_or_ck_fp8_row(
-            xq, wq, x_scale, w_scale, use_fast_accum=self.fp8_fast_accum
-        )
+    def _cutlass_or_ck(self, xq, wq, x_scale, w_scale, bias) -> Callable:
+        if bias is not None:
+            return (
+                lambda: cutlass_or_ck_fp8_row(
+                    xq, wq, x_scale, w_scale, use_fast_accum=self.fp8_fast_accum
+                )
+                + bias
+            )
+        else:
+            return lambda: cutlass_or_ck_fp8_row(
+                xq, wq, x_scale, w_scale, use_fast_accum=self.fp8_fast_accum
+            )
 
     @register_benchmark(enabled=HAS_CUBLAS, label=f"cublas_{torch.version.cuda}")
-    def _cublas(self, xq, wq, x_scale, w_scale) -> Callable:
-        return lambda: scale_fp8_row(
-            cublas_fp8_row(xq, wq, use_fast_accum=self.fp8_fast_accum), x_scale, w_scale
-        )
+    def _cublas(self, xq, wq, x_scale, w_scale, bias) -> Callable:
+        if bias is not None:
+            return (
+                lambda: scale_fp8_row(
+                    cublas_fp8_row(xq, wq, use_fast_accum=self.fp8_fast_accum),
+                    x_scale,
+                    w_scale,
+                )
+                + bias
+            )
+        else:
+            return lambda: scale_fp8_row(
+                cublas_fp8_row(xq, wq, use_fast_accum=self.fp8_fast_accum),
+                x_scale,
+                w_scale,
+            )
 
     # TODO: add cublas rowwise FP8 kernel
     # @register_benchmark(baseline=True)
@@ -227,10 +250,13 @@ class Operator(BenchmarkOperator):
     def flops(
         self, fn_name: str, example_inputs: Any, metrics: BenchmarkOperatorMetrics
     ) -> List[float]:
-        xq, wq, _, _ = example_inputs
+        xq, wq, _, _, bias = example_inputs
         m, k = xq.size()
         n, k = wq.size()
-        flops = m * k * 2 * n
+        if bias is not None:
+            flops = m * k * 2 * n + 2 * m * n
+        else:
+            flops = m * k * 2 * n
         return flops
 
     @register_metric()
@@ -238,7 +264,7 @@ class Operator(BenchmarkOperator):
         def nbytes(t):
             return t.numel() * t.element_size()
 
-        a, b, _, _ = example_inputs
+        a, b, _, _, _ = example_inputs
         c = fn()
         c = c[0] if isinstance(c, tuple) else c
 
@@ -247,7 +273,7 @@ class Operator(BenchmarkOperator):
 
     @register_x_val(label="(M, N, K)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
-        xq, wq, _, _ = example_inputs
+        xq, wq, _, _, _ = example_inputs
         m, k = xq.size()
         n, k = wq.size()
         return (m, n, k)
@@ -263,7 +289,13 @@ class Operator(BenchmarkOperator):
             ).requires_grad_(False)
             xq, x_scale = fp8_row_quantize(x)
             wq, w_scale = fp8_row_quantize(w)
-            yield xq, wq, x_scale, w_scale
+            if self.bias:
+                bias = torch.randn(
+                    (n), device=self.device, dtype=torch.bfloat16
+                ).requires_grad_(False)
+            else:
+                bias = None
+            yield xq, wq, x_scale, w_scale, bias
 
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
         output = fn()
