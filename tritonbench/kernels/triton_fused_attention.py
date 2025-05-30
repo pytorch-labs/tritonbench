@@ -2019,10 +2019,6 @@ class _attention_opt(torch.autograd.Function):
         if HAS_NEW_TMA:
             triton.set_allocator(alloc_fn)
 
-        # Flag to enable warp specialization
-        # True for tma_ws variant, False otherwise
-        enable_ws = baseVariant == "tma_ws"
-
         if baseVariant == "base":
             _attn_fwd[grid_tma](
                 q,
@@ -2131,7 +2127,7 @@ class _attention_opt(torch.autograd.Function):
                 ENABLE_WS=False,
                 **extra_kern_args,
             )
-        elif baseVariant in ("tma_ws", "tma"):
+        elif baseVariant == "tma":
             _attn_fwd_tma_unified[grid_tma](
                 q,
                 k,
@@ -2160,7 +2156,39 @@ class _attention_opt(torch.autograd.Function):
                 N_CTX=q.shape[2],
                 HEAD_DIM=HEAD_DIM_K,
                 STAGE=stage,
-                ENABLE_WS=enable_ws,  # Warp specialization enabled: {True: "tma_ws", False: "tma"}
+                ENABLE_WS=False,  # Disable warp specialization for regular TMA
+                **extra_kern_args,
+            )
+        elif baseVariant == "tma_ws":
+            _attn_fwd_tma_unified[grid_tma](
+                q,
+                k,
+                v,
+                sm_scale,
+                M,
+                o,
+                q.stride(0),
+                q.stride(1),
+                q.stride(2),
+                q.stride(3),
+                k.stride(0),
+                k.stride(1),
+                k.stride(2),
+                k.stride(3),
+                v.stride(0),
+                v.stride(1),
+                v.stride(2),
+                v.stride(3),
+                o.stride(0),
+                o.stride(1),
+                o.stride(2),
+                o.stride(3),
+                q.shape[0],
+                q.shape[1],
+                N_CTX=q.shape[2],
+                HEAD_DIM=HEAD_DIM_K,
+                STAGE=stage,
+                ENABLE_WS=True,  # Enable warp specialization
                 **extra_kern_args,
             )
         elif baseVariant == "tma_ws_persistent":
