@@ -1191,38 +1191,38 @@ def _attn_fwd_opt(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     )
 
 
-@triton.autotune(list(filter(keep, configsTma)), key=["N_CTX"])
+@triton.autotune(list(filter(keep, configsTma + configsTmaWS)), key=["N_CTX"])
 @triton.jit
-def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
+def _attn_fwd_tma_unified(
     Q,
     K,
     V,
     sm_scale,
     M,
-    Out,  #
+    Out,
     stride_qz,
     stride_qh,
     stride_qm,
-    stride_qk,  #
+    stride_qk,
     stride_kz,
     stride_kh,
     stride_kn,
-    stride_kk,  #
+    stride_kk,
     stride_vz,
     stride_vh,
     stride_vk,
-    stride_vn,  #
+    stride_vn,
     stride_oz,
     stride_oh,
     stride_om,
-    stride_on,  #
+    stride_on,
     Z,
     H,
-    N_CTX,  #: tl.constexpr,  #
-    BLOCK_M: tl.constexpr,  #
-    BLOCK_N: tl.constexpr,  #
-    HEAD_DIM: tl.constexpr,  #
-    STAGE: tl.constexpr,  #
+    N_CTX,
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    HEAD_DIM: tl.constexpr,
+    STAGE: tl.constexpr,
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
@@ -1230,6 +1230,12 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
     off_hz = tl.program_id(1)
+
+    # TMA descriptor creation - shared for both WS and non-WS paths
+    desc_q = None
+    desc_k = None
+    desc_v = None
+    desc_o = None
 
     if ENABLE_TMA:
         desc_k = tl.make_tensor_descriptor(
@@ -1266,161 +1272,87 @@ def _attn_fwd_tma(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
             block_shape=[BLOCK_M, HEAD_DIM],
         )
 
-    _attn_fwd_compute(
-        Q,
-        K,
-        V,
-        sm_scale,
-        M,
-        Out,  #
-        desc_q,
-        desc_k,
-        desc_v,
-        desc_o,
-        stride_qz,
-        stride_qh,
-        stride_qm,
-        stride_qk,  #
-        stride_kz,
-        stride_kh,
-        stride_kn,
-        stride_kk,  #
-        stride_vz,
-        stride_vh,
-        stride_vk,
-        stride_vn,  #
-        stride_oz,
-        stride_oh,
-        stride_om,
-        stride_on,  #
-        off_hz,
-        pid,
-        Z,
-        H,
-        N_CTX,  #: tl.constexpr,  #
-        BLOCK_M,
-        BLOCK_N,
-        HEAD_DIM,
-        STAGE,
-        ENABLE_TMA,
-        LOOP_SCHEDULE,
-    )
-
-
-@triton.autotune(list(filter(keep, configsTmaWS)), key=["N_CTX"])
-@triton.jit
-def _attn_fwd_tma_ws(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
-    Q,
-    K,
-    V,
-    sm_scale,
-    M,
-    Out,  #
-    stride_qz,
-    stride_qh,
-    stride_qm,
-    stride_qk,  #
-    stride_kz,
-    stride_kh,
-    stride_kn,
-    stride_kk,  #
-    stride_vz,
-    stride_vh,
-    stride_vk,
-    stride_vn,  #
-    stride_oz,
-    stride_oh,
-    stride_om,
-    stride_on,  #
-    Z,
-    H,
-    N_CTX,  #: tl.constexpr,  #
-    BLOCK_M: tl.constexpr,  #
-    BLOCK_N: tl.constexpr,  #
-    HEAD_DIM: tl.constexpr,  #
-    STAGE: tl.constexpr,  #
-    ENABLE_TMA: tl.constexpr,
-    LOOP_SCHEDULE: tl.constexpr,
-    ENABLE_WS: tl.constexpr,
-):
-    tl.static_assert(BLOCK_N <= HEAD_DIM)
-    pid = tl.program_id(0)
-    off_hz = tl.program_id(1)
-
-    if ENABLE_TMA:
-        desc_k = tl.make_tensor_descriptor(
-            K,
-            shape=[Z * H * N_CTX, HEAD_DIM],
-            strides=[HEAD_DIM, 1],
-            block_shape=[BLOCK_N, HEAD_DIM],
-        )
-        if V.dtype == torch.float8_e5m2:
-            desc_v = tl.make_tensor_descriptor(
-                V,
-                shape=[Z * H * HEAD_DIM, N_CTX],
-                strides=[N_CTX, 1],
-                block_shape=[HEAD_DIM, BLOCK_N],
-            )
-        else:
-            desc_v = tl.make_tensor_descriptor(
-                V,
-                shape=[Z * H * N_CTX, HEAD_DIM],
-                strides=[HEAD_DIM, 1],
-                block_shape=[BLOCK_N, HEAD_DIM],
-            )
-
-        desc_q = tl.make_tensor_descriptor(
+    # Call appropriate compute function based on ENABLE_WS
+    if ENABLE_WS:
+        _attn_fwd_compute_ws(
             Q,
-            shape=[Z * H * N_CTX, HEAD_DIM],
-            strides=[HEAD_DIM, 1],
-            block_shape=[BLOCK_M, HEAD_DIM],
-        )
-        desc_o = tl.make_tensor_descriptor(
+            K,
+            V,
+            sm_scale,
+            M,
             Out,
-            shape=[Z * H * N_CTX, HEAD_DIM],
-            strides=[HEAD_DIM, 1],
-            block_shape=[BLOCK_M, HEAD_DIM],
+            desc_q,
+            desc_k,
+            desc_v,
+            desc_o,
+            stride_qz,
+            stride_qh,
+            stride_qm,
+            stride_qk,
+            stride_kz,
+            stride_kh,
+            stride_kn,
+            stride_kk,
+            stride_vz,
+            stride_vh,
+            stride_vk,
+            stride_vn,
+            stride_oz,
+            stride_oh,
+            stride_om,
+            stride_on,
+            off_hz,
+            pid,
+            Z,
+            H,
+            N_CTX,
+            BLOCK_M,
+            BLOCK_N,
+            HEAD_DIM,
+            STAGE,
+            ENABLE_TMA,
+            LOOP_SCHEDULE,
         )
-
-    _attn_fwd_compute_ws(
-        Q,
-        K,
-        V,
-        sm_scale,
-        M,
-        Out,  #
-        desc_q,
-        desc_k,
-        desc_v,
-        desc_o,
-        stride_qz,
-        stride_qh,
-        stride_qm,
-        stride_qk,  #
-        stride_kz,
-        stride_kh,
-        stride_kn,
-        stride_kk,  #
-        stride_vz,
-        stride_vh,
-        stride_vk,
-        stride_vn,  #
-        stride_oz,
-        stride_oh,
-        stride_om,
-        stride_on,  #
-        off_hz,
-        pid,
-        Z,
-        H,
-        N_CTX,  #: tl.constexpr,  #
-        BLOCK_M,
-        BLOCK_N,
-        HEAD_DIM,
-        STAGE,
-        ENABLE_TMA,
-        LOOP_SCHEDULE,
-    )
+    else:
+        _attn_fwd_compute(
+            Q,
+            K,
+            V,
+            sm_scale,
+            M,
+            Out,
+            desc_q,
+            desc_k,
+            desc_v,
+            desc_o,
+            stride_qz,
+            stride_qh,
+            stride_qm,
+            stride_qk,
+            stride_kz,
+            stride_kh,
+            stride_kn,
+            stride_kk,
+            stride_vz,
+            stride_vh,
+            stride_vk,
+            stride_vn,
+            stride_oz,
+            stride_oh,
+            stride_om,
+            stride_on,
+            off_hz,
+            pid,
+            Z,
+            H,
+            N_CTX,
+            BLOCK_M,
+            BLOCK_N,
+            HEAD_DIM,
+            STAGE,
+            ENABLE_TMA,
+            LOOP_SCHEDULE,
+        )
 
 
 @triton.autotune(list(filter(keep, configsTmaWSPersistent)), key=["N_CTX"])
@@ -2087,6 +2019,10 @@ class _attention_opt(torch.autograd.Function):
         if HAS_NEW_TMA:
             triton.set_allocator(alloc_fn)
 
+        # Flag to enable warp specialization
+        # True for tma_ws variant, False otherwise
+        enable_ws = baseVariant == "tma_ws"
+
         if baseVariant == "base":
             _attn_fwd[grid_tma](
                 q,
@@ -2195,8 +2131,8 @@ class _attention_opt(torch.autograd.Function):
                 ENABLE_WS=False,
                 **extra_kern_args,
             )
-        elif baseVariant == "tma":
-            _attn_fwd_tma[grid_tma](
+        elif baseVariant in ("tma_ws", "tma"):
+            _attn_fwd_tma_unified[grid_tma](
                 q,
                 k,
                 v,
@@ -2206,57 +2142,25 @@ class _attention_opt(torch.autograd.Function):
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
-                q.stride(3),  #
+                q.stride(3),
                 k.stride(0),
                 k.stride(1),
                 k.stride(2),
-                k.stride(3),  #
+                k.stride(3),
                 v.stride(0),
                 v.stride(1),
                 v.stride(2),
-                v.stride(3),  #
+                v.stride(3),
                 o.stride(0),
                 o.stride(1),
                 o.stride(2),
-                o.stride(3),  #
+                o.stride(3),
                 q.shape[0],
-                q.shape[1],  #
-                N_CTX=q.shape[2],  #
-                HEAD_DIM=HEAD_DIM_K,  #
-                STAGE=stage,  #
-                ENABLE_WS=False,
-                **extra_kern_args,
-            )
-        elif baseVariant == "tma_ws":
-            _attn_fwd_tma_ws[grid_tma](
-                q,
-                k,
-                v,
-                sm_scale,
-                M,
-                o,
-                q.stride(0),
-                q.stride(1),
-                q.stride(2),
-                q.stride(3),  #
-                k.stride(0),
-                k.stride(1),
-                k.stride(2),
-                k.stride(3),  #
-                v.stride(0),
-                v.stride(1),
-                v.stride(2),
-                v.stride(3),  #
-                o.stride(0),
-                o.stride(1),
-                o.stride(2),
-                o.stride(3),  #
-                q.shape[0],
-                q.shape[1],  #
-                N_CTX=q.shape[2],  #
-                HEAD_DIM=HEAD_DIM_K,  #
-                STAGE=stage,  #
-                ENABLE_WS=True,
+                q.shape[1],
+                N_CTX=q.shape[2],
+                HEAD_DIM=HEAD_DIM_K,
+                STAGE=stage,
+                ENABLE_WS=enable_ws,  # Warp specialization enabled: {True: "tma_ws", False: "tma"}
                 **extra_kern_args,
             )
         elif baseVariant == "tma_ws_persistent":
