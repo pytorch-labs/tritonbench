@@ -271,21 +271,9 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        # base: do not enable TMA/WarpSpec/CompPipe
+        # includes base (default scheduling) + opt (optimized loop scheduling based on hueristics)
         return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "base"
-        )
-
-    @register_benchmark(enabled=HAS_CUDA_124)
-    def triton_tutorial_flash_v2_opt(
-        self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-    ) -> Callable:
-        # autotune CompPipe
-        return lambda: triton_tutorial_FA2_opt(
-            q, k, v, self.causal, self.sm_scale, "opt"
+            q, k, v, self.causal, self.sm_scale, "base_opt"
         )
 
     @register_benchmark(enabled=HAS_CUDA_124)

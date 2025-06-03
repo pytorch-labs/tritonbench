@@ -1005,15 +1005,15 @@ def _attn_fwd_ws(
     )
 
 
-@triton.autotune(list(filter(keep, configsOrig)), key=["N_CTX"])
+@triton.autotune(list(filter(keep, configsOrig + configsOpt)), key=["N_CTX"])
 @triton.jit
-def _attn_fwd(
+def _atn_fwd_base_opt(
     Q,
     K,
     V,
     sm_scale,
     M,
-    Out,  #
+    Out,
     desc_q,
     desc_k,
     desc_v,
@@ -1021,26 +1021,26 @@ def _attn_fwd(
     stride_qz,
     stride_qh,
     stride_qm,
-    stride_qk,  #
+    stride_qk,
     stride_kz,
     stride_kh,
     stride_kn,
-    stride_kk,  #
+    stride_kk,
     stride_vz,
     stride_vh,
     stride_vk,
-    stride_vn,  #
+    stride_vn,
     stride_oz,
     stride_oh,
     stride_om,
-    stride_on,  #
+    stride_on,
     Z,
     H,
-    N_CTX,  #: tl.constexpr,  #
-    BLOCK_M: tl.constexpr,  #
-    BLOCK_N: tl.constexpr,  #
-    HEAD_DIM: tl.constexpr,  #
-    STAGE: tl.constexpr,  #
+    N_CTX,
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    HEAD_DIM: tl.constexpr,
+    STAGE: tl.constexpr,
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
@@ -1063,16 +1063,19 @@ def _attn_fwd(
     tl.assume(stride_on >= 0)
     tl.assume(Z >= 0)
     tl.assume(H >= 0)
+
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
     off_hz = tl.program_id(1)
+
+    # Both base and opt use the same compute function
     _attn_fwd_compute(
         Q,
         K,
         V,
         sm_scale,
         M,
-        Out,  #
+        Out,
         desc_q,
         desc_k,
         desc_v,
@@ -1080,108 +1083,24 @@ def _attn_fwd(
         stride_qz,
         stride_qh,
         stride_qm,
-        stride_qk,  #
+        stride_qk,
         stride_kz,
         stride_kh,
         stride_kn,
-        stride_kk,  #
+        stride_kk,
         stride_vz,
         stride_vh,
         stride_vk,
-        stride_vn,  #
+        stride_vn,
         stride_oz,
         stride_oh,
         stride_om,
-        stride_on,  #
+        stride_on,
         off_hz,
         pid,
         Z,
         H,
-        N_CTX,  #: tl.constexpr,  #
-        BLOCK_M,
-        BLOCK_N,
-        HEAD_DIM,
-        STAGE,
-        ENABLE_TMA,
-        LOOP_SCHEDULE,
-    )
-
-
-@triton.autotune(list(filter(keep, configsOpt)), key=["N_CTX"])
-@triton.jit
-def _attn_fwd_opt(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
-    Q,
-    K,
-    V,
-    sm_scale,
-    M,
-    Out,  #
-    desc_q,
-    desc_k,
-    desc_v,
-    desc_o,
-    stride_qz,
-    stride_qh,
-    stride_qm,
-    stride_qk,  #
-    stride_kz,
-    stride_kh,
-    stride_kn,
-    stride_kk,  #
-    stride_vz,
-    stride_vh,
-    stride_vk,
-    stride_vn,  #
-    stride_oz,
-    stride_oh,
-    stride_om,
-    stride_on,  #
-    Z,
-    H,
-    N_CTX,  #: tl.constexpr,  #
-    BLOCK_M: tl.constexpr,  #
-    BLOCK_N: tl.constexpr,  #
-    HEAD_DIM: tl.constexpr,  #
-    STAGE: tl.constexpr,  #
-    ENABLE_TMA: tl.constexpr,
-    LOOP_SCHEDULE: tl.constexpr,
-    ENABLE_WS: tl.constexpr,
-):
-    tl.static_assert(BLOCK_N <= HEAD_DIM)
-    pid = tl.program_id(0)
-    off_hz = tl.program_id(1)
-    _attn_fwd_compute(
-        Q,
-        K,
-        V,
-        sm_scale,
-        M,
-        Out,  #
-        desc_q,
-        desc_k,
-        desc_v,
-        desc_o,
-        stride_qz,
-        stride_qh,
-        stride_qm,
-        stride_qk,  #
-        stride_kz,
-        stride_kh,
-        stride_kn,
-        stride_kk,  #
-        stride_vz,
-        stride_vh,
-        stride_vk,
-        stride_vn,  #
-        stride_oz,
-        stride_oh,
-        stride_om,
-        stride_on,  #
-        off_hz,
-        pid,
-        Z,
-        H,
-        N_CTX,  #: tl.constexpr,  #
+        N_CTX,
         BLOCK_M,
         BLOCK_N,
         HEAD_DIM,
@@ -2019,8 +1938,8 @@ class _attention_opt(torch.autograd.Function):
         if HAS_NEW_TMA:
             triton.set_allocator(alloc_fn)
 
-        if baseVariant == "base":
-            _attn_fwd[grid_tma](
+        if baseVariant == "base_opt":
+            _atn_fwd_base_opt[grid_tma](
                 q,
                 k,
                 v,
@@ -2030,28 +1949,28 @@ class _attention_opt(torch.autograd.Function):
                 desc_q,
                 desc_k,
                 desc_v,
-                desc_o,  #
+                desc_o,
                 q.stride(0),
                 q.stride(1),
                 q.stride(2),
-                q.stride(3),  #
+                q.stride(3),
                 k.stride(0),
                 k.stride(1),
                 k.stride(2),
-                k.stride(3),  #
+                k.stride(3),
                 v.stride(0),
                 v.stride(1),
                 v.stride(2),
-                v.stride(3),  #
+                v.stride(3),
                 o.stride(0),
                 o.stride(1),
                 o.stride(2),
-                o.stride(3),  #
+                o.stride(3),
                 q.shape[0],
-                q.shape[1],  #
-                N_CTX=q.shape[2],  #
-                HEAD_DIM=HEAD_DIM_K,  #
-                STAGE=stage,  #
+                q.shape[1],
+                N_CTX=q.shape[2],
+                HEAD_DIM=HEAD_DIM_K,
+                STAGE=stage,
                 ENABLE_WS=False,
                 **extra_kern_args,
             )
@@ -2089,42 +2008,6 @@ class _attention_opt(torch.autograd.Function):
                 HEAD_DIM=HEAD_DIM_K,  #
                 STAGE=stage,  #
                 ENABLE_WS=True,
-                **extra_kern_args,
-            )
-        elif baseVariant == "opt":
-            _attn_fwd_opt[grid_tma](
-                q,
-                k,
-                v,
-                sm_scale,
-                M,
-                o,
-                desc_q,
-                desc_k,
-                desc_v,
-                desc_o,  #
-                q.stride(0),
-                q.stride(1),
-                q.stride(2),
-                q.stride(3),  #
-                k.stride(0),
-                k.stride(1),
-                k.stride(2),
-                k.stride(3),  #
-                v.stride(0),
-                v.stride(1),
-                v.stride(2),
-                v.stride(3),  #
-                o.stride(0),
-                o.stride(1),
-                o.stride(2),
-                o.stride(3),  #
-                q.shape[0],
-                q.shape[1],  #
-                N_CTX=q.shape[2],  #
-                HEAD_DIM=HEAD_DIM_K,  #
-                STAGE=stage,  #
-                ENABLE_WS=False,
                 **extra_kern_args,
             )
         elif baseVariant == "tma":
