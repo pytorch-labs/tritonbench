@@ -3,7 +3,7 @@ FROM ${BASE_IMAGE}
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV CONDA_ENV=pytorch
-ENV CONDA_ENV_TRITON_MAIN=triton-main
+ENV CONDA_ENV_TRITON_MAIN=triton-evo
 ENV SETUP_SCRIPT=/workspace/setup_instance.sh
 ARG OVERRIDE_GENCODE="-gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_90,code=sm_90 -gencode arch=compute_90a,code=sm_90a"
 ARG OVERRIDE_GENCODE_CUDNN="-gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_90,code=sm_90 -gencode arch=compute_90a,code=sm_90a"
@@ -110,6 +110,10 @@ RUN sudo apt-get purge -y libnvidia-compute-550
 # Clone the pytorch env as triton-main env, then compile triton main from source
 RUN cd /workspace/tritonbench && \
     BASE_CONDA_ENV=${CONDA_ENV} CONDA_ENV=${CONDA_ENV_TRITON_MAIN} bash .ci/tritonbench/install-triton-main.sh
+
+# Clone the pytorch env as triton-evo env, then compile triton evo from source
+RUN cd /workspace/tritonbench && \
+    BASE_CONDA_ENV=${CONDA_ENV} CONDA_ENV=${CONDA_ENV_TRITON_EVO} bash .ci/tritonbench/install-triton-evo.sh
 
 # Set run command
 CMD ["bash", "/workspace/tritonbench/docker/entrypoint.sh"]
