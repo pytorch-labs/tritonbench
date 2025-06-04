@@ -97,38 +97,3 @@ kubectl get pods -n arc-runners
 # inspect the logs
 kubectl logs -n arc-runners gcp-h100-runner-...
 ```
-
-## Step 4: Install NVIDIA driver on the K8s host machine
-
-```
-kubectl apply -f daemonset.yaml
-```
-
-When the host machine runs Ubuntu, use the following command to find all available driver versions:
-
-```
-gsutil ls gs://ubuntu_nvidia_packages/
-
-# For example:
-# gsutil ls gs://ubuntu_nvidia_packages/nvidia-driver-gke_jammy-5.15.0-1048-gke-535.104.05_amd64.deb
-```
-
-
-## Troubleshooting
-
-If all the Pods are created but in `Pending` state, it could be the NVIDIA driver version updates and
-the old version is deleted.
-
-To check if the NVIDIA driver is installed correctly:
-
-```
-kubectl -n kube-system logs -f daemonset.apps/nvidia-driver-installer -c nvidia-driver-installer
-```
-
-If the NVIDIA driver file is not found, find the available versions using
-
-```
-gsutil ls gs://ubuntu_nvidia_packages/
-```
-
-and update the version in `daemonset.yaml`.
