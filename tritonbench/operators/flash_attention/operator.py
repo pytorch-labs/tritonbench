@@ -139,7 +139,7 @@ from tritonbench.utils.triton_op import (
     register_metric,
     register_x_val,
 )
-from tritonbench.utils.triton_utils import has_warp_spec
+from tritonbench.utils.triton_utils import has_new_tma, has_warp_spec
 
 
 def parse_op_args(args: List[str]):
@@ -276,7 +276,7 @@ class Operator(BenchmarkOperator):
             q, k, v, self.causal, self.sm_scale, "base_opt"
         )
 
-    @register_benchmark(enabled=HAS_CUDA_124)
+    @register_benchmark(enabled=HAS_CUDA_124 and has_new_tma())
     def triton_tutorial_flash_v2_tma(
         self,
         q: torch.Tensor,
@@ -357,7 +357,7 @@ class Operator(BenchmarkOperator):
                 q, k, v, self.causal, self.sm_scale, "ws"
             )
 
-        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
+        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec() and has_new_tma())
         def triton_tutorial_flash_v2_tma_ws(
             self,
             q: torch.Tensor,
@@ -369,7 +369,7 @@ class Operator(BenchmarkOperator):
                 q, k, v, self.causal, self.sm_scale, "tma_ws"
             )
 
-        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec())
+        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec() and has_new_tma())
         def triton_tutorial_flash_v2_tma_ws_persistent(
             self,
             q: torch.Tensor,
