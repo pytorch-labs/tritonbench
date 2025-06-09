@@ -102,6 +102,12 @@ def install_liger():
     subprocess.check_call(cmd)
 
 
+def install_tritonparse():
+    # Install tritonparse from GitHub
+    cmd = ["pip", "install", "-e", "git+https://github.com/pytorch-labs/tritonparse.git#egg=tritonparse", "--no-deps"]
+    subprocess.check_call(cmd)
+
+
 def setup_hip(args: argparse.Namespace):
     # We have to disable all third-parties that donot support hip/rocm
     args.all = False
@@ -134,6 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("--xformers", action="store_true", help="Install xformers")
     parser.add_argument("--tile", action="store_true", help="install tile lang")
     parser.add_argument("--aiter", action="store_true", help="install AMD's aiter")
+    parser.add_argument("--tritonparse", action="store_true", help="Install tritonparse")
     parser.add_argument(
         "--all", action="store_true", help="Install all custom kernel repos"
     )
@@ -193,4 +200,7 @@ if __name__ == "__main__":
         from tools.aiter.install import install_aiter
 
         install_aiter()
+    if args.tritonparse:
+        logger.info("[tritonbench] installing tritonparse...")
+        install_tritonparse()
     logger.info("[tritonbench] installation complete!")

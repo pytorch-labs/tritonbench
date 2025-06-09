@@ -211,6 +211,14 @@ def get_parser(args=None):
         help="Only print the simple output.",
     )
 
+    parser.add_argument(
+        "--tritonparse",
+        nargs="?",
+        const="./tritonparse_logs/",
+        default=None,
+        help="Enable tritonparse structured logging. Optionally specify log directory path (default: ./tritonparse_logs/).",
+    )
+
     if is_fbcode():
         parser.add_argument(
             "--input-loader",

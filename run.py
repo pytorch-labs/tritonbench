@@ -105,6 +105,17 @@ def run(args: List[str] = []):
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
 
+    # Initialize tritonparse if requested
+    if args.tritonparse is not None:
+        try:
+            import tritonparse.structured_logging
+            tritonparse.structured_logging.init(args.tritonparse)
+            print(f"[tritonbench] TritonParse structured logging initialized with log path: {args.tritonparse}")
+        except ImportError:
+            print("[tritonbench] Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it.")
+        except Exception as e:
+            print(f"[tritonbench] Warning: Failed to initialize tritonparse: {e}")
+
     if args.op:
         ops = args.op.split(",")
     else:
