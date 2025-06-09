@@ -43,10 +43,14 @@ import triton  # @manual=//triton:triton
 
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
+from tritonbench.kernels.proton_fused_attention import (
+    attention_opt as proton_tutorial_FA2_opt,
+)
 
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
+
 from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
 
 from tritonbench.utils.path_utils import add_ld_library_path
@@ -328,6 +332,21 @@ class Operator(BenchmarkOperator):
         return lambda: xformers_splitk_fhma().apply(
             fhma_input, needs_gradient=need_gradient
         )
+
+    if IS_B200:
+        # Only enable calling this benchmark directly.
+        @register_benchmark(enabled=False)
+        def proton_tutorial_flash_v2(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # includes base (default scheduling) + opt (optimized loop scheduling based on hueristics)
+            # Also allows for TMA via WITH_TMA=1
+            return lambda: proton_tutorial_FA2_opt(
+                q, k, v, self.causal, self.sm_scale, "base_opt"
+            )
 
     if not IS_B200:
 
