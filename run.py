@@ -6,6 +6,7 @@ Note: make sure to `python install.py` first or otherwise make sure the benchmar
 """
 
 import argparse
+import importlib.util
 import os
 import sys
 from typing import List
@@ -104,6 +105,23 @@ def run(args: List[str] = []):
     usage_report_logger(benchmark_name="tritonbench")
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
+
+    # Initialize tritonparse if requested
+    if args.tritonparse is not None:
+        try:
+            if importlib.util.find_spec("tritonparse") is None:
+                print(
+                    "Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it."
+                )
+                return
+            import tritonparse.structured_logging
+
+            tritonparse.structured_logging.init(args.tritonparse)
+            print(
+                f"TritonParse structured logging initialized with log path: {args.tritonparse}"
+            )
+        except Exception as e:
+            print(f"Warning: Failed to initialize tritonparse: {e}")
 
     if args.op:
         ops = args.op.split(",")
