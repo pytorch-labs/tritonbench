@@ -19,6 +19,7 @@ from tritonbench.utils.parser import get_parser
 from tritonbench.utils.run_utils import run_config, run_in_task
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult
+import importlib.util
 
 try:
     if is_fbcode():
@@ -108,13 +109,14 @@ def run(args: List[str] = []):
     # Initialize tritonparse if requested
     if args.tritonparse is not None:
         try:
+            if importlib.util.find_spec("tritonparse") is None:
+                print("Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it.")
+                return
             import tritonparse.structured_logging
             tritonparse.structured_logging.init(args.tritonparse)
-            print(f"[tritonbench] TritonParse structured logging initialized with log path: {args.tritonparse}")
-        except ImportError:
-            print("[tritonbench] Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it.")
+            print(f"TritonParse structured logging initialized with log path: {args.tritonparse}")
         except Exception as e:
-            print(f"[tritonbench] Warning: Failed to initialize tritonparse: {e}")
+            print(f"Warning: Failed to initialize tritonparse: {e}")
 
     if args.op:
         ops = args.op.split(",")
