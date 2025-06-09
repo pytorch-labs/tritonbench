@@ -67,7 +67,7 @@ from tritonbench.utils.triton_op import (
 # [AMD only] aiter backend
 HAS_AITER = True
 try:
-    import aiter_ops
+    import aiter_
 except (ImportError, IOError, AttributeError):
     HAS_AITER = False
 
@@ -619,7 +619,7 @@ class Operator(BenchmarkOperator):
         )
         query.uniform_(*uniform_range)
 
-        return lambda: aiter_ops.pa_fwd_asm(
+        return lambda: aiter_.pa_fwd_asm(
             query.contiguous(),
             k_quant,
             asm_V_shuffle(v_quant),
