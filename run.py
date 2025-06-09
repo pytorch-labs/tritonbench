@@ -110,11 +110,16 @@ def run(args: List[str] = []):
     if args.tritonparse is not None:
         try:
             if importlib.util.find_spec("tritonparse") is None:
-                print("Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it.")
+                print(
+                    "Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it."
+                )
                 return
             import tritonparse.structured_logging
+
             tritonparse.structured_logging.init(args.tritonparse)
-            print(f"TritonParse structured logging initialized with log path: {args.tritonparse}")
+            print(
+                f"TritonParse structured logging initialized with log path: {args.tritonparse}"
+            )
         except Exception as e:
             print(f"Warning: Failed to initialize tritonparse: {e}")
 

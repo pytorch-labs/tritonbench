@@ -104,7 +104,13 @@ def install_liger():
 
 def install_tritonparse():
     # Install tritonparse from GitHub
-    cmd = ["pip", "install", "-e", "git+https://github.com/pytorch-labs/tritonparse.git#egg=tritonparse", "--no-deps"]
+    cmd = [
+        "pip",
+        "install",
+        "-e",
+        "git+https://github.com/pytorch-labs/tritonparse.git#egg=tritonparse",
+        "--no-deps",
+    ]
     subprocess.check_call(cmd)
 
 
@@ -140,7 +146,9 @@ if __name__ == "__main__":
     parser.add_argument("--xformers", action="store_true", help="Install xformers")
     parser.add_argument("--tile", action="store_true", help="install tile lang")
     parser.add_argument("--aiter", action="store_true", help="install AMD's aiter")
-    parser.add_argument("--tritonparse", action="store_true", help="Install tritonparse")
+    parser.add_argument(
+        "--tritonparse", action="store_true", help="Install tritonparse"
+    )
     parser.add_argument(
         "--all", action="store_true", help="Install all custom kernel repos"
     )
