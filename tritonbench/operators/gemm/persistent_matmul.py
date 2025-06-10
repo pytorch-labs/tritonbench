@@ -175,10 +175,10 @@ def matmul_kernel_persistent(
 
             start_m = pid_m * BLOCK_M
             start_n = pid_n * BLOCK_N
-            offs_am = tl.arange(0, BLOCK_M)
-            offs_bn = tl.arange(0, BLOCK_N)
-            offs_am = tl.where(offs_am < M - start_m, offs_am, 0)
-            offs_bn = tl.where(offs_bn < N - start_n, offs_bn, 0)
+            offs_am = start_m + tl.arange(0, BLOCK_M)
+            offs_bn = start_n + tl.arange(0, BLOCK_N)
+            offs_am = tl.where(offs_am < M, offs_am, 0)
+            offs_bn = tl.where(offs_bn < N, offs_bn, 0)
             offs_am = tl.max_contiguous(tl.multiple_of(offs_am, BLOCK_M), BLOCK_M)
             offs_bn = tl.max_contiguous(tl.multiple_of(offs_bn, BLOCK_N), BLOCK_N)
         offs_k = ki * BLOCK_K + tl.arange(0, BLOCK_K)
