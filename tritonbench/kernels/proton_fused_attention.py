@@ -12,10 +12,18 @@ Extra Credits:
 
 """
 
+import logging
 import os
-import sys
 
 from typing import Optional
+from uuid import uuid4
+
+from tritonbench.utils.env_utils import is_fbcode
+
+if is_fbcode():
+    import manifold.clients.python as manifold
+else:
+    manifold = None
 
 import numpy as np
 
@@ -30,14 +38,12 @@ import triton.language as tl
 from .attention_utils import HAS_TMA_DESC, TmaAutoTuneHelper, WITH_TMA
 
 if HAS_TMA_DESC:
-    print(
+    logging.info(
         "TMA benchmarks will be running with experimental grid constant TMA descriptor.",
-        file=sys.stderr,
     )
 else:
-    print(
+    logging.info(
         "TMA benchmarks will be running without grid constant TMA descriptor.",
-        file=sys.stderr,
     )
 
 HAS_NEW_TMA = hasattr(triton, "set_allocator") and hasattr(tl, "make_tensor_descriptor")
@@ -625,14 +631,30 @@ class _attention_opt(torch.autograd.Function):
         # Note: You need to run this with TRITON_ALWAYS_COMPILE=1 and
         # TRITON_KERNEL_OVERRIDE=1 TRITON_OVERRIDE_DIR=override_dir
         # to actually generate a trace.
-
+        trace_filepath = f"/home/{os.getenv("USER")}/chrome_trace.json"
         proton.dump_chrome_trace(
             np.prod(proton_grid),
             pconfig,
             profile_mem,
-            f"/home/{os.getenv("USER")}/chrome_trace.json",
+            trace_filepath,
             kernel_info,
         )
+        if is_fbcode():
+            if os.path.exists(trace_filepath):
+                bucket_name = "tc_bench_ci"
+                random_id = uuid4()
+                dest_filepath = (
+                    f"tree/tritonbench/proton_traces/fa_trace_{random_id}.json"
+                )
+                client = manifold.ManifoldClient(bucket_name)
+                client.sync_put(dest_filepath, trace_filepath)
+                logging.info(
+                    f"Trace uploaded to manifold. Trace URL: https://www.internalfb.com/intern/perfdoctor/trace_view?filepath={dest_filepath}&bucket={bucket_name}"
+                )
+            else:
+                logging.info(
+                    "No proton trace generated. Please verify you have provided a modified IR with proton ops."
+                )
 
         return o
 
