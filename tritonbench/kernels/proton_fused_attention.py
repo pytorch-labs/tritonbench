@@ -43,9 +43,6 @@ else:
 HAS_NEW_TMA = hasattr(triton, "set_allocator") and hasattr(tl, "make_tensor_descriptor")
 ENABLE_TMA = (WITH_TMA == "1") and HAS_NEW_TMA
 
-# Track the number of slots for proton
-SLOT = 256
-
 
 @triton.jit
 def _attn_fwd_inner(
@@ -563,6 +560,15 @@ class _attention_opt(torch.autograd.Function):
         # TODO: Extend this as you modify the IR.
         named_region = {
             0: "whole_kernel_time",
+            1: "prologue",
+            2: "tensor_map_alloc",
+            3: "loop_body",
+            4: "epilogue",
+            5: "loop_section1",
+            6: "loop_section2",
+            7: "loop_section3",
+            8: "loop_section4",
+            9: "loop_section5",
         }
         proton_grid = proton.const_grid(
             grid_tma,
@@ -583,9 +589,7 @@ class _attention_opt(torch.autograd.Function):
             HEAD_DIM=HEAD_DIM_K,
             STAGE=stage,
         )
-        pconfig = proton.get_intra_kernel_config(
-            num_warps=8, proton_slots=SLOT, names=named_region
-        )
+        pconfig = proton.get_intra_kernel_config(num_warps=8, names=named_region)
         profile_size = proton.intra_kernel_memsize(np.prod(proton_grid), pconfig)
         profile_mem = torch.empty(profile_size, device="cuda", dtype=torch.uint32)
         kernel_info = _attn_fwd_base_opt[grid_tma](
