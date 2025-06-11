@@ -43,6 +43,7 @@ import triton  # @manual=//triton:triton
 
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
+
 from tritonbench.kernels.proton_fused_attention import (
     attention_opt as proton_tutorial_FA2_opt,
 )
@@ -333,6 +334,26 @@ class Operator(BenchmarkOperator):
             fhma_input, needs_gradient=need_gradient
         )
 
+    @register_benchmark(enabled=False, label=f"cudnn-{torch.backends.cudnn.version()}")
+    def cudnn(self, q, k, v):
+        os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
+
+        def sdpa_flash_attention(q, k, v):
+            with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
+                return sdpa(
+                    q,
+                    k,
+                    v,
+                    is_causal=self.causal,
+                    scale=self.sm_scale,
+                )
+
+        return lambda: sdpa_flash_attention(
+            q,
+            k,
+            v,
+        )
+
     if IS_B200:
         # Only enable calling this benchmark directly.
         @register_benchmark(enabled=False)
@@ -450,28 +471,6 @@ class Operator(BenchmarkOperator):
                 return o
 
             return _inner
-
-        @register_benchmark(
-            enabled=False, label=f"cudnn-{torch.backends.cudnn.version()}"
-        )
-        def cudnn(self, q, k, v):
-            os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
-
-            def sdpa_flash_attention(q, k, v):
-                with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
-                    return sdpa(
-                        q,
-                        k,
-                        v,
-                        is_causal=self.causal,
-                        scale=self.sm_scale,
-                    )
-
-            return lambda: sdpa_flash_attention(
-                q,
-                k,
-                v,
-            )
 
     @register_benchmark()
     def flex_attention(self, q, k, v):
