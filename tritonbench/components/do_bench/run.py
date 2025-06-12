@@ -56,6 +56,14 @@ class Latency:
     def p50(self):
         return statistics.median_low(self.times)
 
+    @property
+    def min(self):
+        return min(self.times)
+
+    @property
+    def max(self):
+        return max(self.times)
+
     def __add__(self, other):
         return self.p50 + other.p50 if isinstance(other, Latency) else self.p50 + other
 
@@ -90,21 +98,16 @@ class Latency:
             other.p50 // self.p50 if isinstance(other, Latency) else other // self.p50
         )
 
-    def __str__(self):
-        return self.to_str()
-
     def to_str(self, mode="p50") -> str:
         if mode == "p50":
             return str(self.p50)
         elif mode == "with_variance":
-            min_val = min(self.times)
-            max_val = max(self.times)
-            max_variance = max((max_val - self.p50), (self.p50 - min_val)) / self.p50
+            max_variance = max((self.max - self.p50), (self.p50 - self.min)) / self.p50
             return f"{self.p50:6f} (±{max_variance * 100:.2f}%)"
         elif mode == "max":
-            return str(max(self.times))
+            return str(self.max)
         elif mode == "min":
-            return str(min(self.times))
+            return str(self.max)
         elif mode == "mean":
             return str(statistics.mean(self.times))
         else:

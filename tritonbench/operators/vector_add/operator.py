@@ -1,4 +1,3 @@
-import os
 from typing import Generator, List
 
 import torch
@@ -15,14 +14,23 @@ from .kernels import triton_add_kernel
 
 
 class Operator(BenchmarkOperator):
+    DEFAULT_METRICS = ["latency", "gbps"]
+
     @register_metric()
     def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
+        def normalize(lat):
+            return (
+                3
+                * example_inputs[0].element_size()
+                * example_inputs[0].numel()
+                / lat
+                * 1e-6
+            )
+
         return (
-            3
-            * example_inputs[0].element_size()
-            * example_inputs[0].numel()
-            / metrics.latency
-            * 1e-6
+            normalize(metrics.latency),
+            normalize(metrics.latency.max),
+            normalize(metrics.latency.min),
         )
 
     @register_benchmark()
@@ -61,7 +69,7 @@ class Operator(BenchmarkOperator):
         @triton.testing.perf_report(
             triton.testing.Benchmark(
                 x_names=["size"],  # Argument names to use as an x-axis for the plot.
-                x_vals=self.x_vals,  # Different possible values for `x_name`.
+                x_vals=self.output.x_vals,  # Different possible values for `x_name`.
                 x_log=True,  # x axis is logarithmic.
                 line_arg="provider",  # Argument name whose value corresponds to a different line in the plot.
                 line_vals=[
