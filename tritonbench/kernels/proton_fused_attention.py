@@ -32,7 +32,13 @@ import torch
 import triton
 
 # Note: This only works with 3.3.1fb or earlier
-import triton.intraprof as proton  # @manual=//triton:triton
+try:
+    import triton.intraprof as proton  # @manual=//triton:triton
+
+    SUPPORTS_PROTON = True
+except ModuleNotFoundError:
+    SUPPORTS_PROTON = False
+
 import triton.language as tl
 
 from .attention_utils import HAS_TMA_DESC, TmaAutoTuneHelper, WITH_TMA
@@ -463,6 +469,10 @@ def _attn_fwd_base_opt(
 class _attention_opt(torch.autograd.Function):
     @staticmethod
     def forward(ctx, q, k, v, causal, sm_scale, baseVariant):
+        if not SUPPORTS_PROTON:
+            raise RuntimeError(
+                "This version of Triton does not support running this file with proton."
+            )
         # shape constraints
         HEAD_DIM_Q, HEAD_DIM_K = q.shape[-1], k.shape[-1]
         # when v is in float8_e5m2 it is transposed.
@@ -631,7 +641,8 @@ class _attention_opt(torch.autograd.Function):
         # Note: You need to run this with TRITON_ALWAYS_COMPILE=1 and
         # TRITON_KERNEL_OVERRIDE=1 TRITON_OVERRIDE_DIR=override_dir
         # to actually generate a trace.
-        trace_filepath = f"/home/{os.getenv("USER")}/chrome_trace.json"
+        user = os.getenv("USER")
+        trace_filepath = f"/home/{user}/chrome_trace.json"
         proton.dump_chrome_trace(
             np.prod(proton_grid),
             pconfig,
