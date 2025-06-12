@@ -44,6 +44,10 @@ import triton  # @manual=//triton:triton
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
 
+from tritonbench.kernels.proton_blackwell_ws_fused_attention import (
+    attention_opt as proton_blackwell_ws_FA2_opt,
+)
+
 from tritonbench.kernels.proton_fused_attention import (
     attention_opt as proton_tutorial_FA2_opt,
 )
@@ -367,6 +371,34 @@ class Operator(BenchmarkOperator):
             # Also allows for TMA via WITH_TMA=1
             return lambda: proton_tutorial_FA2_opt(
                 q, k, v, self.causal, self.sm_scale, "base_opt"
+            )
+
+        # Only enable calling this benchmark directly.
+        @register_benchmark(enabled=False)
+        def proton_blackwell_tutorial_flash_v2(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # Calls the Triton Tutorial from OAI without modification
+            # without using the warp spec path.
+            return lambda: proton_blackwell_ws_FA2_opt(
+                q, k, v, self.causal, self.sm_scale, False
+            )
+
+        # Only enable calling this benchmark directly.
+        @register_benchmark(enabled=False)
+        def proton_blackwell_tutorial_flash_v2_ws(
+            self,
+            q: torch.Tensor,
+            k: torch.Tensor,
+            v: torch.Tensor,
+        ) -> Callable:
+            # Calls the Triton Tutorial from OAI without modification
+            # using the warp spec path.
+            return lambda: proton_blackwell_ws_FA2_opt(
+                q, k, v, self.causal, self.sm_scale, True
             )
 
     if not IS_B200:
