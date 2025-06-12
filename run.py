@@ -6,7 +6,6 @@ Note: make sure to `python install.py` first or otherwise make sure the benchmar
 """
 
 import argparse
-import importlib.util
 import os
 import sys
 from typing import List
@@ -20,6 +19,7 @@ from tritonbench.utils.parser import get_parser
 from tritonbench.utils.run_utils import run_config, run_in_task
 
 from tritonbench.utils.triton_op import BenchmarkOperatorResult
+from tritonbench.utils.tritonparse_utils import tritonparse_init, tritonparse_parse
 
 try:
     if is_fbcode():
@@ -105,24 +105,7 @@ def run(args: List[str] = []):
     usage_report_logger(benchmark_name="tritonbench")
     parser = get_parser()
     args, extra_args = parser.parse_known_args(args)
-
-    # Initialize tritonparse if requested
-    if args.tritonparse is not None:
-        try:
-            if importlib.util.find_spec("tritonparse") is None:
-                print(
-                    "Warning: tritonparse is not installed. Run 'python install.py --tritonparse' to install it."
-                )
-                return
-            import tritonparse.structured_logging
-
-            tritonparse.structured_logging.init(args.tritonparse)
-            print(
-                f"TritonParse structured logging initialized with log path: {args.tritonparse}"
-            )
-        except Exception as e:
-            print(f"Warning: Failed to initialize tritonparse: {e}")
-
+    tritonparse_init(args.tritonparse)
     if args.op:
         ops = args.op.split(",")
     else:
@@ -139,6 +122,7 @@ def run(args: List[str] = []):
                 run_in_task(op)
             else:
                 _run(args, extra_args)
+    tritonparse_parse(args.tritonparse)
 
 
 if __name__ == "__main__":
