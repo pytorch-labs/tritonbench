@@ -4,6 +4,27 @@ on:
     # Test nightly docker daily at 4 PM UTC
     - cron: '0 16 * * *'
   workflow_dispatch:
+    inputs:
+      test_type:
+        type: choice
+        required: true
+        description: 'Choose advanced testing options'
+        default: 'periodic'
+        options:
+          - 'periodic'
+          - 'ab_test'
+      side_a_triton:
+        default: 'triton-lang/triton'
+        description: 'Side A Triton repo'
+      side_a_triton_commit:
+        default: 'main'
+        description: 'Side A Triton commit'
+      side_b_triton:
+        default: 'triton-lang/triton'
+        description: 'Side B Triton repo'
+      side_b_triton_commit:
+        default: 'main'
+        description: 'Side B Triton commit'
   pull_request:
     paths:
       - benchmarks/nightly/**
@@ -16,6 +37,11 @@ jobs:
     with:
       conda_env: "triton-main"
       benchmark_name: "nightly"
+      test_type: ${{ inputs.test_type }}
+      side_a_triton: ${{ inputs.side_a_triton }}
+      side_a_triton_commit: ${{ inputs.side_a_triton_commit }}
+      side_b_triton: ${{ inputs.side_b_triton }}
+      side_b_triton_commit: ${{ inputs.side_b_triton_commit }}
     secrets:
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
 
