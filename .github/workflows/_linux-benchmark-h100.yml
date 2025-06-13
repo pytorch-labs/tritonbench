@@ -76,7 +76,7 @@ jobs:
       - name: Compile Triton (Side A)
         if: ${{ inputs.test_type == 'ab_test' }}
         run: |
-          bash ./.ci/tritonbench/compile.sh ${{ inputs.side_a_triton }} ${{ inputs.side_a_commit }} --conda-env triton-side-b
+          bash ./.ci/triton/compile.sh ${{ inputs.side_a_triton }} ${{ inputs.side_a_commit }} --conda-env triton-side-b
       - name: Benchmark Triton (Side A)
         if: ${{ inputs.test_type == 'ab_test' }}
         run: |
@@ -85,7 +85,7 @@ jobs:
       - name: Compile Triton (Side B)
         if: ${{ inputs.test_type == 'ab_test' }}
         run: |
-          bash ./.ci/tritonbench/compile.sh ${{ inputs.side_a_triton }} ${{ inputs.side_a_commit }} --conda-env triton-side-b
+          bash ./.ci/triton/compile.sh ${{ inputs.side_a_triton }} ${{ inputs.side_a_commit }} --conda-env triton-side-b
       - name: Benchmark Triton (Side B)
         if: ${{ inputs.test_type == 'ab_test' }}
         run: |
