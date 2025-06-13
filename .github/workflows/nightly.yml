@@ -32,18 +32,25 @@ on:
       - .github/workflows/nightly.yml
 
 jobs:
-  h100-triton-main-nightly-test:
+  h100-triton-nightly-periodic-test:
     uses: ./.github/workflows/_linux-benchmark-h100.yml
+    if: ${{ inputs.test_type == 'periodic' }}
     with:
       conda_env: "triton-main"
       benchmark_name: "nightly"
-      test_type: ${{ inputs.test_type }}
+    secrets:
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
+  h100-triton-nightly-ab-test:
+    uses: ./.github/workflows/_linux-benchmark-abtest-h100.yml
+    if: ${{ inputs.test_type == 'ab_test' }}
+    with:
+      benchmark_name: "nightly"
       side_a_triton: ${{ inputs.side_a_triton }}
       side_a_triton_commit: ${{ inputs.side_a_triton_commit }}
       side_b_triton: ${{ inputs.side_b_triton }}
       side_b_triton_commit: ${{ inputs.side_b_triton_commit }}
     secrets:
-      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPH
 
 
 concurrency:
