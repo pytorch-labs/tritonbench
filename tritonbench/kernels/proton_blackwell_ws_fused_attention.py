@@ -23,10 +23,14 @@ import torch
 import triton
 import triton.language as tl
 
+# Note: This only works with Trunk or OSS Triton
+IS_SUPPORTED = True
+try:
+    import triton.profiler as proton  # @manual=//triton:triton
+except ModuleNotFoundError:
+    IS_SUPPORTED = False
 try:
     from triton.tools.tensor_descriptor import TensorDescriptor
-
-    IS_SUPPORTED = True
 except ModuleNotFoundError:
     IS_SUPPORTED = False
 
