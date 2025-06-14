@@ -53,6 +53,7 @@ We depend on the following projects as a source of customized Triton or CUTLASS 
 * (CUDA, HIP) [generative-recommenders](https://github.com/facebookresearch/generative-recommenders)
 * (CUDA, HIP) [Liger-Kernel](https://github.com/linkedin/Liger-Kernel)
 * (CUDA, HIP) [tilelang](https://github.com/tile-ai/tilelang)
+* (CUDA) [CUTLASS Python DSL](https://github.com/NVIDIA/cutlass)
 * (CUDA) [xformers](https://github.com/facebookresearch/xformers)
 * (CUDA) [flash-attention](https://github.com/Dao-AILab/flash-attention)
 * (CUDA) [FBGEMM](https://github.com/pytorch/FBGEMM)
