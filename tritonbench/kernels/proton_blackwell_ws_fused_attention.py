@@ -34,8 +34,6 @@ try:
 except ModuleNotFoundError:
     IS_SUPPORTED = False
 
-DEVICE = triton.runtime.driver.active.get_active_torch_device()
-
 
 @triton.jit
 def _attn_fwd_inner(
