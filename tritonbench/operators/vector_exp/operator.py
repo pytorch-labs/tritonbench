@@ -33,6 +33,17 @@ class Operator(BenchmarkOperator):
             normalize(metrics.latency.min),
         )
 
+    @register_metric()
+    def duration(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics):
+        output = fn()
+        if output is None:
+            return None
+        return (
+            torch.mean(output, dtype=torch.float32).item(),
+            torch.max(output).item(),
+            torch.min(output).item(),
+        )
+
     @register_benchmark()
     def triton_exp(self, x: torch.Tensor):
         # We need to preallocate the output.
@@ -47,15 +58,26 @@ class Operator(BenchmarkOperator):
         #  - `triton.jit`'ed functions can be indexed with a launch grid to obtain a callable GPU kernel.
         #  - Don't forget to pass meta-parameters as keywords arguments.
 
+        # Prepare a memory buffer to store the profiled data, with the size equal to the number of programs.
+        BLOCK_SIZE = 1024
+        n_programs = triton.cdiv(n_elements, BLOCK_SIZE)
+        profile_mem = torch.empty(n_programs, dtype=torch.int64, device=self.device)
+
         def _inner():
-            return_val = triton_exp_kernel[grid](x, output, n_elements, BLOCK_SIZE=1024)
-            return return_val
+            triton_exp_kernel[grid](
+                x, output, n_elements, BLOCK_SIZE=1024, profile_mem=profile_mem
+            )
+            return profile_mem
 
         return _inner
 
     @register_benchmark(baseline=True)
     def torch_exp(self, x: torch.Tensor):
-        return lambda: torch.exp(x)
+        def _inner():
+            torch.exp(x)
+            return None
+
+        return _inner
 
     def get_x_vals(self) -> List[int]:
         return [2**i for i in range(12, 28, 1)]
