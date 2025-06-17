@@ -10,7 +10,6 @@ The benchmarking file (i.e. this file) is mostly copied from the
 """
 
 import argparse
-import os
 import statistics
 
 from typing import Any, List, Optional
@@ -181,8 +180,5 @@ class Operator(BenchmarkOperator):
             return tflops
 
         save_path = "/tmp/bf16xint16_gemm"
-
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
 
         _plot.run(show_plots=True, print_data=True, save_path=save_path)

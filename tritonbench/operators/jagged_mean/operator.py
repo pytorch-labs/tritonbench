@@ -298,7 +298,4 @@ class Operator(BenchmarkOperator):
             + f"/pytorch/tritonbench/tritonbench/operators/jagged_mean/jagged_mean_performance/{plot_name}"
         )
 
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
-
         _plot.run(show_plots=True, print_data=True, save_path=save_path)

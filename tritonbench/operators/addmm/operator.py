@@ -1,6 +1,5 @@
 import argparse
 import itertools
-import os
 from typing import Any, Callable, Generator, List, Optional, Tuple
 
 import torch
@@ -218,10 +217,5 @@ class Operator(BenchmarkOperator):
         def _plot(density, provider):
             tflops = self.output.get_y_vals(density, provider, "tflops")
             return tflops
-
-        save_path = "/tmp/test_addmm"
-
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
 
         _plot.run(show_plots=True, print_data=True, save_path="/tmp/test_addmm")

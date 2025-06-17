@@ -1,5 +1,4 @@
 import argparse
-import os
 from typing import Any, Callable, Generator, List, Optional, Tuple
 
 import torch
@@ -337,8 +336,5 @@ class Operator(BenchmarkOperator):
             return tflops
 
         save_path = "/tmp/test_fp8_gemm_rowwise"
-
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
 
         _plot.run(show_plots=True, print_data=True, save_path=save_path)

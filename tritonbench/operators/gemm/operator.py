@@ -493,7 +493,4 @@ class Operator(BenchmarkOperator):
 
         save_path = "/tmp/test_gemm"
 
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
-
         _plot.run(show_plots=True, print_data=True, save_path=save_path)

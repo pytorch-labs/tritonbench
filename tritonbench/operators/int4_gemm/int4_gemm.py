@@ -6,7 +6,6 @@ Triton implementation by @jlebar: https://gist.github.com/jlebar/3435b2c00deea53
 """
 
 import argparse
-import os
 import statistics
 
 from typing import Any, List, Optional
@@ -134,8 +133,5 @@ class Operator(BenchmarkOperator):
             return tflops
 
         save_path = "/tmp/int4_gemm"
-
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
 
         _plot.run(show_plots=True, print_data=True, save_path=save_path)

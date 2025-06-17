@@ -48,7 +48,6 @@ The following metrics are measured by this benchmark:
 
 # Import necessary libraries and modules
 import argparse
-import os
 import random
 from typing import Any, Callable, Generator, List, Optional, Tuple
 
@@ -650,10 +649,6 @@ class Operator(BenchmarkOperator):
 
         # Set the save path for the plot
         save_path = "/tmp/test_fp8_gemm_grouped"
-
-        # Create the directory if it doesn't exist
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
 
         # Run the plot and save it to the specified path
         _plot.run(show_plots=True, print_data=True, save_path=save_path)
