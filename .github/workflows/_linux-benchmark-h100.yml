@@ -71,7 +71,7 @@ jobs:
           . "${SETUP_SCRIPT}"
           latest_result_json=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
           python ./.ci/test_infra/oss_ci_benchmark_v3.py --json ${latest_result_json} \
-                 --output-dir benchmark-output/results
+                 --output benchmark-output/results/result.json
       - name: Setup uploader dependencies
         run: |
           sudo apt-get install -y python3-pip
