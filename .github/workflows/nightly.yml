@@ -32,7 +32,7 @@ on:
       - .github/workflows/nightly.yml
 
 jobs:
-  h100-triton-main-nightly-periodic-test:
+  h100-triton-main-nightly-periodic:
     uses: ./.github/workflows/_linux-benchmark-h100.yml
     if: ${{ inputs.test_type == 'periodic' }}
     with:

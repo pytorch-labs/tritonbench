@@ -64,13 +64,13 @@ jobs:
       - name: Upload result to Scribe
         run: |
           . "${SETUP_SCRIPT}"
-          result_jsons=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
-          python ./.ci/upload/scribe.py --json ${result_jsons}
+          latest_result_json=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
+          python ./.ci/upload/scribe.py --json ${latest_result_json}
       - name: Rewrite Tritonbench json to ClickHouse style
         run: |
           . "${SETUP_SCRIPT}"
-          result_jsons=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
-          python ./.ci/test_infra/oss_ci_benchmark_v3.py --json ${result_jsons} \
+          latest_result_json=$(find ./benchmark-output -name "result.json"  | sort -r | head -n 1)
+          python ./.ci/test_infra/oss_ci_benchmark_v3.py --json ${latest_result_json} \
                  --output-dir benchmark-output/results
       - name: Setup uploader dependencies
         run: |
