@@ -121,12 +121,12 @@ def generate_input_vals(B, M, max_seqlen, sparsity, sizes):
         M_vals.extend([M])
 
     if max_seqlen is None:
-        seqlen_vals.extend(list(range(100, 1000, 100)) + list(range(1000, 20000, 1000)))
+        seqlen_vals.extend((100, 500, 1000, 3000, 10_000, 18_000))
     else:
         seqlen_vals.extend([max_seqlen])
 
     if sparsity is None:
-        sparsity_vals.extend([n / 10 for n in range(1, 10)])
+        sparsity_vals.extend((0.1, 0.25, 0.5, 0.75, 0.9))
     else:
         sparsity_vals.extend([sparsity])
 
@@ -205,7 +205,6 @@ def generate_random_nested_tensors(
     with maximum sequence length `max_seqlen` and average sparsity `sparsity`
     """
 
-    nested_tensors = []
     vals = itertools.product(B_vals, M_vals, seqlen_vals, sparsity_vals)
 
     for B, M, max_seqlen, sparsity in vals:
@@ -222,17 +221,14 @@ def generate_random_nested_tensors(
                 max_seqlen * RANDOM_CHOICE_MARGIN
             )  # use margin to constrain sequence lengths to range [seqlen_avg - seqlen_margin, seqlen_avg + seqlen_margin] to approximate an average sequence length, which correlates with sparsity
 
-            for _ in range(B):
-                seqlen_randint = random.randint(
-                    max(
-                        seqlen_avg - seqlen_margin, 1
-                    ),  # seqlen_randint must be at least 1
-                    min(
-                        seqlen_avg + seqlen_margin, max_seqlen
-                    ),  # seqlen_randint must not exceed self.seqlen
-                )
-                tensor_2d = torch.randn((seqlen_randint, M), device=device, dtype=dtype)
-                tensors.append(tensor_2d)
+            lower = max(seqlen_avg - seqlen_margin, 1)
+            upper = min(seqlen_avg + seqlen_margin, max_seqlen)
+            seqlens = [random.randint(lower, upper) for _ in range(B)]
+            tensor_2d = torch.randn((sum(seqlens), M), device=device, dtype=dtype)
+            for seqlen in seqlens:
+                t, tensor_2d = tensor_2d[:seqlen, :], tensor_2d[seqlen:, :]
+                tensors.append(t)
+            del tensor_2d
 
             nt = torch.nested.nested_tensor(
                 tensors,
@@ -240,8 +236,7 @@ def generate_random_nested_tensors(
                 device=device,
                 dtype=dtype,
             )
-
-            nested_tensors.append((nt, B, M, max_seqlen, sparsity))
+            yield (nt, B, M, max_seqlen, sparsity)
 
     # add 0-seqlen nested tensor
     if (
@@ -258,9 +253,7 @@ def generate_random_nested_tensors(
             device=device,
             dtype=dtype,
         )
-        nested_tensors.append((nt, 3, M, seqlen_vals[0], 0.5))
-
-    return nested_tensors
+        yield (nt, 3, M, seqlen_vals[0], 0.5)
 
 
 # plot helper functions

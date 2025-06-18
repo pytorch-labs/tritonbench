@@ -102,7 +102,7 @@ class Operator(BenchmarkOperator):
     ):
         super().__init__(tb_args, extra_args)
         self.sizes = (
-            list(range(2, 12, 4)) + list(range(12, 23, 3))
+            list(range(2, 12, 4)) + list(range(11, 18, 3))
         )  # bias towards larger sizes, which are more representative of real-world shapes
 
         args = parse_op_args(self.extra_args)
@@ -195,8 +195,7 @@ class Operator(BenchmarkOperator):
         """
         if not self.prod_shapes:
             B_vals, M_vals, seqlen_vals, sparsity_vals = self.get_x_vals()
-
-            for nt, B, M, max_seqlen, sparsity in generate_random_nested_tensors(
+            yield from generate_random_nested_tensors(
                 B_vals,
                 M_vals,
                 seqlen_vals,
@@ -205,8 +204,7 @@ class Operator(BenchmarkOperator):
                 dtype=self.dtype,
                 TENSOR_BYTES_LIMIT=self.tensor_bytes_limit,
                 RANDOM_CHOICE_MARGIN=RANDOM_CHOICE_MARGIN,
-            ):
-                yield (nt, B, M, max_seqlen, sparsity)
+            )
         else:
             from tritonbench.data.fb.jagged_dense_dense import (
                 generate_input_vals_fb,
