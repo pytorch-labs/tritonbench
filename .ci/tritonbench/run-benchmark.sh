@@ -23,6 +23,11 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+if [ -z "${CONDA_ENV}" ]; then
+  echo "ERROR: CONDA_ENV is not set"
+  exit 1
+fi
+
 tritonbench_dir=$(dirname "$(readlink -f "$0")")/../..
 cd "${tritonbench_dir}"
 
