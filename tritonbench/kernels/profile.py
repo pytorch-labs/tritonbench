@@ -8,8 +8,8 @@ import triton.language as tl
 from tritonbench.utils.env_utils import is_cuda, is_hip
 
 
-IS_CUDA: tl.constexpr = is_cuda()
-IS_HIP: tl.constexpr = is_hip()
+IS_CUDA = tl.constexpr(is_cuda())
+IS_HIP = tl.constexpr(is_hip())
 
 
 @triton.jit
