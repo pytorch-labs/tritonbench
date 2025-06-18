@@ -1167,7 +1167,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     use_cuda_graphs=self.use_cuda_graphs,
                     bypass_fail=self.tb_args.bypass_fail,
                 )
-            if {"latency", "tflops", "speedup", "compile_time"} & set(
+            if {"latency", "tflops", "gbps", "speedup", "compile_time"} & set(
                 self.required_metrics
             ):
                 metrics.latency = do_bench_wrapper(
