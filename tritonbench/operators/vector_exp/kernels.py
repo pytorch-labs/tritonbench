@@ -1,27 +1,7 @@
 import triton
 import triton.language as tl
 
-from tritonbench.utils.env_utils import is_hip
-
-IS_HIP: tl.constexpr = is_hip()
-
-
-@triton.jit
-def memrealtime(_semantic=None):
-    if IS_HIP:
-        return tl.inline_asm_elementwise(
-            """
-            s_memrealtime $0
-            s_waitcnt vmcnt(0)
-            """,
-            "=r",
-            [],
-            dtype=tl.int64,
-            is_pure=False,
-            pack=1,
-        )
-    else:
-        return 0
+from tritonbench.kernels.profile import time
 
 
 @triton.jit
@@ -31,10 +11,10 @@ def triton_exp_kernel(
     n_elements,  # Size of the vector.
     BLOCK_SIZE: tl.constexpr,  # Number of elements each program should process.
     # NOTE: `constexpr` so it can be used as a shape value.
-    profile_mem,  # *Pointer* to profile_mem.
+    profile_mem=None,  # *Pointer* to profile_mem.
 ):
     if profile_mem is not None:
-        start = memrealtime()
+        start = time()
     # There are multiple 'programs' processing different data. We identify which program
     # we are here:
     pid = tl.program_id(axis=0)  # We use a 1D launch grid so axis is 0.
@@ -54,5 +34,5 @@ def triton_exp_kernel(
     tl.store(output_ptr + offsets, output, mask=mask)
 
     if profile_mem is not None:
-        end = memrealtime()
+        end = time()
         tl.store(profile_mem + pid, end - start)
