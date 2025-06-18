@@ -17,6 +17,27 @@ on:
         type: string
         description: |
           Conda environment to activate when testing Triton
+      test_type:
+        required: True
+        type: string
+        description: |
+          Test type, e.g., "periodic" or "ab_test"
+      side_a_triton:
+        type: string
+        description: |
+          Triton repository to test on side A, e.g., "triton-lang/triton"
+      side_a_commit:
+        type: string
+        description: |
+          Triton commit or tag to test on side A, e.g., "main"
+      side_b_triton:
+        type: string
+        description: |
+          Triton repository to test on side B, e.g., "triton-lang/triton"
+      side_b_commit:
+        type: string
+        description: |
+          Triton commit or tag to test on side B, e.g., "main"
 
 jobs:
   linux-benchmark-h100:
@@ -52,7 +73,26 @@ jobs:
           # The max duration enforced by the server side
           role-duration-seconds: 18000
           aws-region: us-east-1
+      - name: Compile Triton (Side A)
+        if: ${{ inputs.test_type == 'ab_test' }}
+        run: |
+          bash ./.ci/triton/compile.sh ${{ inputs.side_a_triton }} ${{ inputs.side_a_commit }} --conda-env triton-side-b
+      - name: Benchmark Triton (Side A)
+        if: ${{ inputs.test_type == 'ab_test' }}
+        run: |
+          bash ./.ci/tritonbench/run-benchmark.sh --conda-env triton-side-a
+          cp -r .benchmarks/${{ inputs.benchmark_name }} benchmark-output/triton-side-a
+      - name: Compile Triton (Side B)
+        if: ${{ inputs.test_type == 'ab_test' }}
+        run: |
+          bash ./.ci/triton/compile.sh ${{ inputs.side_a_triton }} ${{ inputs.side_a_commit }} --conda-env triton-side-b
+      - name: Benchmark Triton (Side B)
+        if: ${{ inputs.test_type == 'ab_test' }}
+        run: |
+          bash ./.ci/tritonbench/run-benchmark.sh --conda-env triton-side-b
+          cp -r .benchmarks/${{ inputs.benchmark_name }} benchmark-output/triton-side-b
       - name: Benchmarking periodic
+        if: ${{ inputs.test_type == 'periodic' }}
         run: |
           bash .ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }}
           cp -r .benchmarks/${{ inputs.benchmark_name }} benchmark-output
@@ -64,13 +104,13 @@ jobs:
       - name: Upload result to Scribe
         run: |
           . "${SETUP_SCRIPT}"
-          result_json=$(find ./benchmark-output -name "result.json"  | sort -r | tail -n 1)
-          python ./.ci/upload/scribe.py --json ${result_json}
+          result_jsons=$(find ./benchmark-output -name "result.json"  | sort -r)
+          python ./.ci/upload/scribe.py --json ${result_jsons}
       - name: Rewrite Tritonbench json to ClickHouse style
         run: |
           . "${SETUP_SCRIPT}"
-          result_json=$(find ./benchmark-output -name "result.json"  | sort -r | tail -n 1)
-          python ./.ci/test_infra/oss_ci_benchmark_v3.py --json ${result_json} \
+          result_jsons=$(find ./benchmark-output -name "result.json"  | sort -r)
+          python ./.ci/test_infra/oss_ci_benchmark_v3.py --json ${result_jsons} \
                  --output-dir benchmark-output/results
       - name: Setup uploader dependencies
         run: |
