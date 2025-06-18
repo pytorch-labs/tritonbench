@@ -67,6 +67,21 @@ if [ -z "${REPO}" ] || [ -z "${COMMIT}" ] || [ -z "${SIDE}" ]; then
     usage
 fi
 
+if [ "${SIDE}" == "single" ]; then
+    TRITON_INSTALL_DIR=/workspace/triton
+    if [ -z "${CONDA_ENV}" ]; then
+        echo "Must specifify CONDA_ENV if running with --side single."
+        exit 1
+    fi
+elif [ "${SIDE}" == "a" || "${SIDE}" == "b" ]; then
+    mkdir -p /workspace/abtest
+    TRITON_INSTALL_DIR=/workspace/abtest/${CONDA_ENV}
+    CONDA_ENV="triton_side_${SIDE}"
+else
+    echo "Unknown side: ${SIDE}"
+    exit 1
+fi
+
 # clone BASE_CONDA_ENV
 CONDA_ENV=${BASE_CONDA_ENV} . "${SETUP_SCRIPT}"
 conda activate "${BASE_CONDA_ENV}"
@@ -79,26 +94,13 @@ conda activate "${CONDA_ENV}"
 
 remove_triton
 
-# checkout triton to /workspace/abtest/<env-name> and install it
-if [ "${SIDE}" == "single" ]; then
-    TRITON_INSTALL_DIR=/workspace/triton
-elif [ "${SIDE}" == "a" ]; then
-    TRITON_INSTALL_DIR=/workspace/abtest/triton_a
-elif [ "${SIDE}" == "b" ]; then
-    TRITON_INSTALL_DIR=/workspace/abtest/triton_b
-else
-    echo "Unknown side: ${SIDE}"
-    exit 1
-fi
-
 checkout_triton "${REPO}" "${COMMIT}" "${TRITON_INSTALL_DIR}"
 install_triton "${TRITON_INSTALL_DIR}"
-
-SIDE_UPPER="${SIDE^^}"
 
 # export Triton repo related envs
 # these envs will be used in nightly runs and other benchmarks
 cd "${TRITON_INSTALL_DIR}"
 TRITONBENCH_TRITON_COMMIT=$(git rev-parse --verify HEAD)
+TRITONBENCH_TRITON_REPO=$(git config --get remote.origin.url | sed -E 's|.*github.com[:/](.+)\.git|\1|')
 echo "export TRITONBENCH_TRITON_COMMIT=${TRITONBENCH_TRITON_COMMIT}" >> /workspace/setup_instance.sh
 echo "export TRITONBENCH_TRITON_REPO=${TRITON_INSTALL_DIR}" >> /workspace/setup_instance.sh
