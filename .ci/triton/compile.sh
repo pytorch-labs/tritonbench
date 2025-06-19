@@ -75,7 +75,7 @@ if [ "${SIDE}" == "single" ]; then
     fi
 elif [ "${SIDE}" == "a" ] || [ "${SIDE}" == "b" ]; then
     mkdir -p /workspace/abtest
-    CONDA_ENV="triton_side_${SIDE}"
+    CONDA_ENV="triton-side-${SIDE}"
     TRITON_INSTALL_DIR=/workspace/abtest/${CONDA_ENV}
 else
     echo "Unknown side: ${SIDE}"
