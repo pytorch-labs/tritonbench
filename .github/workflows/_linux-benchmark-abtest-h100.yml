@@ -74,7 +74,7 @@ jobs:
           bash ./.ci/triton/compile.sh --repo ${{ inputs.side_a_triton }} --commit ${{ inputs.side_a_commit }} --side a
       - name: Benchmark Triton (Side A)
         run: |
-          bash ./.ci/tritonbench/run-benchmark.sh --conda-env triton-side-a
+          bash ./.ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }} --conda-env triton-side-a
           cp -r .benchmarks/${{ inputs.benchmark_name }} benchmark-output/triton-side-a
       - name: Compile Triton (Side B)
         run: |
