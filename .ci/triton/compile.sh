@@ -77,9 +77,7 @@ else
     exit 1
 fi
 
-# clone BASE_CONDA_ENV
-CONDA_ENV=${BASE_CONDA_ENV} . "${SETUP_SCRIPT}"
-conda activate "${BASE_CONDA_ENV}"
+CONDA_ENV=pytorch . "${SETUP_SCRIPT}"
 # Remove the conda env if exists
 conda remove --name "${CONDA_ENV}" -y --all || true
 cd /workspace/tritonbench
