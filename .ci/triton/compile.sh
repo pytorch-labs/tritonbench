@@ -73,10 +73,10 @@ if [ "${SIDE}" == "single" ]; then
         echo "Must specifify CONDA_ENV if running with --side single."
         exit 1
     fi
-elif [ "${SIDE}" == "a" || "${SIDE}" == "b" ]; then
+elif [ "${SIDE}" == "a" ] || [ "${SIDE}" == "b" ]; then
     mkdir -p /workspace/abtest
-    TRITON_INSTALL_DIR=/workspace/abtest/${CONDA_ENV}
     CONDA_ENV="triton_side_${SIDE}"
+    TRITON_INSTALL_DIR=/workspace/abtest/${CONDA_ENV}
 else
     echo "Unknown side: ${SIDE}"
     exit 1
