@@ -103,4 +103,4 @@ cd "${TRITON_INSTALL_DIR}"
 TRITONBENCH_TRITON_COMMIT=$(git rev-parse --verify HEAD)
 TRITONBENCH_TRITON_REPO=$(git config --get remote.origin.url | sed -E 's|.*github.com[:/](.+)\.git|\1|')
 echo "export TRITONBENCH_TRITON_COMMIT=${TRITONBENCH_TRITON_COMMIT}" >> /workspace/setup_instance.sh
-echo "export TRITONBENCH_TRITON_REPO=${TRITON_INSTALL_DIR}" >> /workspace/setup_instance.sh
+echo "export TRITONBENCH_TRITON_REPO=${TRITONBENCH_TRITON_REPO}" >> /workspace/setup_instance.sh
