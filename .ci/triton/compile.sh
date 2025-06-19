@@ -51,11 +51,6 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# BASE_CONDA_ENV and SETUP_SCRIPT must be set
-if [ -z "${BASE_CONDA_ENV}" ]; then
-  echo "ERROR: BASE_CONDA_ENV is not set"
-  exit 1
-fi
 if [ -z "${SETUP_SCRIPT}" ]; then
   echo "ERROR: SETUP_SCRIPT is not set"
   exit 1
@@ -87,8 +82,13 @@ CONDA_ENV=${BASE_CONDA_ENV} . "${SETUP_SCRIPT}"
 conda activate "${BASE_CONDA_ENV}"
 # Remove the conda env if exists
 conda remove --name "${CONDA_ENV}" -y --all || true
-conda create --name "${CONDA_ENV}" -y --clone "${BASE_CONDA_ENV}"
+cd /workspace/tritonbench
+python tools/python_utils.py --create-conda-env "${CONDA_ENV}"
 conda activate "${CONDA_ENV}"
+RUN cd /workspace/tritonbench && \
+    . ${SETUP_SCRIPT} && \
+    python -m tools.cuda_utils --install-torch-deps && \
+    python -m tools.cuda_utils --install-torch-nightly
 
 . "${SETUP_SCRIPT}"
 
