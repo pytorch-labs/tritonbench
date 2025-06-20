@@ -47,7 +47,7 @@ jobs:
     env:
       SETUP_SCRIPT: "/workspace/setup_instance.sh"
       RUNNER_TYPE: "gcp-h100-runner"
-      JOB_NAME: tritonbench-h100-abtest-${{ inputs.side_a_triton }}-${{ inputs.side_a_commit }}-${{ inputs.side_b_triton }}-${{ inputs.side_b_commit }}-${{ inputs.benchmark_name }}
+      JOB_NAME: tritonbench-h100-abtest-${{ inputs.benchmark_name }}
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -87,7 +87,7 @@ jobs:
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tritonbench-abtest-output
+          name: ${{ env.JOB_NAME }}
           path: benchmark-output/
       - name: Upload result to Scribe
         run: |
