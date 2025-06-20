@@ -115,6 +115,11 @@ jobs:
           dry-run: false
           schema-version: v3
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf ./.benchmarks || true
+          rm -rf benchmark-output || true
       - name: Restore Nvidia GPU
         if: always()
         run: |

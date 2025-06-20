@@ -50,7 +50,7 @@ jobs:
       side_b_triton: ${{ inputs.side_b_triton }}
       side_b_commit: ${{ inputs.side_b_commit }}
     secrets:
-      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPH }}
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
 
 
 concurrency:
