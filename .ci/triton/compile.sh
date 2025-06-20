@@ -81,12 +81,7 @@ CONDA_ENV=pytorch . "${SETUP_SCRIPT}"
 # Remove the conda env if exists
 conda remove --name "${CONDA_ENV}" -y --all || true
 cd /workspace/tritonbench
-python tools/python_utils.py --create-conda-env "${CONDA_ENV}"
-conda activate "${CONDA_ENV}"
-cd /workspace/tritonbench && \
-    . ${SETUP_SCRIPT} && \
-    python -m tools.cuda_utils --install-torch-deps && \
-    python -m tools.cuda_utils --install-torch-nightly
+conda create --name "${CONDA_ENV}" -y --clone pytorch
 
 . "${SETUP_SCRIPT}"
 
