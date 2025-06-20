@@ -76,6 +76,7 @@ jobs:
           bash ./.ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }} --conda-env triton-side-a
           mkdir -p benchmark-output
           cp -r .benchmarks/${{ inputs.benchmark_name }} benchmark-output/triton-side-a
+          rm -rf .benchmarks || true
       - name: Compile Triton (Side B)
         run: |
           bash ./.ci/triton/compile.sh --repo ${{ inputs.side_a_triton }} --commit ${{ inputs.side_a_commit }} --side b
@@ -84,6 +85,7 @@ jobs:
           bash ./.ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }} --conda-env triton-side-b
           mkdir -p benchmark-output
           cp -r ".benchmarks/${{ inputs.benchmark_name }}" benchmark-output/triton-side-b
+          rm -rf .benchmarks || true
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -115,11 +117,6 @@ jobs:
           dry-run: false
           schema-version: v3
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cleanup
-        if: always()
-        run: |
-          rm -rf ./.benchmarks || true
-          rm -rf benchmark-output || true
       - name: Restore Nvidia GPU
         if: always()
         run: |
