@@ -55,7 +55,7 @@ jobs:
       - name: Benchmarking
         run: |
           bash .ci/tritonbench/run-benchmark.sh ${{ inputs.benchmark_name }}
-          cp -r .benchmarks/${{ inputs.benchmark_name }} benchmark-output
+          cp -r ".benchmarks/${{ inputs.benchmark_name }}" benchmark-output
       - name: Upload result to GH Actions Artifact
         uses: actions/upload-artifact@v4
         with:
