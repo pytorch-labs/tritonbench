@@ -41,7 +41,6 @@ def parse_op_args(args: List[str]):
     parser.add_argument(
         "--embedding-dim",
         type=int,
-        default=3072,
         help="specify embedding dim, embedding dim = n_heads * head_dim",
     )
     parser.add_argument("--n-heads", type=int, default=48, help="Number of heads")
