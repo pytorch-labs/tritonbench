@@ -5,6 +5,7 @@
 #  op-name: to skip an entire operator
 #  op-name:\n\t- impl-name to skip an impl
 flash_attention:
+  - pallas
   # uses old TMA API async_task
   - triton_tutorial_flash_v2_tma
   # _ws kernels require Triton with warp specialization
