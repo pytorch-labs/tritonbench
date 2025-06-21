@@ -194,33 +194,15 @@ class Operator(BenchmarkOperator):
             ):
                 yield (nt, B, M, max_seqlen, sparsity)
         else:
-            from tritonbench.data.fb.jagged_dense_dense import (
-                generate_input_vals_fb,
-                get_prod_input_metadata,
-            )
+            from tritonbench.data.fb.input_loader import get_input_loader_jagged
 
-            input_data = get_prod_input_metadata()
-            for (
-                jagged_values_shape,
-                dense_0_shape,
-                dense_1_shape,
-                jagged_values_dtype,
-                dense_0_dtype,
-                dense_1_dtype,
-            ) in input_data:
-                jagged_values, jagged_offsets, _, _ = generate_input_vals_fb(
-                    jagged_values_shape,
-                    dense_0_shape=dense_0_shape,
-                    dense_1_shape=dense_1_shape,
-                    jagged_values_dtype=jagged_values_dtype,
-                    dense_0_dtype=dense_0_dtype,
-                    dense_1_dtype=dense_1_dtype,
-                )
+            loader = get_input_loader_jagged(self)
+            for jagged_values, jagged_offsets, dense_0, _ in loader():
                 nested_tensor = jagged_to_nested_tensor(jagged_values, jagged_offsets)
                 # Yueming: in the future, if we integrate more input shapes for other jagged operators,
                 # the dense_0 may be None. In that case, we should use another way to obtain the batch size
                 # and max seq len.
-                batch_size, max_seq_len, _ = dense_0_shape
+                batch_size, max_seq_len, _ = dense_0.shape
                 yield (nested_tensor, batch_size, 1, max_seq_len, 0.0)
 
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
