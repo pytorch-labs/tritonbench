@@ -5,6 +5,7 @@
 #  op-name: to skip an entire operator
 #  op-name:\n\t- impl-name to skip an impl
 flash_attention:
+  - pallas
   # tma API changed in upstream
   - triton_tutorial_flash_v2_tma
   # triton_tutorial_*_ws kernels require triton-main
