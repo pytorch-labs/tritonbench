@@ -1757,7 +1757,12 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         )
         if self.tb_args.compile_cold_start:
             op_task_args.append("--compile-cold-start")
-        op_task = OpTask(name=self.name, save_output_dir=Path("/tmp/tritonbench"))
+        # Set this env variable if you get a Permission denied issue
+        # with local testing.
+        output_dir = os.environ.get(
+            "TRITONBENCH_COMPILE_TIME_OUTPUT_DIR", "/tmp/tritonbench"
+        )
+        op_task = OpTask(name=self.name, save_output_dir=Path(output_dir))
         op_task.make_operator_instance(args=op_task_args)
         op_task.run()
         if kineto_trace:
