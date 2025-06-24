@@ -15,6 +15,7 @@ from tritonbench.operators.gemm.stream_k import streamk_matmul
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
+    PRECISION_DTYPE_MAPPING,
     register_benchmark,
     register_metric,
     register_x_val,
@@ -161,27 +162,51 @@ class Operator(BenchmarkOperator):
 
     def get_input_iter(self) -> Generator:
         for shape_id, shape in enumerate(self.shapes):
-            m, k, n = shape
-            a = torch.randn(
-                (m, n), device=self.device, dtype=self.dtype
-            ).requires_grad_(False)
-            mat1 = torch.randn(
-                (m, k), device=self.device, dtype=self.dtype
-            ).requires_grad_(False)
-            mat2 = torch.randn(
-                (k, n), device=self.device, dtype=self.dtype
-            ).requires_grad_(False)
-            if self.col_major:
-                mat2 = mat2.T.contiguous().T
+            if hasattr(self, "dtypes") and self.dtypes:
+                self.tb_args.precision = "bypass"
+                self.dtype = PRECISION_DTYPE_MAPPING[self.dtypes[shape_id]]
             if hasattr(self, "strides"):
+                # generate shapes with different strides
                 strides = self.strides[shape_id]
                 assert (
                     len(strides) == 3
                 ), f"Can only have 3 strides from input, get: {strides}"
-                a = a.as_strided(size=a.size(), stride=strides[0])
-                mat1 = mat1.as_strided(size=mat1.size(), stride=strides[1])
-                mat2 = mat2.as_strided(size=mat2.size(), stride=strides[2])
-            yield a, mat1, mat2
+                assert (
+                    len(strides[0]) == 2
+                    and len(strides[1]) == 2
+                    and len(strides[2]) == 2
+                ), f"Can only deal with 2D strides, get: {strides}"
+                m, k, n = shape
+                original_m = max(m, strides[1][1])
+                original_k = max(k, strides[1][0], strides[2][1])
+                original_n = max(n, strides[2][0])
+                a = torch.randn(
+                    (m, n), device=self.device, dtype=self.dtype
+                ).requires_grad_(False)
+                mat1 = torch.randn(
+                    (original_m, original_k), device=self.device, dtype=self.dtype
+                ).requires_grad_(False)
+                mat2 = torch.randn(
+                    (original_k, original_n), device=self.device, dtype=self.dtype
+                ).requires_grad_(False)
+                a = a.as_strided((m, n), strides[0])
+                mat1 = mat1.as_strided((m, k), strides[1])
+                mat2 = mat2.as_strided((k, n), strides[2])
+                yield a, mat1, mat2
+            else:
+                m, k, n = shape
+                a = torch.randn(
+                    (m, n), device=self.device, dtype=self.dtype
+                ).requires_grad_(False)
+                mat1 = torch.randn(
+                    (m, k), device=self.device, dtype=self.dtype
+                ).requires_grad_(False)
+                mat2 = torch.randn(
+                    (k, n), device=self.device, dtype=self.dtype
+                ).requires_grad_(False)
+                if self.col_major:
+                    mat2 = mat2.T.contiguous().T
+                yield a, mat1, mat2
 
     def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
         output = fn()
