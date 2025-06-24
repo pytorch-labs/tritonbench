@@ -2,6 +2,7 @@ import itertools
 
 import triton
 import triton.language as tl
+from tritonbench.kernels.profile import profile_mem_pre_hook, smid, time
 
 
 BLOCK_SIZES = [2**n for n in range(3, 7, 3)]
@@ -170,6 +171,7 @@ def triton_jagged_sum_kernel_simple_fused_buffer_then_sum(
             },
             num_warps=w,
             num_stages=s,
+            pre_hook=profile_mem_pre_hook,
         )
         for b_r, b_m, w, s in itertools.product(
             BLOCK_SIZES,  # block sizes on non-reduction dimension
@@ -242,6 +244,7 @@ def triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer(
             },
             num_warps=w,
             num_stages=s,
+            pre_hook=profile_mem_pre_hook,
         )
         for b_r, b_m, w, s in itertools.product(
             BLOCK_SIZES,  # block sizes on non-reduction dimension
@@ -262,7 +265,11 @@ def triton_jagged_sum_kernel_variable_length_loop_buffer_then_sum(
     # block sizes (input)
     BLOCK_SIZE_RAGGED: tl.constexpr,  # number of elements in ragged dimension per block, with logical dimensions (B, *, M)
     BLOCK_SIZE_M: tl.constexpr,  # number of elements in M-th dimension per block, with logical dimensions (B, *, M)
+    profile_mem=None,  # *Pointer* to profile_mem
 ):
+    if profile_mem is not None:
+        start = time()
+
     pid = tl.program_id(axis=0)  # i-th tensor in nested tensor
     pid_ragged = pid // tl.cdiv(M, BLOCK_SIZE_M)
     pid_m = pid % tl.cdiv(M, BLOCK_SIZE_M)
@@ -303,3 +310,9 @@ def triton_jagged_sum_kernel_variable_length_loop_buffer_then_sum(
     output_mask = output_offsets < (M * (pid_ragged + 1))
 
     tl.store(output_ptr + output_offsets, buffer_view, mask=output_mask)
+
+    if profile_mem is not None:
+        end = time()
+        tl.store(profile_mem + pid * 3, smid())
+        tl.store(profile_mem + pid * 3 + 1, start)
+        tl.store(profile_mem + pid * 3 + 2, end)

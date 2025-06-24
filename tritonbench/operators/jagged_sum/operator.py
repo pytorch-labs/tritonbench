@@ -1,8 +1,5 @@
 import argparse
-import itertools
-import math
 import os
-import random
 from typing import Callable, Generator, List, Optional, Tuple
 
 import torch
@@ -67,13 +64,15 @@ def execute_kernel_simple_fused(x, max_seqlen, sum_then_buffer):
             MAX_SEQLEN=max_seqlen,
         )
 
-    return kernel_output
+    return None
 
 
 def execute_kernel_variable_length_loop(x, sum_then_buffer):
     B, M = x.shape[0], x.shape[2]
     grid = lambda meta: ((len(x.offsets()) - 1) * triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     kernel_output = torch.zeros((B, M), device=x.device)
+    # The size of the profile memory will be determined by the autotuner
+    profile_mem = torch.empty(0, dtype=torch.int64, device=x.device)
 
     if sum_then_buffer:
         triton_jagged_sum_kernel_variable_length_loop_sum_then_buffer[grid](
@@ -81,6 +80,7 @@ def execute_kernel_variable_length_loop(x, sum_then_buffer):
             x.offsets(),
             kernel_output,
             M=M,
+            profile_mem=profile_mem,
         )
     else:
         triton_jagged_sum_kernel_variable_length_loop_buffer_then_sum[grid](
@@ -88,13 +88,14 @@ def execute_kernel_variable_length_loop(x, sum_then_buffer):
             x.offsets(),
             kernel_output,
             M=M,
+            profile_mem=profile_mem,
         )
 
-    return kernel_output
+    return profile_mem
 
 
 class Operator(BenchmarkOperator):
-    DEFAULT_METRICS = ["latency", "accuracy", "best_config"]
+    DEFAULT_METRICS = ["latency", "best_config"]
     DEFAULT_PRECISION = "fp32"
 
     def __init__(
@@ -285,7 +286,8 @@ class Operator(BenchmarkOperator):
             )
         )
         def _plot(x_axis, provider):
-            return self.output.get_y_vals(x_axis, provider, "latency")
+            latency = self.output.get_y_vals(x_axis, provider, "latency")
+            return latency.p50, latency.max, latency.min
 
         save_path = (
             os.getcwd()

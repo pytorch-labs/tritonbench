@@ -2,6 +2,9 @@
 Common kernels used for profiling.
 """
 
+from typing import Tuple
+
+import torch
 import triton
 import triton.language as tl
 
@@ -81,3 +84,17 @@ def smid(_semantic=None):
         return tl.extra.cuda.smid()
     else:
         tl.static_assert(False, "Unsupported platform")
+
+
+def profile_mem_pre_hook(nargs):
+    """
+    Pre-hook for allocating memory for profiling.
+    """
+    profile_mem: torch.Tensor | None = nargs.get("profile_mem")
+    if profile_mem is not None:
+        shape: Tuple[int] = nargs["grid"](nargs)
+        # Add another dimension for simd, start, and end time
+        shape = (*shape, 3)
+        # We use `resize_` to avoid creating a new tensor.
+        # Otherwise, the caller cannot reference the tensor.
+        profile_mem.resize_(shape)

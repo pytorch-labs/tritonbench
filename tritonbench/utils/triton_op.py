@@ -260,6 +260,8 @@ class BenchmarkOperatorMetrics:
     kernel_source_hash: Optional[str] = None
     # cuda time
     cuda_time: Optional[float] = None
+    # occupancy, computed as the ratio of actual GPU time to maximum possible GPU time
+    occupancy: Optional[float] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
@@ -1235,6 +1237,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.tflops = self.tflops(fn_name, self.example_inputs, metrics)
             if "gbps" in self.required_metrics:
                 metrics.gbps = self.gbps(fn, self.example_inputs, metrics)
+            if "occupancy" in self.required_metrics:
+                metrics.occupancy = self.occupancy(fn, self.example_inputs, metrics)
             if "compile_time" in self.required_metrics:
                 compile_time, compile_time_by_stage = self.compile_time(
                     input_id, fn_name, metrics
@@ -1836,6 +1840,35 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             self._op_flops[fn] = _get_flops(self, fn)
         op_flops = self._op_flops[fn]
         return op_flops / metrics.latency / 1e12 * 1e3
+
+    def occupancy(
+        self, fn: Callable, example_inputs: Any, metrics: BenchmarkOperatorMetrics
+    ) -> float:
+        profile_mem = fn()
+        if profile_mem is None:
+            return None
+
+        # each row of profile_mem is (smid, start, end)
+        smids = profile_mem[:, 0]
+        start_times = profile_mem[:, 1]
+        end_times = profile_mem[:, 2]
+
+        # We use the actual number of SMs that are active to calculate occupancy.
+        # max_sm counts the total number of SMs on the device, but not all of them
+        # are active.
+        active_sm = torch.unique(smids).numel()
+        # max_sm = torch.cuda.get_device_properties("cuda").multi_processor_count
+
+        # Wall time measures the actual time taken to run the kernel.
+        # GPU time measures the time spent on the GPU, aggregated across all SMs.
+        wall_time = torch.max(end_times) - torch.min(start_times)
+        gpu_time = torch.sum(end_times - start_times)
+
+        # We define the occupancy to be the ratio of actual GPU time to the maximum
+        # possible GPU time using the active SMs.
+        NUM_WAVES = 2
+        occupancy = gpu_time / (wall_time * active_sm) / NUM_WAVES
+        return occupancy
 
     def dump_ir(self, input_id, fn):
         from unittest import mock
