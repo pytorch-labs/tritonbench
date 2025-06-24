@@ -30,3 +30,54 @@ def time(_semantic=None):
         return tl.extra.cuda.globaltimer()
     else:
         tl.static_assert(False, "Unsupported platform")
+
+
+@triton.jit
+def smid(_semantic=None):
+    if IS_HIP:
+        # Reference: https://github.com/triton-lang/triton/blob/4d3c4980044eb40fae31490ee07fcf94b6bb7f4a/third_party/amd/backend/include/hip/amd_detail/amd_device_functions.h#L891-L937
+        HW_ID_CU_ID_OFFSET: tl.constexpr = 8
+        HW_ID_CU_ID_SIZE: tl.constexpr = 4
+        cu_id = tl.inline_asm_elementwise(
+            f"""
+            s_getreg_b32 $0, hwreg(HW_REG_HW_ID, {HW_ID_CU_ID_OFFSET}, {HW_ID_CU_ID_SIZE})
+            """,
+            "=s",
+            [],
+            dtype=tl.int32,
+            is_pure=False,
+            pack=1,
+        )
+
+        HW_ID_SE_ID_OFFSET: tl.constexpr = 13
+        HW_ID_SE_ID_SIZE: tl.constexpr = 3
+        se_id = tl.inline_asm_elementwise(
+            f"""
+            s_getreg_b32 $0, hwreg(HW_REG_HW_ID, {HW_ID_SE_ID_OFFSET}, {HW_ID_SE_ID_SIZE})
+            """,
+            "=s",
+            [],
+            dtype=tl.int32,
+            is_pure=False,
+            pack=1,
+        )
+
+        XCC_ID_XCC_ID_OFFSET: tl.constexpr = 0
+        XCC_ID_XCC_ID_SIZE: tl.constexpr = 4
+        xcc_id = tl.inline_asm_elementwise(
+            f"""
+            s_getreg_b32 $0, hwreg(HW_REG_XCC_ID, {XCC_ID_XCC_ID_OFFSET}, {XCC_ID_XCC_ID_SIZE})
+            """,
+            "=s",
+            [],
+            dtype=tl.int32,
+            is_pure=False,
+            pack=1,
+        )
+
+        # Format: 1 | 3 digits for xcc_id | 3 digits for se_id | 3 digits for cu_id
+        return 1_000_000_000 + xcc_id * 1_000_000 + se_id * 1_000 + cu_id
+    elif IS_CUDA:
+        return tl.extra.cuda.smid()
+    else:
+        tl.static_assert(False, "Unsupported platform")
