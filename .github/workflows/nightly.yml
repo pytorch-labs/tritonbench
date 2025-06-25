@@ -4,6 +4,27 @@ on:
     # Test nightly docker daily at 4 PM UTC
     - cron: '0 16 * * *'
   workflow_dispatch:
+    inputs:
+      test_type:
+        type: choice
+        required: true
+        description: 'Choose advanced testing options'
+        default: 'single'
+        options:
+          - 'single'
+          - 'abtest'
+      side_a_triton:
+        default: 'triton-lang/triton'
+        description: 'Side A Triton repo'
+      side_a_commit:
+        default: 'main'
+        description: 'Side A Triton commit'
+      side_b_triton:
+        default: 'triton-lang/triton'
+        description: 'Side B Triton repo'
+      side_b_commit:
+        default: 'main'
+        description: 'Side B Triton commit'
   pull_request:
     paths:
       - benchmarks/nightly/**
@@ -11,11 +32,23 @@ on:
       - .github/workflows/nightly.yml
 
 jobs:
-  h100-triton-main-nightly-test:
+  h100-triton-main-nightly-periodic:
     uses: ./.github/workflows/_linux-benchmark-h100.yml
+    if: ${{ inputs.test_type != 'abtest' }}
     with:
       conda_env: "triton-main"
       benchmark_name: "nightly"
+    secrets:
+      TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
+  h100-triton-nightly-abtest:
+    uses: ./.github/workflows/_linux-benchmark-abtest-h100.yml
+    if: ${{ inputs.test_type == 'abtest' }}
+    with:
+      benchmark_name: "nightly"
+      side_a_triton: ${{ inputs.side_a_triton }}
+      side_a_commit: ${{ inputs.side_a_commit }}
+      side_b_triton: ${{ inputs.side_b_triton }}
+      side_b_commit: ${{ inputs.side_b_commit }}
     secrets:
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
 
