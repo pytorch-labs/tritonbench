@@ -17,8 +17,8 @@ include = ["tritonbench*"]
 
 [tool.ufmt]
 formatter = "ruff-api"
+sorter = "usort"
 excludes = ["submodules/"]
 
-[tool.black]
-line-length = 88
-target-version = ["py312"]
+[tool.usort]
+first_party_detection = false
