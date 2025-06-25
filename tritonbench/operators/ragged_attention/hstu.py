@@ -6,7 +6,11 @@ from tritonbench.utils.path_utils import add_path, SUBMODULE_PATH
 
 if is_fbcode():
     # Internal Imports
-    from generative_recommenders.common import apply_sampling, generate_sparse_seq_len
+    from generative_recommenders.common import (
+        apply_sampling,
+        generate_sparse_seq_len,
+        set_use_runtime_max_seq_len,
+    )
     from generative_recommenders.ops.triton.triton_hstu_attention import triton_hstu_mha
 else:
     # OSS Import
@@ -14,6 +18,7 @@ else:
         from generative_recommenders.common import (
             apply_sampling,
             generate_sparse_seq_len,
+            set_use_runtime_max_seq_len,
         )
         from generative_recommenders.ops.triton.triton_hstu_attention import (
             triton_hstu_mha,
@@ -22,6 +27,9 @@ else:
 from typing import Tuple
 
 triton_hstu_mha = triton_hstu_mha
+
+# Always autotune based on the actual max_seq_len
+set_use_runtime_max_seq_len(True)
 
 
 def get_test_inputs(
