@@ -9,9 +9,9 @@ on:
         type: choice
         required: true
         description: 'Choose advanced testing options'
-        default: 'periodic'
+        default: 'single'
         options:
-          - 'periodic'
+          - 'single'
           - 'abtest'
       side_a_triton:
         default: 'triton-lang/triton'
@@ -34,7 +34,7 @@ on:
 jobs:
   h100-triton-main-nightly-periodic:
     uses: ./.github/workflows/_linux-benchmark-h100.yml
-    if: ${{ inputs.test_type == 'periodic' }}
+    if: ${{ inputs.test_type != 'abtest' }}
     with:
       conda_env: "triton-main"
       benchmark_name: "nightly"
