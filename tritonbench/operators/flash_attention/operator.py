@@ -56,7 +56,7 @@ from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
 
-from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
+from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda, is_hip
 
 from tritonbench.utils.path_utils import add_ld_library_path
 from tritonbench.utils.triton_op import is_fbcode
@@ -280,7 +280,7 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        # includes base (default scheduling) + opt (optimized loop scheduling based on hueristics)
+        # includes base (default scheduling) + opt (optimized loop scheduling based on heuristics)
         return lambda: triton_tutorial_FA2_opt(
             q, k, v, self.causal, self.sm_scale, "base_opt"
         )
@@ -310,7 +310,8 @@ class Operator(BenchmarkOperator):
         )
         return fhma_input
 
-    @register_benchmark(enabled=HAS_XFORMERS)
+    # Cutlass implementation is not supported on AMD GPUs.
+    @register_benchmark(enabled=HAS_XFORMERS and not is_hip())
     def xformers(
         self,
         q: torch.Tensor,
@@ -367,7 +368,7 @@ class Operator(BenchmarkOperator):
             k: torch.Tensor,
             v: torch.Tensor,
         ) -> Callable:
-            # includes base (default scheduling) + opt (optimized loop scheduling based on hueristics)
+            # includes base (default scheduling) + opt (optimized loop scheduling based on heuristics)
             # Also allows for TMA via WITH_TMA=1
             return lambda: proton_tutorial_FA2_opt(
                 q, k, v, self.causal, self.sm_scale, "base_opt"
