@@ -7,13 +7,19 @@ from typing import List
 
 from tritonbench.utils.env_utils import is_fbcode
 
+target_kernel = os.getenv("TRITONBENCH_ATT_KERNEL", None)
+if target_kernel:
+    kernel_text = f"KERNEL={target_kernel}"
+else:
+    kernel_text = "range: 0:20"
+
 # as an example, we only capture the first 20 kernels per operator
-INPUT_TXT_TEMPLATE = """
+INPUT_TXT_TEMPLATE = f"""
 att: TARGET_CU=1
 SE_MASK=0x1
 SIMD_SELECT=0xF
 ISA_CAPTURE_MODE=2
-range: 0:20
+{kernel_text}
 """
 
 logger = logging.getLogger(__name__)
@@ -32,8 +38,12 @@ def launch_att(att_profile_dir: str, benchmark_cmd: List[str]) -> str:
     p = Path(att_profile_dir)
     p.mkdir(parents=True, exist_ok=True)
     input_file_path = _generate_input_txt(att_profile_dir)
+    if is_fbcode():
+        profiler = "fbrocrof"
+    else:
+        profiler = "rocprofv2"
     cmd = [
-        "rocprofv2",
+        profiler,
         "-i",
         input_file_path,
         "-d",
