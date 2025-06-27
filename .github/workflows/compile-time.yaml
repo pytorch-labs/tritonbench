@@ -4,6 +4,27 @@ on:
     # Run nightly at 4 PM UTC after the nightly docker is updated
     - cron: '0 16 * * *'
   workflow_dispatch:
+    inputs:
+      test_type:
+        type: choice
+        required: true
+        description: 'Choose advanced testing options'
+        default: 'single'
+        options:
+          - 'single'
+          - 'abtest'
+      side_a_triton:
+        default: 'triton-lang/triton'
+        description: 'Side A Triton repo'
+      side_a_commit:
+        default: 'main'
+        description: 'Side A Triton commit'
+      side_b_triton:
+        default: 'triton-lang/triton'
+        description: 'Side B Triton repo (abtest only)'
+      side_b_commit:
+        default: 'main'
+        description: 'Side B Triton commit (abtest only)'
   pull_request:
     paths:
       - benchmarks/compile_time/**
@@ -16,6 +37,9 @@ jobs:
     with:
       conda_env: "triton-main"
       benchmark_name: "compile_time"
+      side_a_triton: ${{ inputs.side_a_triton }}
+      side_a_commit: ${{ inputs.side_a_commit }}
+
     secrets:
       TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.TRITONBENCH_SCRIBE_GRAPHQL_ACCESS_TOKEN }}
 
