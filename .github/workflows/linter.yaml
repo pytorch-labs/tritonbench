@@ -18,7 +18,7 @@ jobs:
           path: tritonbench
       - name: Install deps
         run: |
-          pip install ruff-api==0.1.0
+          pip install -r requirements-fmt.txt
       - name: Check Formatting
         uses: omnilib/ufmt@action-v1
         with:
