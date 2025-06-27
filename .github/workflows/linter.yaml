@@ -18,6 +18,7 @@ jobs:
           path: tritonbench
       - name: Install deps
         run: |
+          cd tritonbench
           pip install -r requirements-fmt.txt
       - name: Check Formatting
         uses: omnilib/ufmt@action-v1
