@@ -37,7 +37,14 @@ install_triton() {
     # install main triton
     pip install ninja cmake wheel pybind11; # build-time dependencies
     pip install -r python/requirements.txt
+    # old versions of triton have setup.py in ./python; newer versions in ./
+    if [ ! -f setup.py ]; then
+      pushd python
+    else
+      pushd .
+    fi
     pip install -e .
+    popd
 }
 
 # Parse arguments
