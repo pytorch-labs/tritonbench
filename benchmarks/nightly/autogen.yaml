@@ -84,10 +84,10 @@ welford_fwd:
 cross_entropy_bwd:
   op: cross_entropy
   args: --op cross_entropy --baseline cross_entropy_loss --metrics speedup --bwd --only
-    liger_cross_entropy_loss,cross_entropy_loss,cross_entropy_loss
+    liger_cross_entropy_loss,cross_entropy_loss
 embedding_bwd:
   op: embedding
-  args: --op embedding --baseline torch_embedding --metrics speedup --bwd --only liger_embedding,torch_embedding,torch_embedding
+  args: --op embedding --baseline torch_embedding --metrics speedup --bwd --only liger_embedding,torch_embedding
 # flash_attention triton bwd only works with causal
 bf16_flash_attention_bwd:
   op: flash_attention
@@ -95,24 +95,24 @@ bf16_flash_attention_bwd:
 bf16_flex_attention_bwd:
   op: flex_attention
   args: --op flex_attention --baseline eager --metrics tflops,speedup --bwd --only
-    compiled,eager,eager
+    compiled,eager
 fused_linear_cross_entropy_bwd:
   op: fused_linear_cross_entropy
   args: --op fused_linear_cross_entropy --baseline torch_lm_head_ce --metrics speedup
-    --bwd --only liger_lm_head_ce,torch_lm_head_ce,torch_lm_head_ce
+    --bwd --only liger_lm_head_ce,torch_lm_head_ce
 fused_linear_jsd_bwd:
   op: fused_linear_jsd
   args: --op fused_linear_jsd --baseline torch_lm_head_jsd --metrics speedup --bwd
-    --only liger_lm_head_jsd,torch_lm_head_jsd,torch_lm_head_jsd
+    --only liger_lm_head_jsd,torch_lm_head_jsd
 geglu_bwd:
   op: geglu
-  args: --op geglu --baseline torch_geglu --metrics speedup --bwd --only liger_geglu,torch_geglu,torch_geglu
+  args: --op geglu --baseline torch_geglu --metrics speedup --bwd --only liger_geglu,torch_geglu
 jsd_bwd:
   op: jsd
-  args: --op jsd --baseline torch_jsd --metrics speedup --bwd --only liger_jsd,torch_jsd,torch_jsd
+  args: --op jsd --baseline torch_jsd --metrics speedup --bwd --only liger_jsd,torch_jsd
 kl_div_bwd:
   op: kl_div
-  args: --op kl_div --baseline torch_kl_div --metrics speedup --bwd --only liger_kl_div,torch_kl_div,torch_kl_div
+  args: --op kl_div --baseline torch_kl_div --metrics speedup --bwd --only liger_kl_div,torch_kl_div
 layer_norm_bwd:
   op: layer_norm
   args: --op layer_norm --baseline torch_layer_norm --metrics speedup --bwd --only
@@ -125,7 +125,7 @@ rms_norm_bwd:
   args: --op rms_norm --baseline llama_rms --metrics speedup --bwd --only liger_rms,llama_rms,llama_rms
 rope_bwd:
   op: rope
-  args: --op rope --baseline apply_rotary_pos_emb --metrics speedup --bwd --only liger_rotary_pos_emb,apply_rotary_pos_emb,apply_rotary_pos_emb
+  args: --op rope --baseline apply_rotary_pos_emb --metrics speedup --bwd --only liger_rotary_pos_emb,apply_rotary_pos_emb
 swiglu_bwd:
   op: swiglu
-  args: --op swiglu --baseline torch_swiglu --metrics speedup --bwd --only liger_swiglu,torch_swiglu,torch_swiglu
+  args: --op swiglu --baseline torch_swiglu --metrics speedup --bwd --only liger_swiglu,torch_swiglu

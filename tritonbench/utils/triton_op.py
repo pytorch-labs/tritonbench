@@ -874,7 +874,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.baseline_metrics = None
                 self._op_flops = {}
                 if self._only:
-                    benchmarks = self._only
+                    benchmarks = list(set(self._only))  # remove duplicates
                 else:
                     benchmarks = find_enabled_benchmarks(
                         self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
