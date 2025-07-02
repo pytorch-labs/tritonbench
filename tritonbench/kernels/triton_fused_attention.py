@@ -911,6 +911,7 @@ def _attn_fwd_ws(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
+    HAS_EXPLICIT_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
@@ -1149,6 +1150,7 @@ def _attn_fwd_tma_unified(
     ENABLE_TMA: tl.constexpr,
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
+    HAS_EXPLICIT_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     pid = tl.program_id(0)
@@ -1357,6 +1359,7 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     LOOP_SCHEDULE: tl.constexpr,
     ENABLE_WS: tl.constexpr,
     GRID_MULTIPLE: tl.constexpr,
+    HAS_EXPLICIT_WS: tl.constexpr,
 ):
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     # original grid
@@ -2097,9 +2100,10 @@ class _attention_opt(torch.autograd.Function):
                 HEAD_DIM=HEAD_DIM_K,  #
                 STAGE=stage,  #
                 ENABLE_WS=True,
+                HAS_EXPLICIT_WS=HAS_EXPLICIT_WS,
                 **extra_kern_args,
             )
-        elif baseVariant == "tma":
+        elif baseVariant == "tma_ws" or baseVariant == "tma":
             _attn_fwd_tma_unified[grid_tma](
                 q,
                 k,
@@ -2128,39 +2132,8 @@ class _attention_opt(torch.autograd.Function):
                 N_CTX=q.shape[2],
                 HEAD_DIM=HEAD_DIM_K,
                 STAGE=stage,
-                ENABLE_WS=False,  # Disable warp specialization for regular TMA
-                **extra_kern_args,
-            )
-        elif baseVariant == "tma_ws":
-            _attn_fwd_tma_unified[grid_tma](
-                q,
-                k,
-                v,
-                sm_scale,
-                M,
-                o,
-                q.stride(0),
-                q.stride(1),
-                q.stride(2),
-                q.stride(3),
-                k.stride(0),
-                k.stride(1),
-                k.stride(2),
-                k.stride(3),
-                v.stride(0),
-                v.stride(1),
-                v.stride(2),
-                v.stride(3),
-                o.stride(0),
-                o.stride(1),
-                o.stride(2),
-                o.stride(3),
-                q.shape[0],
-                q.shape[1],
-                N_CTX=q.shape[2],
-                HEAD_DIM=HEAD_DIM_K,
-                STAGE=stage,
-                ENABLE_WS=True,  # Enable warp specialization
+                ENABLE_WS=True if baseVariant == "tma_ws" else False,
+                HAS_EXPLICIT_WS=HAS_EXPLICIT_WS,
                 **extra_kern_args,
             )
         elif baseVariant == "tma_ws_persistent":
@@ -2193,6 +2166,7 @@ class _attention_opt(torch.autograd.Function):
                 HEAD_DIM=HEAD_DIM_K,  #
                 STAGE=stage,  #
                 ENABLE_WS=True,
+                HAS_EXPLICIT_WS=HAS_EXPLICIT_WS,
                 **extra_kern_args,
             )
 
