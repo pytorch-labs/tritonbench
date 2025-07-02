@@ -5,9 +5,15 @@ from typing import Dict, List
 
 import yaml
 
-from tritonbench.operators import load_opbench_by_name
-from tritonbench.operators_collection import list_operators_by_collection
-from tritonbench.utils.env_utils import is_fbcode
+from tritonbench.operators import (  # @manual=//pytorch/tritonbench:tritonbench
+    load_opbench_by_name,
+)
+from tritonbench.operators_collection import (
+    list_operators_by_collection,  # @manual=//pytorch/tritonbench:tritonbench
+)
+from tritonbench.utils.env_utils import (
+    is_fbcode,  # @manual=//pytorch/tritonbench:tritonbench
+)
 
 from tritonbench.utils.parser import get_parser
 
@@ -43,8 +49,8 @@ TEST_OPERATORS = set(list_operators_by_collection(op_collection="default"))
 
 def check_ci_output(op):
     from tritonbench.utils.triton_op import (
-        find_enabled_benchmarks,
-        REGISTERED_BENCHMARKS,
+        find_enabled_benchmarks,  # @manual=//pytorch/tritonbench:tritonbench
+        REGISTERED_BENCHMARKS,  # @manual=//pytorch/tritonbench:tritonbench
     )
 
     output = op.output
@@ -86,7 +92,9 @@ def _run_one_operator(args: List[str]):
 
 
 def _run_operator_in_task(op: str, args: List[str]):
-    from tritonbench.operators.op_task import OpTask
+    from tritonbench.operators.op_task import (  # @manual=//pytorch/tritonbench:tritonbench
+        OpTask,
+    )
 
     if op in skip_tests:
         # If the op itself is in the skip list, skip all tests
