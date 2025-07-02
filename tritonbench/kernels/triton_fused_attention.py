@@ -29,8 +29,6 @@ from .attention_utils import (
     WITH_TMA,
 )
 
-# if we want to use tl.async_task, set env var HAS_EXPLICIT_WS
-# if we want to use warp_specialize on ForOp, set env var HAS_AUTO_WS
 
 if HAS_TMA_DESC:
     print(
