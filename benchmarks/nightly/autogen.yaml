@@ -17,19 +17,22 @@ bf16_flex_attention_fwd:
 bf16_ragged_attention_fwd:
   op: ragged_attention
   args: --op ragged_attention --metrics tflops --only hstu
-fp8_gemm_fwd:
-  op: fp8_gemm
-  args: --op fp8_gemm --baseline torch_fp8_gemm --metrics tflops,speedup --only triton_tma_persistent_fp8_gemm,torch_fp8_gemm
+# fbgemm fp8_gemm does not work on the latest triton main
+# fp8_gemm_fwd:
+#   op: fp8_gemm
+#   args: --op fp8_gemm --baseline torch_fp8_gemm --metrics tflops,speedup --only triton_tma_persistent_fp8_gemm,torch_fp8_gemm
 fp8_gemm_blockwise_fwd:
   op: fp8_gemm_blockwise
   args: --op fp8_gemm_blockwise --baseline _cutlass --metrics tflops,speedup --only
     _triton,_cutlass
-fp8_gemm_rowwise_fwd:
-  op: fp8_gemm_rowwise
-  args: --op fp8_gemm_rowwise --baseline _cutlass_or_ck --metrics tflops,speedup --only _triton,_cutlass_or_ck
-fp8_gemm_rowwise_grouped_fwd:
-  op: fp8_gemm_rowwise_grouped
-  args: --op fp8_gemm_rowwise_grouped --baseline _cutlass_or_ck --metrics tflops,speedup --only _triton,_cutlass_or_ck
+# fbgemm fp8_gemm_rowwise does not work on the latest triton main
+# fp8_gemm_rowwise_fwd:
+#   op: fp8_gemm_rowwise
+#   args: --op fp8_gemm_rowwise --baseline _cutlass_or_ck --metrics tflops,speedup --only _triton,_cutlass_or_ck
+# fbgemm fp8_gemm_rowwise_grouped does not work on the latest triton main
+# fp8_gemm_rowwise_grouped_fwd:
+#   op: fp8_gemm_rowwise_grouped
+#   args: --op fp8_gemm_rowwise_grouped --baseline _cutlass_or_ck --metrics tflops,speedup --only _triton,_cutlass_or_ck
 fused_linear_cross_entropy_fwd:
   op: fused_linear_cross_entropy
   args: --op fused_linear_cross_entropy --baseline torch_lm_head_ce --metrics speedup
@@ -85,9 +88,10 @@ cross_entropy_bwd:
 embedding_bwd:
   op: embedding
   args: --op embedding --baseline torch_embedding --metrics speedup --bwd --only liger_embedding,torch_embedding,torch_embedding
+# flash_attention triton bwd only works with causal
 bf16_flash_attention_bwd:
   op: flash_attention
-  args: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --bwd --only triton_tutorial_flash_v2,flash_v3
+  args: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --bwd --only triton_tutorial_flash_v2,flash_v3 --causal
 bf16_flex_attention_bwd:
   op: flex_attention
   args: --op flex_attention --baseline eager --metrics tflops,speedup --bwd --only
