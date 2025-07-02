@@ -346,7 +346,7 @@ def get_fwd_config_space(
 ):
     configs = []
     bmList = [128] if enable_ws else [64, 128]
-    bnList = [64, 128] # To handle hDim of 64, we need BLOCK_N to be <= 64
+    bnList = [64, 128]  # To handle hDim of 64, we need BLOCK_N to be <= 64
     wList = [4] if enable_ws else [4, 8]
     stageList = [2] if enable_ws else [3, 4, 7]
     for BM in bmList:
@@ -1104,6 +1104,7 @@ def _attn_fwd_base_opt(
         False,  # WARP_SPECIALIZE
     )
 
+
 def prune_invalid_configs(configs, named_args, **kwargs):
     ENABLE_WS = kwargs["ENABLE_WS"]
     # Choose configsTmaWS when ENABLE_WS is True
@@ -1114,8 +1115,11 @@ def prune_invalid_configs(configs, named_args, **kwargs):
 
 # when ENABLE_WS is true, we can't use configsTma
 # use either configsTma or configsTmaWS, not configsTma + configsTmaWS
-@triton.autotune(list(filter(keep, configsTma + configsTmaWS)), key=["N_CTX"],
-                 prune_configs_by={'early_config_prune': prune_invalid_configs})
+@triton.autotune(
+    list(filter(keep, configsTma + configsTmaWS)),
+    key=["N_CTX"],
+    prune_configs_by={"early_config_prune": prune_invalid_configs},
+)
 @triton.jit
 def _attn_fwd_tma_unified(
     Q,
