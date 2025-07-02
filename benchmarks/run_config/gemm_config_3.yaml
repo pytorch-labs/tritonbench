@@ -1,0 +1,3 @@
+bf16_gemm_fwd:
+    op: gemm
+    args: --op gemm --only pt2_triton_matmul --m 32768 --n 512 --k 384 --precision bf16 --metrics tflops --cudagraph --simple-output
