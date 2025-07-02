@@ -21,7 +21,7 @@ import triton
 import triton.language as tl
 
 from .attention_utils import (
-    HAS_EXPLICIT_WS, # guard new tuning configs such as num_consumer_groups
+    HAS_EXPLICIT_WS,  # guard new tuning configs such as num_consumer_groups
     HAS_TMA_DESC,
     PEEL_LAST,
     TmaAutoTuneHelper,
@@ -43,7 +43,20 @@ else:
 
 
 @triton.jit
-def _attn_fwd_iteration(q, k, offs_m, start_n, offs_n, qk_scale, l_i, m_i, acc, v, fp8_v: tl.constexpr, STAGE: tl.constexpr):
+def _attn_fwd_iteration(
+    q,
+    k,
+    offs_m,
+    start_n,
+    offs_n,
+    qk_scale,
+    l_i,
+    m_i,
+    acc,
+    v,
+    fp8_v: tl.constexpr,
+    STAGE: tl.constexpr,
+):
     qk = tl.dot(q, k)
     if STAGE == 2:
         mask = offs_m[:, None] >= (start_n + offs_n[None, :])
@@ -113,7 +126,9 @@ def _attn_fwd_inner_autows(
         K_block_ptr = tl.advance(K_block_ptr, (0, lo))
         V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
     # loop over k, v and update accumulator
-    for start_n in tl.range(lo, hi, BLOCK_N, warp_specialize=WARP_SPECIALIZE):  # , loop_schedule=LOOP_SCHEDULE):
+    for start_n in tl.range(
+        lo, hi, BLOCK_N, warp_specialize=WARP_SPECIALIZE
+    ):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         if ENABLE_TMA:
@@ -134,7 +149,9 @@ def _attn_fwd_inner_autows(
                 v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
         else:
             v = tl.load(V_block_ptr)
-        l_i, m_i, acc = _attn_fwd_iteration(q, k, offs_m, start_n, offs_n, qk_scale, l_i, m_i, acc, v, fp8_v, STAGE)
+        l_i, m_i, acc = _attn_fwd_iteration(
+            q, k, offs_m, start_n, offs_n, qk_scale, l_i, m_i, acc, v, fp8_v, STAGE
+        )
         if not ENABLE_TMA:
             V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
             K_block_ptr = tl.advance(K_block_ptr, (0, BLOCK_N))
@@ -203,7 +220,9 @@ def _attn_fwd_inner(
                 v = desc_v.load([(qvk_offset // stride_vk + start_n).to(tl.int32), 0])
         else:
             v = tl.load(V_block_ptr)
-        l_i, m_i, acc = _attn_fwd_iteration(q, k, offs_m, start_n, offs_n, qk_scale, l_i, m_i, acc, v, fp8_v, STAGE)
+        l_i, m_i, acc = _attn_fwd_iteration(
+            q, k, offs_m, start_n, offs_n, qk_scale, l_i, m_i, acc, v, fp8_v, STAGE
+        )
         if not ENABLE_TMA:
             V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
             K_block_ptr = tl.advance(K_block_ptr, (0, BLOCK_N))
@@ -321,15 +340,18 @@ schedList = ["FA_secondDot"] if PEEL_LAST else schedList
 
 tmaList = [True] if WITH_TMA and HAS_NEW_TMA else [False]
 
-def get_fwd_config_space(persistent: bool, enable_ws: bool, support_explicit_ws: bool, enable_tma: bool):
+
+def get_fwd_config_space(
+    persistent: bool, enable_ws: bool, support_explicit_ws: bool, enable_tma: bool
+):
     configs = []
-    bmList = [128] if enable_ws else [64, 128] 
+    bmList = [128] if enable_ws else [64, 128]
     bnList = [128] if enable_ws else [64, 128]
     wList = [4] if enable_ws else [4, 8]
     stageList = [2] if enable_ws else [3, 4, 7]
     for BM in bmList:
         for BN in bnList:
-            for sched in schedList: # set in global scope
+            for sched in schedList:  # set in global scope
                 for w in wList:
                     for stage in stageList:
                         base_config_dict = {
@@ -343,7 +365,7 @@ def get_fwd_config_space(persistent: bool, enable_ws: bool, support_explicit_ws:
                             config_dicts.append(
                                 {
                                     **base_config_dict,
-                                    "GRID_MULTIPLE": 1, # This can be set to multiple values
+                                    "GRID_MULTIPLE": 1,  # This can be set to multiple values
                                 }
                             )
                         else:
@@ -382,6 +404,7 @@ def get_fwd_config_space(persistent: bool, enable_ws: bool, support_explicit_ws:
                                 )
     return configs
 
+
 # BLOCK_M: 128, BLOCK_N: 128, ENABLE_TMA: False, LOOP_SCHEDULE: default, num_warps: 8, num_ctas: 1, num_stages: 3
 if torch.version.hip is None:
     configsOrig = get_fwd_config_space(False, False, HAS_EXPLICIT_WS, False)
@@ -414,8 +437,12 @@ configsTma = get_fwd_config_space(False, False, HAS_EXPLICIT_WS, True)
 # no TMA, with WS and CompPipe
 configsWS = get_fwd_config_space(False, True, HAS_EXPLICIT_WS, False)
 # TMA, WS, and CompPipe
-configsTmaWS = get_fwd_config_space(False, True, HAS_EXPLICIT_WS, WITH_TMA and HAS_NEW_TMA)
-configsTmaWSPersistent = get_fwd_config_space(True, True, HAS_EXPLICIT_WS, WITH_TMA and HAS_NEW_TMA)
+configsTmaWS = get_fwd_config_space(
+    False, True, HAS_EXPLICIT_WS, WITH_TMA and HAS_NEW_TMA
+)
+configsTmaWSPersistent = get_fwd_config_space(
+    True, True, HAS_EXPLICIT_WS, WITH_TMA and HAS_NEW_TMA
+)
 
 
 def keep(conf):
@@ -1073,7 +1100,7 @@ def _attn_fwd_base_opt(
         STAGE,
         ENABLE_TMA,
         LOOP_SCHEDULE,
-        False, # WARP_SPECIALIZE
+        False,  # WARP_SPECIALIZE
     )
 
 
@@ -1240,7 +1267,7 @@ def _attn_fwd_tma_unified(
                 STAGE,
                 ENABLE_TMA,
                 LOOP_SCHEDULE,
-                True, # WARP_SPECIALIZE
+                True,  # WARP_SPECIALIZE
             )
     else:
         _attn_fwd_compute(
@@ -1281,7 +1308,7 @@ def _attn_fwd_tma_unified(
             STAGE,
             ENABLE_TMA,
             LOOP_SCHEDULE,
-            False, # WARP_SPECIALIZE
+            False,  # WARP_SPECIALIZE
         )
 
 
