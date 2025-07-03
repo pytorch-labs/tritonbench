@@ -466,18 +466,6 @@ class Operator(BenchmarkOperator):
                 q, k, v, self.causal, self.sm_scale, "tma_ws_persistent"
             )
 
-        @register_benchmark(enabled=HAS_CUDA_124 and has_warp_spec() and has_new_tma())
-        def triton_tutorial_flash_v2_tma_ws_persistent_blackwell(
-            self,
-            q: torch.Tensor,
-            k: torch.Tensor,
-            v: torch.Tensor,
-        ) -> Callable:
-            # autotune TMA/WarpSpec/CompPipe/Persistent
-            return lambda: triton_tutorial_FA2_opt(
-                q, k, v, self.causal, self.sm_scale, "tma_ws_persistent_blackwell"
-            )
-
         @register_benchmark(enabled=not is_fbcode() and HAS_TK)
         def tk(self, q, k, v):
             def _inner():
