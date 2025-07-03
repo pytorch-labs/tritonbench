@@ -395,7 +395,7 @@ def _attn_fwd_inner_ws_with_dp(
                 k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
 
         with tl.async_task([FIRST_MMA]):
-            if ENABLE_TMA: # feeds into gemm
+            if ENABLE_TMA:  # feeds into gemm
                 k = tl.trans(k)
             qk0 = tl.dot(q0, k)
             qk1 = tl.dot(q1, k)
@@ -1114,7 +1114,12 @@ def _attn_fwd_compute_ws_with_dp(
     with tl.async_task([LAST_LOADQ]):
         if ENABLE_TMA:
             q1 = desc_q.load(
-                [(qvk_offset // stride_qm + start_m * BLOCK_M + BLOCK_M_HALF).to(tl.int32), 0]
+                [
+                    (qvk_offset // stride_qm + start_m * BLOCK_M + BLOCK_M_HALF).to(
+                        tl.int32
+                    ),
+                    0,
+                ]
             )
         else:
             q1 = tl.load(Q_block_ptr)
@@ -1228,7 +1233,12 @@ def _attn_fwd_compute_ws_with_dp(
         tl.store(m_ptrs1, m_i1)
         if ENABLE_TMA:
             desc_o.store(
-                [(qvk_offset // stride_om + start_m * BLOCK_M + BLOCK_M_HALF).to(tl.int32), 0],
+                [
+                    (qvk_offset // stride_om + start_m * BLOCK_M + BLOCK_M_HALF).to(
+                        tl.int32
+                    ),
+                    0,
+                ],
                 acc1.to(Out.type.element_ty),
             )
         else:
@@ -1692,7 +1702,7 @@ def _attn_fwd_tma_unified(
 
 @triton.autotune(list(filter(keep, configsTmaWSPersistent)), key=["N_CTX"])
 @triton.jit
-def _attn_fwd_tma_ws_persistent( # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
+def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
     Q,
     K,
     V,
@@ -1905,7 +1915,7 @@ configsCutlassBlackwell = [
 ]
 
 
-configsTKBlackwell = [ # ThunderKitten
+configsTKBlackwell = [  # ThunderKitten
     (
         triton.Config(
             {
