@@ -401,7 +401,7 @@ def _attn_fwd_inner_ws_with_dp(
             qk1 = tl.dot(q1, k)
         with tl.async_task([FIRST_SOFTMAX]):
             if STAGE == 2:
-                mask = offs_m[:, None] >= (start_n + offs_n[None, :])
+                mask = offs_m0[:, None] >= (start_n + offs_n[None, :])
                 qk0 = qk0 * qk_scale + tl.where(mask, 0, -1.0e6)
                 m_ij0 = tl.maximum(m_i0, tl.max(qk0, 1))
                 qk0 -= m_ij0[:, None]
@@ -430,7 +430,7 @@ def _attn_fwd_inner_ws_with_dp(
             m_i0 = m_ij0
         with tl.async_task([LAST_SOFTMAX]):
             if STAGE == 2:
-                mask = offs_m[:, None] >= (start_n + offs_n[None, :])
+                mask = offs_m1[:, None] >= (start_n + offs_n[None, :])
                 qk1 = qk1 * qk_scale + tl.where(mask, 0, -1.0e6)
                 m_ij1 = tl.maximum(m_i1, tl.max(qk1, 1))
                 qk1 -= m_ij1[:, None]
