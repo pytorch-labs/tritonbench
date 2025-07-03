@@ -98,7 +98,7 @@ def install_fa2(compile=False):
 def install_liger():
     # Liger-kernel has a conflict dependency `triton` with pytorch,
     # so we need to install it without dependencies
-    cmd = ["pip", "install", "liger-kernel", "--no-deps"]
+    cmd = ["pip", "install", "liger-kernel-nightly", "--no-deps"]
     subprocess.check_call(cmd)
 
 
