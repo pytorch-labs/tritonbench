@@ -31,7 +31,7 @@ import torch
 
 import triton
 
-# Note: This only works with 3.3.1fb or earlier
+# Note: This only works with 3.3.1+fb or earlier
 try:
     import triton.intraprof as proton  # @manual=//triton:triton
 
