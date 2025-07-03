@@ -275,7 +275,7 @@ class Operator(BenchmarkOperator):
 
         return lambda: flex_attention(q, k, v, block_mask=block_mask)
 
-    @register_benchmark()
+    @register_benchmark(enabled=False)
     def triton_tutorial_flash_v2_tma_ws_persistent_blackwell(
         self,
         q: torch.Tensor,
