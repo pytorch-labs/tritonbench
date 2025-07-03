@@ -15,7 +15,7 @@ HAS_TMA_DESC = "nv_tma_desc_type" in dir(tl)
 WITH_COMPPIPE = os.getenv("ENABLE_COMPPIPE")
 PEEL_LAST = os.getenv("PEEL_LAST_ITER")
 WITH_TMA = os.getenv("WITH_TMA")
-HAS_AUTO_WS = os.getenv("ENABLE_AUTO_WS")
+HAS_EXPLICIT_WS = os.getenv("ENABLE_EXPLICIT_WS")
 
 
 class TmaAutoTuneHelper:
