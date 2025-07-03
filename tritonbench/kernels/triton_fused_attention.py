@@ -995,7 +995,7 @@ def _attn_fwd_ws(
             STAGE,
             ENABLE_TMA,
             LOOP_SCHEDULE,
-            False, # warp_specialize on hopper is not ready yet
+            False,  # warp_specialize on hopper is not ready yet
         )
 
 
@@ -1282,7 +1282,7 @@ def _attn_fwd_tma_unified(
                 STAGE,
                 ENABLE_TMA,
                 LOOP_SCHEDULE,
-                False, # warp_specialize on hopper is not ready yet
+                False,  # warp_specialize on hopper is not ready yet
             )
     else:
         _attn_fwd_compute(
@@ -1500,7 +1500,7 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
                 STAGE,
                 ENABLE_TMA,
                 LOOP_SCHEDULE,
-                False, # warp_specialize on hopper is not ready yet
+                False,  # warp_specialize on hopper is not ready yet
             )
         tile_idx += num_progs
 
