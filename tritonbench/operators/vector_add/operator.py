@@ -48,10 +48,8 @@ class Operator(BenchmarkOperator):
         #  - Don't forget to pass meta-parameters as keywords arguments.
 
         def _inner():
-            return_val = triton_add_kernel[grid](
-                x, y, output, n_elements, BLOCK_SIZE=1024
-            )
-            return return_val
+            triton_add_kernel[grid](x, y, output, n_elements, BLOCK_SIZE=1024)
+            return output
 
         return _inner
 
