@@ -7,6 +7,10 @@ on:
     paths:
       - .github/workflows/docker.yaml
       - docker/tritonbench-nightly.dockerfile
+      - submodules/FBGEMM
+      - submodules/ThunderKittens
+      - submodules/flash-attention
+      - submodules/aiter
       - install.py
       - tools/**
   workflow_dispatch:
