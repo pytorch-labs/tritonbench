@@ -16,6 +16,10 @@ import torch
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
 
+from tritonbench.kernels.triton_fused_attention import (
+    attention_opt as triton_tutorial_FA2_opt,
+)
+
 from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
 
 # [Optional] flash_attn v2
@@ -270,6 +274,17 @@ class Operator(BenchmarkOperator):
             block_mask = None
 
         return lambda: flex_attention(q, k, v, block_mask=block_mask)
+
+    @register_benchmark(enabled=False)
+    def triton_tutorial_flash_v2_tma_ws_persistent_blackwell(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "tma_ws_persistent_blackwell"
+        )
 
     @register_metric(x_only=True)
     def flops(
