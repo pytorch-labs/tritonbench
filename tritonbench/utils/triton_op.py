@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from itertools import product
@@ -83,7 +83,8 @@ DEFAULT_WARMUP = 25
 DEFAULT_RUN_ITERS = 100
 DEFAULT_QUANTILES = [0.5, 0.1, 0.9]
 REGISTERED_BENCHMARKS: Dict[str, OrderedDict[str, BenchmarkOperatorBackend]] = {}
-REGISTERED_METRICS: Dict[str, List[str]] = {}
+REGISTERED_METRICS: defaultdict[str, List[str]] = defaultdict(list)
+OVERRIDDEN_METRICS: defaultdict[str, List[str]] = defaultdict(list)
 REGISTERED_X_VALS: Dict[str, str] = {}
 BASELINE_BENCHMARKS: Dict[str, str] = {}
 BASELINE_SKIP_METRICS = {
@@ -260,8 +261,6 @@ class BenchmarkOperatorMetrics:
     kernel_source_hash: Optional[str] = None
     # cuda time
     cuda_time: Optional[float] = None
-    # occupancy, computed as the ratio of actual GPU time to maximum possible GPU time
-    occupancy: Optional[float] = None
 
 
 BUILTIN_METRICS = {x.name for x in fields(BenchmarkOperatorMetrics)} - {"extra_metrics"}
@@ -654,11 +653,11 @@ def register_metric(
 ):
     def decorator(func):
         metric_name = func.__name__
+        operator_name = _find_op_name_from_module_path(func.__module__)
         if metric_name not in BUILTIN_METRICS:
-            operator_name = _find_op_name_from_module_path(func.__module__)
-            if operator_name not in REGISTERED_METRICS:
-                REGISTERED_METRICS[operator_name] = []
             REGISTERED_METRICS[operator_name].append(func.__name__)
+        else:
+            OVERRIDDEN_METRICS[operator_name].append(metric_name)
         if skip_baseline:
             BASELINE_SKIP_METRICS.add(func.__name__)
         if x_only:
@@ -1110,10 +1109,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def get_temp_path(self, path: Union[str, Path]) -> Path:
         return Path(tempfile.gettempdir()) / "tritonbench" / self.name / Path(path)
 
-    def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
+    def accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
         output = fn()
         baseline_output = baseline_fn()
-        accuracy = True
         try:
             if self.mode == Mode.FWD:
                 torch.testing.assert_close(output, baseline_output)
@@ -1124,11 +1122,10 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 baseline_fwd_output, baseline_loss = baseline_output
                 torch.testing.assert_close(fwd_output, baseline_fwd_output)
                 torch.testing.assert_close(loss.grad, baseline_loss.grad)
+            return True
         except Exception:
             # either the output tensor or the loss grad tensor does not match
-            accuracy = False
-        finally:
-            return accuracy
+            return False
 
     def _do_bench(
         self,
@@ -1141,13 +1138,14 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     ) -> BenchmarkOperatorMetrics:
         def _init_extra_metrics() -> Dict[str, Any]:
             extra_metrics = {}
-            if self.name in REGISTERED_METRICS:
-                for metric_name in REGISTERED_METRICS[self.name]:
-                    if metric_name in BUILTIN_METRICS:
-                        continue
-                    if metric_name not in self.required_metrics:
-                        continue
-                    extra_metrics[metric_name] = None
+            required_custom_metrics = set(REGISTERED_METRICS.get(self.name, [])) & set(
+                self.required_metrics
+            )
+            for metric_name in required_custom_metrics:
+                assert (
+                    metric_name not in BUILTIN_METRICS
+                ), "Metric name {metric_name} is built-in and should be OVERRIDDEN_METRICS. Please report a bug."
+                extra_metrics[metric_name] = None
             return extra_metrics
 
         metrics = BenchmarkOperatorMetrics(
@@ -1226,9 +1224,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 )
             if not baseline and "accuracy" in self.required_metrics:
                 metrics.accuracy = (
-                    self._get_accuracy(fn, self.baseline_fn)
-                    if self.baseline_fn
-                    else None
+                    self.accuracy(fn, self.baseline_fn) if self.baseline_fn else None
                 )
             if "hw_roofline" in self.required_metrics:
                 metrics.hw_roofline = self.hw_roofline()
@@ -1237,8 +1233,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 metrics.tflops = self.tflops(fn_name, self.example_inputs, metrics)
             if "gbps" in self.required_metrics:
                 metrics.gbps = self.gbps(fn, self.example_inputs, metrics)
-            if "occupancy" in self.required_metrics:
-                metrics.occupancy = self.occupancy(fn, self.example_inputs, metrics)
             if "compile_time" in self.required_metrics:
                 compile_time, compile_time_by_stage = self.compile_time(
                     input_id, fn_name, metrics
@@ -1840,35 +1834,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             self._op_flops[fn] = _get_flops(self, fn)
         op_flops = self._op_flops[fn]
         return op_flops / metrics.latency / 1e12 * 1e3
-
-    def occupancy(
-        self, fn: Callable, example_inputs: Any, metrics: BenchmarkOperatorMetrics
-    ) -> float:
-        profile_mem = fn()
-        if profile_mem is None:
-            return None
-
-        # each row of profile_mem is (smid, start, end)
-        smids = profile_mem[:, 0]
-        start_times = profile_mem[:, 1]
-        end_times = profile_mem[:, 2]
-
-        # We use the actual number of SMs that are active to calculate occupancy.
-        # max_sm counts the total number of SMs on the device, but not all of them
-        # are active.
-        active_sm = torch.unique(smids).numel()
-        # max_sm = torch.cuda.get_device_properties("cuda").multi_processor_count
-
-        # Wall time measures the actual time taken to run the kernel.
-        # GPU time measures the time spent on the GPU, aggregated across all SMs.
-        wall_time = torch.max(end_times) - torch.min(start_times)
-        gpu_time = torch.sum(end_times - start_times)
-
-        # We define the occupancy to be the ratio of actual GPU time to the maximum
-        # possible GPU time using the active SMs.
-        NUM_WAVES = 2
-        occupancy = gpu_time / (wall_time * active_sm) / NUM_WAVES
-        return occupancy
 
     def dump_ir(self, input_id, fn):
         from unittest import mock

@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import Callable, Generator, List, Optional, Tuple
+from typing import Any, Callable, Generator, List, Optional, Tuple
 
 import torch
 import triton
@@ -91,7 +91,7 @@ def execute_kernel_variable_length_loop(x, sum_then_buffer):
             profile_mem=profile_mem,
         )
 
-    return profile_mem
+    return {"output": kernel_output, "profile_mem": profile_mem}
 
 
 class Operator(BenchmarkOperator):
@@ -218,9 +218,10 @@ class Operator(BenchmarkOperator):
                 batch_size, max_seq_len, _ = dense_0.shape
                 yield (nested_tensor, batch_size, 1, max_seq_len, 0.0)
 
-    def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
-        output = fn()
-        baseline_output = baseline_fn()
+    @register_metric()
+    def accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
+        output = fn()["output"]
+        baseline_output = baseline_fn()["output"]
         return torch.allclose(
             output, baseline_output, atol=ABSOLUTE_TOLERANCE, rtol=RELATIVE_TOLERANCE
         )
@@ -245,6 +246,36 @@ class Operator(BenchmarkOperator):
             f"max seqlen: {example_inputs[3]}",  # seqlen
             f"sparsity: {example_inputs[4]}",  # sparsity
         )  # return (B, '*', M, max seqlen, sparsity) for each example input
+
+    @register_metric()
+    def occupancy(
+        self, fn: Callable, example_inputs: Any, metrics: BenchmarkOperatorMetrics
+    ) -> float:
+        profile_mem = fn().get("profile_mem", None)
+        if profile_mem is None:
+            return None
+
+        # each row of profile_mem is (smid, start, end)
+        smids = profile_mem[:, 0]
+        start_times = profile_mem[:, 1]
+        end_times = profile_mem[:, 2]
+
+        # We use the actual number of SMs that are active to calculate occupancy.
+        # max_sm counts the total number of SMs on the device, but not all of them
+        # are active.
+        active_sm = torch.unique(smids).numel()
+        # max_sm = torch.cuda.get_device_properties("cuda").multi_processor_count
+
+        # Wall time measures the actual time taken to run the kernel.
+        # GPU time measures the time spent on the GPU, aggregated across all SMs.
+        wall_time = torch.max(end_times) - torch.min(start_times)
+        gpu_time = torch.sum(end_times - start_times)
+
+        # We define the occupancy to be the ratio of actual GPU time to the maximum
+        # possible GPU time using the active SMs.
+        NUM_WAVES = 2
+        occupancy = gpu_time / (wall_time * active_sm) / NUM_WAVES
+        return occupancy
 
     def plot(self):
         x_axis, params = get_param_fstrings(self.B, self.M, self.seqlen, self.sparsity)

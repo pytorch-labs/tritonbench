@@ -1,4 +1,4 @@
-from typing import Generator, List
+from typing import Any, Callable, Generator, List
 
 import torch
 import triton
@@ -67,15 +67,15 @@ class Operator(BenchmarkOperator):
             triton_exp_kernel[grid](
                 x, output, n_elements, BLOCK_SIZE=1024, profile_mem=profile_mem
             )
-            return profile_mem
+            return {"output": output, "profile_mem": profile_mem}
 
         return _inner
 
     @register_benchmark(baseline=True)
     def torch_exp(self, x: torch.Tensor):
         def _inner():
-            torch.exp(x)
-            return None
+            output = torch.exp(x)
+            return {"output": output}
 
         return _inner
 
@@ -84,6 +84,16 @@ class Operator(BenchmarkOperator):
 
     def get_x_val(self, example_inputs):
         return len(example_inputs[0])
+
+    @register_metric()
+    def accuracy(self, fn, baseline_fn) -> bool:
+        output = fn()["output"]
+        baseline_output = baseline_fn()["output"]
+        try:
+            torch.allclose(output, baseline_output)
+            return True
+        except Exception:
+            return False
 
     def plot(self):
         @triton.testing.perf_report(
