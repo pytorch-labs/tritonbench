@@ -1,6 +1,9 @@
 fp16_addmm_fwd:
   op: addmm
   args: --op addmm --baseline aten_addmm --metrics tflops,speedup --only triton_addmm,aten_addmm
+bf16xint16_gemm_fwd:
+  op: bf16xint16_gemm
+  args: --op bf16xint16_gemm --metrics tflops --only bf16xbf16
 cross_entropy_fwd:
   op: cross_entropy
   args: --op cross_entropy --baseline cross_entropy_loss --metrics speedup --only
@@ -14,25 +17,30 @@ bf16_flash_attention_fwd:
 bf16_flex_attention_fwd:
   op: flex_attention
   args: --op flex_attention --baseline eager --metrics tflops,speedup --only compiled,eager
-bf16_ragged_attention_fwd:
-  op: ragged_attention
-  args: --op ragged_attention --metrics tflops --only hstu
-# fbgemm fp8_gemm does not work on the latest triton main
-# fp8_gemm_fwd:
-#   op: fp8_gemm
-#   args: --op fp8_gemm --baseline torch_fp8_gemm --metrics tflops,speedup --only triton_tma_persistent_fp8_gemm,torch_fp8_gemm
+fp8_attention_fwd:
+  op: fp8_attention
+  args: --op fp8_attention --metrics tflops --only triton_flash_v2_tma
+fp8_fused_quant_gemm_rowwise_fwd:
+  op: fp8_fused_quant_gemm_rowwise
+  args: --op fp8_fused_quant_gemm_rowwise --metrics tflops --only rms_norm_fused
+fp8_gemm_fwd:
+  op: fp8_gemm
+  args: --op fp8_gemm --baseline torch_fp8_gemm --metrics tflops,speedup --only triton_tma_persistent_fp8_gemm,torch_fp8_gemm
+  disabled: true
 fp8_gemm_blockwise_fwd:
   op: fp8_gemm_blockwise
   args: --op fp8_gemm_blockwise --baseline _cutlass --metrics tflops,speedup --only
     _triton,_cutlass
-# fbgemm fp8_gemm_rowwise does not work on the latest triton main
-# fp8_gemm_rowwise_fwd:
-#   op: fp8_gemm_rowwise
-#   args: --op fp8_gemm_rowwise --baseline _cutlass_or_ck --metrics tflops,speedup --only _triton,_cutlass_or_ck
-# fbgemm fp8_gemm_rowwise_grouped does not work on the latest triton main
-# fp8_gemm_rowwise_grouped_fwd:
-#   op: fp8_gemm_rowwise_grouped
-#   args: --op fp8_gemm_rowwise_grouped --baseline _cutlass_or_ck --metrics tflops,speedup --only _triton,_cutlass_or_ck
+fp8_gemm_rowwise_fwd:
+  op: fp8_gemm_rowwise
+  args: --op fp8_gemm_rowwise --baseline _cutlass_or_ck --metrics tflops,speedup --only
+    _triton,_cutlass_or_ck
+  disabled: true
+fp8_gemm_rowwise_grouped_fwd:
+  op: fp8_gemm_rowwise_grouped
+  args: --op fp8_gemm_rowwise_grouped --baseline _cutlass_or_ck --metrics tflops,speedup
+    --only _triton,_cutlass_or_ck
+  disabled: true
 fused_linear_cross_entropy_fwd:
   op: fused_linear_cross_entropy
   args: --op fused_linear_cross_entropy --baseline torch_lm_head_ce --metrics speedup
@@ -64,8 +72,10 @@ layer_norm_fwd:
   args: --op layer_norm --baseline torch_layer_norm --metrics speedup --only liger_layer_norm,torch_layer_norm
 low_mem_dropout_fwd:
   op: low_mem_dropout
-  args: --op low_mem_dropout --baseline torch_dropout --metrics tflops,speedup --only
-    triton_dropout,torch_dropout
+  args: --op low_mem_dropout --baseline torch_dropout --metrics speedup --only triton_dropout,torch_dropout
+bf16_ragged_attention_fwd:
+  op: ragged_attention
+  args: --op ragged_attention --metrics tflops --only hstu
 rms_norm_fwd:
   op: rms_norm
   args: --op rms_norm --baseline llama_rms --metrics speedup --only liger_rms,llama_rms
@@ -88,10 +98,10 @@ cross_entropy_bwd:
 embedding_bwd:
   op: embedding
   args: --op embedding --baseline torch_embedding --metrics speedup --bwd --only liger_embedding,torch_embedding
-# flash_attention triton bwd only works with causal
 bf16_flash_attention_bwd:
   op: flash_attention
-  args: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --bwd --only triton_tutorial_flash_v2,flash_v3 --causal
+  args: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --bwd --only
+    triton_tutorial_flash_v2,flash_v3 --causal
 bf16_flex_attention_bwd:
   op: flex_attention
   args: --op flex_attention --baseline eager --metrics tflops,speedup --bwd --only
@@ -116,13 +126,13 @@ kl_div_bwd:
 layer_norm_bwd:
   op: layer_norm
   args: --op layer_norm --baseline torch_layer_norm --metrics speedup --bwd --only
-    liger_layer_norm,torch_layer_norm,torch_layer_norm
+    liger_layer_norm,torch_layer_norm
 bf16_ragged_attention_bwd:
   op: ragged_attention
   args: --op ragged_attention --metrics tflops --bwd --only hstu
 rms_norm_bwd:
   op: rms_norm
-  args: --op rms_norm --baseline llama_rms --metrics speedup --bwd --only liger_rms,llama_rms,llama_rms
+  args: --op rms_norm --baseline llama_rms --metrics speedup --bwd --only liger_rms,llama_rms
 rope_bwd:
   op: rope
   args: --op rope --baseline apply_rotary_pos_emb --metrics speedup --bwd --only liger_rotary_pos_emb,apply_rotary_pos_emb
