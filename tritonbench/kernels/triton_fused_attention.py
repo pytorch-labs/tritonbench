@@ -328,6 +328,159 @@ def _attn_fwd_inner_ws(
     return acc, l_i, m_i
 
 
+@triton.jit
+def _attn_fwd_inner_ws_with_dp(
+    acc0,
+    acc1,
+    l_i0,
+    l_i1,
+    m_i0,
+    m_i1,
+    q0,  #
+    q1,
+    K_block_ptr,
+    V_block_ptr,  #
+    desc_k,
+    desc_v,
+    Q,
+    qvk_offset,
+    stride_kn,
+    stride_vn,
+    stride_vk,  #
+    start_m,
+    qk_scale,  #
+    BLOCK_M: tl.constexpr,
+    HEAD_DIM: tl.constexpr,
+    BLOCK_N: tl.constexpr,  #
+    STAGE: tl.constexpr,
+    offs_m0: tl.constexpr,
+    offs_m1: tl.constexpr,
+    offs_n: tl.constexpr,  #
+    N_CTX: tl.constexpr,
+    fp8_v: tl.constexpr,
+    ENABLE_TMA: tl.constexpr,
+    LOOP_SCHEDULE: tl.constexpr,
+    FIRST_MMA: tl.constexpr,
+    LAST_MMA: tl.constexpr,
+    FIRST_SOFTMAX: tl.constexpr,
+    LAST_SOFTMAX: tl.constexpr,
+    LOAD_K: tl.constexpr,
+    LOAD_V: tl.constexpr,
+    FIRST_CORRECTION: tl.constexpr,
+    LAST_CORRECTION: tl.constexpr,
+    ALPHA_REMAT: tl.constexpr,
+):
+    # range of values handled by this stage
+    if STAGE == 1:
+        lo, hi = 0, start_m * BLOCK_M
+    elif STAGE == 2:
+        lo, hi = start_m * BLOCK_M, (start_m + 1) * BLOCK_M
+        lo = tl.multiple_of(lo, BLOCK_M)
+    # causal = False
+    else:
+        lo, hi = 0, N_CTX
+    if not ENABLE_TMA:
+        K_block_ptr = tl.advance(K_block_ptr, (0, lo))
+        V_block_ptr = tl.advance(V_block_ptr, (lo, 0))
+    # loop over k, v and update accumulator
+    for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
+        start_n = tl.multiple_of(start_n, BLOCK_N)
+        # -- compute qk ----
+        with tl.async_task([LOAD_K]):
+            if ENABLE_TMA:
+                k = desc_k.load(
+                    [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
+                )
+            else:
+                k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
+
+        with tl.async_task([FIRST_MMA]):
+            if ENABLE_TMA:  # feeds into gemm
+                k = tl.trans(k)
+            qk0 = tl.dot(q0, k)
+            qk1 = tl.dot(q1, k)
+        with tl.async_task([FIRST_SOFTMAX]):
+            if STAGE == 2:
+                mask = offs_m0[:, None] >= (start_n + offs_n[None, :])
+                qk0 = qk0 * qk_scale + tl.where(mask, 0, -1.0e6)
+                m_ij0 = tl.maximum(m_i0, tl.max(qk0, 1))
+                qk0 -= m_ij0[:, None]
+            else:
+                m_ij0 = tl.maximum(m_i0, tl.max(qk0, 1) * qk_scale)
+                qk0 = qk0 * qk_scale - m_ij0[:, None]
+            p0 = tl.math.exp2(qk0)
+            l_ij0 = tl.sum(p0, 1)
+            # -- update m_i and l_i
+            alpha0 = tl.math.exp2(m_i0 - m_ij0)
+            l_i0 = l_i0 * alpha0 + l_ij0
+        with tl.async_task([FIRST_CORRECTION]):
+            if ALPHA_REMAT:
+                alpha0_re = tl.math.exp2(m_i0 - m_ij0)
+                # -- update output accumulator --
+                acc0 = acc0 * alpha0_re[:, None]
+            else:
+                acc0 = acc0 * alpha0[:, None]
+        with tl.async_task([FIRST_SOFTMAX]):
+            # update acc
+            if fp8_v:
+                p0 = p0.to(tl.float8e5)
+            else:
+                p0 = p0.to(tl.bfloat16)
+            # update m_i and l_i
+            m_i0 = m_ij0
+        with tl.async_task([LAST_SOFTMAX]):
+            if STAGE == 2:
+                mask = offs_m1[:, None] >= (start_n + offs_n[None, :])
+                qk1 = qk1 * qk_scale + tl.where(mask, 0, -1.0e6)
+                m_ij1 = tl.maximum(m_i1, tl.max(qk1, 1))
+                qk1 -= m_ij1[:, None]
+            else:
+                m_ij1 = tl.maximum(m_i1, tl.max(qk1, 1) * qk_scale)
+                qk1 = qk1 * qk_scale - m_ij1[:, None]
+            p1 = tl.math.exp2(qk1)
+            l_ij1 = tl.sum(p1, 1)
+            # -- update m_i and l_i
+            alpha1 = tl.math.exp2(m_i1 - m_ij1)
+            l_i1 = l_i1 * alpha1 + l_ij1
+        with tl.async_task([LAST_CORRECTION]):
+            if ALPHA_REMAT:
+                alpha1_re = tl.math.exp2(m_i1 - m_ij1)
+                # -- update output accumulator --
+                acc1 = acc1 * alpha1_re[:, None]
+            else:
+                acc1 = acc1 * alpha1[:, None]
+        with tl.async_task([LAST_SOFTMAX]):
+            # update acc
+            if fp8_v:
+                p1 = p1.to(tl.float8e5)
+            else:
+                p1 = p1.to(tl.bfloat16)
+            # update m_i and l_i
+            m_i1 = m_ij1
+        with tl.async_task([LOAD_V]):
+            if ENABLE_TMA:
+                if fp8_v:
+                    v = desc_v.load(
+                        [(qvk_offset // stride_vn).to(tl.int32), start_n.to(tl.int32)]
+                    )
+                else:
+                    v = desc_v.load(
+                        [(qvk_offset // stride_vk + start_n).to(tl.int32), 0]
+                    )
+            else:
+                v = tl.load(V_block_ptr, boundary_check=(0,), padding_option="zero")
+        with tl.async_task([LAST_MMA]):
+            if fp8_v:
+                if ENABLE_TMA:
+                    v = tl.trans(v)
+            acc0 = tl.dot(p0, v, acc0)
+            acc1 = tl.dot(p1, v, acc1)
+        if not ENABLE_TMA:
+            V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
+            K_block_ptr = tl.advance(K_block_ptr, (0, BLOCK_N))
+    return acc0, acc1, l_i0, l_i1, m_i0, m_i1
+
+
 # We don't run auto-tuning every time to keep the tutorial fast. Uncommenting
 # the code below and commenting out the equivalent parameters is convenient for
 # re-tuning.
@@ -867,6 +1020,226 @@ def _attn_fwd_compute_ws(
             desc_o.store(
                 [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
                 acc.to(Out.type.element_ty),
+            )
+        else:
+            tl.store(O_block_ptr, acc.to(Out.type.element_ty))
+
+
+# only supports TMA, and explicit async_task
+@triton.jit
+def _attn_fwd_compute_ws_with_dp(
+    Q,
+    K,
+    V,
+    sm_scale,
+    M,
+    Out,  #
+    desc_q,
+    desc_k,
+    desc_v,
+    desc_o,
+    stride_qz,
+    stride_qh,
+    stride_qm,
+    stride_qk,  #
+    stride_kz,
+    stride_kh,
+    stride_kn,
+    stride_kk,  #
+    stride_vz,
+    stride_vh,
+    stride_vk,
+    stride_vn,  #
+    stride_oz,
+    stride_oh,
+    stride_om,
+    stride_on,  #
+    off_hz,
+    pid,
+    Z,
+    H,
+    N_CTX,  #: tl.constexpr,  #
+    BLOCK_M: tl.constexpr,  #
+    BLOCK_M_HALF: tl.constexpr,
+    BLOCK_N: tl.constexpr,  #
+    HEAD_DIM: tl.constexpr,  #
+    STAGE: tl.constexpr,  #
+    ENABLE_TMA: tl.constexpr,
+    LOOP_SCHEDULE: tl.constexpr,
+    FIRST_MMA: tl.constexpr,
+    LAST_MMA: tl.constexpr,
+    FIRST_SOFTMAX: tl.constexpr,
+    LAST_SOFTMAX: tl.constexpr,
+    LOAD_K: tl.constexpr,
+    LOAD_V: tl.constexpr,
+    FIRST_CORRECTION: tl.constexpr,
+    LAST_CORRECTION: tl.constexpr,
+    ALPHA_REMAT: tl.constexpr,
+    FIRST_LOADQ: tl.constexpr,
+    LAST_LOADQ: tl.constexpr,
+):
+    start_m = pid  # tl.program_id(0)
+    # off_hz = tl.program_id(1)
+    off_z = off_hz // H
+    off_h = off_hz % H
+    qvk_offset = off_z.to(tl.int64) * stride_qz + off_h.to(tl.int64) * stride_qh
+
+    K_block_ptr = None
+    V_block_ptr = None
+    Q_block_ptr = None
+    O_block_ptr = None
+    # initialize offsets
+    offs_m0 = start_m * BLOCK_M + tl.arange(0, BLOCK_M_HALF)
+    offs_m1 = start_m * BLOCK_M + BLOCK_M_HALF + tl.arange(0, BLOCK_M_HALF)
+    offs_n = tl.arange(0, BLOCK_N)
+    # initialize pointer to m and l
+    m_i0 = tl.zeros([BLOCK_M_HALF], dtype=tl.float32) - float("inf")
+    l_i0 = tl.zeros([BLOCK_M_HALF], dtype=tl.float32) + 1.0
+    acc0 = tl.zeros([BLOCK_M_HALF, HEAD_DIM], dtype=tl.float32)
+    m_i1 = tl.zeros([BLOCK_M_HALF], dtype=tl.float32) - float("inf")
+    l_i1 = tl.zeros([BLOCK_M_HALF], dtype=tl.float32) + 1.0
+    acc1 = tl.zeros([BLOCK_M_HALF, HEAD_DIM], dtype=tl.float32)
+    # load scales
+    qk_scale = sm_scale
+    qk_scale *= 1.44269504  # 1/log(2)
+    # load q: it will stay in SRAM throughout
+    # q0 will be BLOCK_M, each kernel invocation will handle 2 * BLOCK_M
+    with tl.async_task([FIRST_LOADQ]):
+        if ENABLE_TMA:
+            q0 = desc_q.load(
+                [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0]
+            )
+        else:
+            q0 = tl.load(Q_block_ptr)
+    with tl.async_task([LAST_LOADQ]):
+        if ENABLE_TMA:
+            q1 = desc_q.load(
+                [
+                    (qvk_offset // stride_qm + start_m * BLOCK_M + BLOCK_M_HALF).to(
+                        tl.int32
+                    ),
+                    0,
+                ]
+            )
+        else:
+            q1 = tl.load(Q_block_ptr)
+    # stage 1: off-band
+    # For causal = True, STAGE = 3 and _attn_fwd_inner gets 1 as its STAGE
+    # For causal = False, STAGE = 1, and _attn_fwd_inner gets 3 as its STAGE
+    if STAGE & 1:
+        acc0, acc1, l_i0, l_i1, m_i0, m_i1 = _attn_fwd_inner_ws_with_dp(
+            acc0,
+            acc1,
+            l_i0,
+            l_i1,
+            m_i0,
+            m_i1,
+            q0,
+            q1,
+            K_block_ptr,
+            V_block_ptr,  #
+            desc_k,
+            desc_v,
+            Q,
+            qvk_offset,
+            stride_kn,
+            stride_vn,
+            stride_vk,  #
+            start_m,
+            qk_scale,  #
+            BLOCK_M,
+            HEAD_DIM,
+            BLOCK_N,  #
+            4 - STAGE,
+            offs_m0,
+            offs_m1,
+            offs_n,
+            N_CTX,
+            V.dtype.element_ty == tl.float8e5,  #
+            ENABLE_TMA,
+            LOOP_SCHEDULE,
+            FIRST_MMA,
+            LAST_MMA,
+            FIRST_SOFTMAX,
+            LAST_SOFTMAX,
+            LOAD_K,
+            LOAD_V,
+            FIRST_CORRECTION,
+            LAST_CORRECTION,
+            ALPHA_REMAT,
+        )
+    # stage 2: on-band
+    if STAGE & 2:
+        # barrier makes it easier for compielr to schedule the
+        # two loops independently
+        acc, l_i, m_i = _attn_fwd_inner_ws_with_dp(
+            acc0,
+            acc1,
+            l_i0,
+            l_i1,
+            m_i0,
+            m_i1,
+            q0,
+            q1,
+            K_block_ptr,
+            V_block_ptr,  #
+            desc_k,
+            desc_v,
+            Q,
+            qvk_offset,
+            stride_kn,
+            stride_vn,
+            stride_vk,  #
+            start_m,
+            qk_scale,  #
+            BLOCK_M,
+            HEAD_DIM,
+            BLOCK_N,  #
+            2,
+            offs_m0,
+            offs_m1,
+            offs_n,
+            N_CTX,
+            V.dtype.element_ty == tl.float8e5,  #
+            ENABLE_TMA,
+            LOOP_SCHEDULE,
+            FIRST_MMA,
+            LAST_MMA,
+            FIRST_SOFTMAX,
+            LAST_SOFTMAX,
+            LOAD_K,
+            LOAD_V,
+            FIRST_CORRECTION,
+            LAST_CORRECTION,
+            ALPHA_REMAT,
+        )
+    # epilogue
+    with tl.async_task([FIRST_SOFTMAX]):
+        m_i0 += tl.math.log2(l_i0)
+        acc0 = acc0 / l_i0[:, None]
+        m_ptrs0 = M + off_hz * N_CTX + offs_m0
+        tl.store(m_ptrs0, m_i0)
+        if ENABLE_TMA:
+            desc_o.store(
+                [(qvk_offset // stride_om + start_m * BLOCK_M).to(tl.int32), 0],
+                acc0.to(Out.type.element_ty),
+            )
+        else:
+            tl.store(O_block_ptr, acc.to(Out.type.element_ty))
+    with tl.async_task([LAST_SOFTMAX]):
+        m_i1 += tl.math.log2(l_i1)
+        acc1 = acc1 / l_i1[:, None]
+        m_ptrs1 = M + off_hz * N_CTX + offs_m1
+        tl.store(m_ptrs1, m_i1)
+        if ENABLE_TMA:
+            desc_o.store(
+                [
+                    (qvk_offset // stride_om + start_m * BLOCK_M + BLOCK_M_HALF).to(
+                        tl.int32
+                    ),
+                    0,
+                ],
+                acc1.to(Out.type.element_ty),
             )
         else:
             tl.store(O_block_ptr, acc.to(Out.type.element_ty))
@@ -1502,6 +1875,238 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
                 LOOP_SCHEDULE,
                 False,  # warp_specialize on hopper is not ready yet
             )
+        tile_idx += num_progs
+
+
+configsCutlassBlackwell = [
+    (
+        triton.Config(
+            {
+                "BLOCK_M": BM,
+                "BLOCK_M_HALF": BMhalf,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+                "GRID_MULTIPLE": mult,
+                "FIRST_MMA": 1,
+                "LAST_MMA": 1,
+                "FIRST_SOFTMAX": 3,
+                "LAST_SOFTMAX": 4,
+                "LOAD_K": 2,
+                "LOAD_V": 2,
+                "FIRST_CORRECTION": 0,
+                "LAST_CORRECTION": 0,
+                "ALPHA_REMAT": True,
+                "FIRST_LOADQ": 2,
+                "LAST_LOADQ": 2,
+            },
+            num_stages=2,
+            num_warps=w,
+        )
+    )
+    for BM in [128]
+    for BMhalf in [64]
+    for BN in [128]
+    for mult in [1]
+    for sched in schedList
+    for enable_tma in [True]
+    for enable_ws in [True]
+    for w in [4]
+]
+
+
+configsTKBlackwell = [  # ThunderKitten
+    (
+        triton.Config(
+            {
+                "BLOCK_M": BM,
+                "BLOCK_M_HALF": BMhalf,
+                "BLOCK_N": BN,
+                "ENABLE_TMA": enable_tma,
+                "LOOP_SCHEDULE": sched,
+                "GRID_MULTIPLE": mult,
+                "FIRST_MMA": 2,
+                "LAST_MMA": 3,
+                "FIRST_SOFTMAX": 0,
+                "LAST_SOFTMAX": 1,
+                "LOAD_K": 4,
+                "LOAD_V": 5,
+                "FIRST_CORRECTION": 2,
+                "LAST_CORRECTION": 3,
+                "ALPHA_REMAT": False,
+                "FIRST_LOADQ": 0,
+                "LAST_LOADQ": 1,
+            },
+            num_stages=2,
+            num_warps=w,
+        )
+    )
+    for BM in [128]
+    for BMhalf in [64]
+    for BN in [128]
+    for mult in [1]
+    for sched in schedList
+    for enable_tma in [True]
+    for enable_ws in [True]
+    for w in [8]
+]
+
+
+@triton.autotune(list(filter(keep, configsCutlassBlackwell)), key=["N_CTX"])
+@triton.jit
+def _attn_fwd_tma_ws_persistent_with_dp(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
+    Q,
+    K,
+    V,
+    sm_scale,
+    M,
+    Out,  #
+    stride_qz,
+    stride_qh,
+    stride_qm,
+    stride_qk,  #
+    stride_kz,
+    stride_kh,
+    stride_kn,
+    stride_kk,  #
+    stride_vz,
+    stride_vh,
+    stride_vk,
+    stride_vn,  #
+    stride_oz,
+    stride_oh,
+    stride_om,
+    stride_on,  #
+    Z,
+    H,
+    N_CTX,  #: tl.constexpr,  #
+    BLOCK_M: tl.constexpr,  #
+    BLOCK_M_HALF: tl.constexpr,
+    BLOCK_N: tl.constexpr,  #
+    HEAD_DIM: tl.constexpr,  #
+    STAGE: tl.constexpr,  #
+    ENABLE_TMA: tl.constexpr,
+    LOOP_SCHEDULE: tl.constexpr,
+    ENABLE_WS: tl.constexpr,
+    GRID_MULTIPLE: tl.constexpr,
+    FIRST_MMA: tl.constexpr,
+    LAST_MMA: tl.constexpr,
+    FIRST_SOFTMAX: tl.constexpr,
+    LAST_SOFTMAX: tl.constexpr,
+    LOAD_K: tl.constexpr,
+    LOAD_V: tl.constexpr,
+    FIRST_CORRECTION: tl.constexpr,
+    LAST_CORRECTION: tl.constexpr,
+    ALPHA_REMAT: tl.constexpr,
+    FIRST_LOADQ: tl.constexpr,
+    LAST_LOADQ: tl.constexpr,
+):
+    tl.static_assert(BLOCK_N <= HEAD_DIM)
+    # original grid
+    #   triton.cdiv(q.shape[2], META["BLOCK_M"]),
+    #   q.shape[0] * q.shape[1],
+    n_tile_num = tl.cdiv(N_CTX, BLOCK_M)
+    prog_id = tl.program_id(0)
+    num_progs = tl.num_programs(0)
+    total_tiles = n_tile_num * Z * H
+
+    tiles_per_sm = total_tiles // num_progs
+    if prog_id < total_tiles % num_progs:
+        tiles_per_sm += 1
+
+    tile_idx = prog_id
+
+    desc_k = tl.make_tensor_descriptor(
+        K,
+        shape=[Z * H * N_CTX, HEAD_DIM],
+        strides=[HEAD_DIM, 1],
+        block_shape=[BLOCK_N, HEAD_DIM],
+    )
+    if V.dtype == torch.float8_e5m2:
+        desc_v = tl.make_tensor_descriptor(
+            V,
+            shape=[Z * H * HEAD_DIM, N_CTX],
+            strides=[N_CTX, 1],
+            block_shape=[HEAD_DIM, BLOCK_N],
+        )
+    else:
+        desc_v = tl.make_tensor_descriptor(
+            V,
+            shape=[Z * H * N_CTX, HEAD_DIM],
+            strides=[HEAD_DIM, 1],
+            block_shape=[BLOCK_N, HEAD_DIM],
+        )
+
+    desc_q = tl.make_tensor_descriptor(
+        Q,
+        shape=[Z * H * N_CTX, HEAD_DIM],
+        strides=[HEAD_DIM, 1],
+        block_shape=[BLOCK_M_HALF, HEAD_DIM],
+    )
+    desc_o = tl.make_tensor_descriptor(
+        Out,
+        shape=[Z * H * N_CTX, HEAD_DIM],
+        strides=[HEAD_DIM, 1],
+        block_shape=[BLOCK_M_HALF, HEAD_DIM],
+    )
+
+    for _ in tl.range(0, tiles_per_sm, num_stages=1):
+        # This has much better cache locality than
+        #     pid = tile_idx // (Z * H)
+        #     off_hz = tile_idx % (Z * H)  # tl.program_id(1)
+        pid = tile_idx % n_tile_num
+        off_hz = tile_idx // n_tile_num
+        _attn_fwd_compute_ws_with_dp(
+            Q,
+            K,
+            V,
+            sm_scale,
+            M,
+            Out,  #
+            desc_q,
+            desc_k,
+            desc_v,
+            desc_o,
+            stride_qz,
+            stride_qh,
+            stride_qm,
+            stride_qk,  #
+            stride_kz,
+            stride_kh,
+            stride_kn,
+            stride_kk,  #
+            stride_vz,
+            stride_vh,
+            stride_vk,
+            stride_vn,  #
+            stride_oz,
+            stride_oh,
+            stride_om,
+            stride_on,  #
+            off_hz,
+            pid,
+            Z,
+            H,
+            N_CTX,  #: tl.constexpr,  #
+            BLOCK_M,
+            BLOCK_M_HALF,
+            BLOCK_N,
+            HEAD_DIM,
+            STAGE,
+            ENABLE_TMA,
+            LOOP_SCHEDULE,
+            FIRST_MMA,
+            LAST_MMA,
+            FIRST_SOFTMAX,
+            LAST_SOFTMAX,
+            LOAD_K,
+            LOAD_V,
+            FIRST_CORRECTION,
+            LAST_CORRECTION,
+            ALPHA_REMAT,
+            FIRST_LOADQ,
+            LAST_LOADQ,
+        )
         tile_idx += num_progs
 
 
@@ -2171,6 +2776,38 @@ class _attention_opt(torch.autograd.Function):
                 STAGE=stage,  #
                 ENABLE_WS=True,
                 HAS_EXPLICIT_WS=HAS_EXPLICIT_WS,
+                **extra_kern_args,
+            )
+        elif baseVariant == "tma_ws_persistent_blackwell":
+            _attn_fwd_tma_ws_persistent_with_dp[grid_tma_persistent](
+                q,
+                k,
+                v,
+                sm_scale,
+                M,
+                o,
+                q.stride(0),
+                q.stride(1),
+                q.stride(2),
+                q.stride(3),  #
+                k.stride(0),
+                k.stride(1),
+                k.stride(2),
+                k.stride(3),  #
+                v.stride(0),
+                v.stride(1),
+                v.stride(2),
+                v.stride(3),  #
+                o.stride(0),
+                o.stride(1),
+                o.stride(2),
+                o.stride(3),  #
+                q.shape[0],
+                q.shape[1],  #
+                N_CTX=q.shape[2],  #
+                HEAD_DIM=HEAD_DIM_K,  #
+                STAGE=stage,  #
+                ENABLE_WS=True,
                 **extra_kern_args,
             )
 
