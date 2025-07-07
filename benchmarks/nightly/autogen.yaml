@@ -20,6 +20,7 @@ bf16_flex_attention_fwd:
 fp8_attention_fwd:
   op: fp8_attention
   args: --op fp8_attention --metrics tflops --only triton_flash_v2_tma
+  disabled: true
 fp8_fused_quant_gemm_rowwise_fwd:
   op: fp8_fused_quant_gemm_rowwise
   args: --op fp8_fused_quant_gemm_rowwise --metrics tflops --only rms_norm_fused
