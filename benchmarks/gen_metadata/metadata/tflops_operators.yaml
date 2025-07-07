@@ -14,3 +14,4 @@
 - fp8_gemm_rowwise_grouped
 - int4_gemm
 - ragged_attention
+- grouped_gemm

@@ -57,7 +57,7 @@ fp16_gemm_fwd:
   args: --op gemm --baseline aten_matmul --metrics speedup --only triton_tutorial_matmul,aten_matmul
 fp16_grouped_gemm_fwd:
   op: grouped_gemm
-  args: --op grouped_gemm --baseline torch --metrics speedup --only triton,torch
+  args: --op grouped_gemm --baseline torch --metrics tflops,speedup --only triton,torch
 int4_gemm_fwd:
   op: int4_gemm
   args: --op int4_gemm --baseline tinygemm --metrics tflops,speedup --only triton,tinygemm
