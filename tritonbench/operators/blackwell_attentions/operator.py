@@ -20,9 +20,14 @@ from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
 
-from tritonbench.kernels.gluon_attention_forward import (
-    attention_forward as gluon_blackwell_fwd,
+from .attention_utils import (
+    SUPPORT_GLUON,
 )
+
+if SUPPORT_GLUON:
+    from tritonbench.kernels.gluon_attention_forward import (
+        attention_forward as gluon_blackwell_fwd,
+    )
 
 from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
 
