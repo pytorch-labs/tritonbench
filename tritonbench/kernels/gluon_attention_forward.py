@@ -9,20 +9,19 @@ from .attention_utils import (
 
 if SUPPORT_GLUON:
     from triton.language.core import _aggregate as aggregate
-
-from triton.experimental import gluon
-from triton.experimental.gluon import language as gl
-from triton.experimental.gluon.nvidia.hopper import TensorDescriptor
-from triton.experimental.gluon.language.nvidia.hopper.tma import tensor_descriptor
-from triton.experimental.gluon.language.nvidia.hopper import fence_async_shared
-from triton.experimental.gluon.language.nvidia.blackwell import (
-    TensorMemoryLayout,
-    allocate_tensor_memory,
-    tensor_memory_descriptor,
-    tma,
-    mbarrier,
-    tcgen05_mma,
-)
+    from triton.experimental import gluon
+    from triton.experimental.gluon import language as gl
+    from triton.experimental.gluon.nvidia.hopper import TensorDescriptor
+    from triton.experimental.gluon.language.nvidia.hopper.tma import tensor_descriptor
+    from triton.experimental.gluon.language.nvidia.hopper import fence_async_shared
+    from triton.experimental.gluon.language.nvidia.blackwell import (
+        TensorMemoryLayout,
+        allocate_tensor_memory,
+        tensor_memory_descriptor,
+        tma,
+        mbarrier,
+        tcgen05_mma,
+    )
 
 # ===-----------------------------------------------------------------------===#
 # Layout Utilities
