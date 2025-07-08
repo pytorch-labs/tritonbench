@@ -96,14 +96,16 @@ def get_operator_benchmarks() -> Dict[str, Any]:
         if not obj:
             return out
         for benchmark_name in obj:
+            # bypass disabled benchmarks
+            if obj[benchmark_name].get("disabled", False):
+                continue
             out[benchmark_name] = (
                 obj[benchmark_name]["op"],
                 obj[benchmark_name]["args"].split(" "),
             )
         return out
 
-    out = _load_benchmarks(os.path.join(CURRENT_DIR, "manual.yaml"))
-    out.update(_load_benchmarks(os.path.join(CURRENT_DIR, "autogen.yaml")))
+    out = _load_benchmarks(os.path.join(CURRENT_DIR, "autogen.yaml"))
     return out
 
 

@@ -1,6 +1,18 @@
-# This file is for manually added nightly benchmarks
-# It will be merged with benchmarks/nightly/autogen.yaml
-# TODO: fix in the CI
-# launch_latency:
-#   op: launch_latency
-#   args: --op launch_latency --skip nop_inductor_kernel --metrics latency,walltime
+# This file is for manually disable or annotate benchmarks
+# It will be merged when generating benchmarks/nightly/autogen.yaml
+disabled:
+  # fp8_attention uses async_task which is not available in Triton main
+  - fp8_attention_fwd
+  # fp8_gemm_* operators are using the old Triton TMA API which is not supported in Triton main
+  - fp8_gemm_fwd
+  - fp8_gemm_rowwise_fwd
+  - fp8_gemm_rowwise_grouped_fwd
+extra_args:
+  # triton_tutorial_flash_v2_opt does not work on Triton main branch
+  bf16_flash_attention_fwd:
+    op: flash_attention
+    args: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --only triton_tutorial_flash_v2,flash_v3
+  # flash_attention triton_tutorial_flash_v2 impl only supports causal in backward
+  bf16_flash_attention_bwd:
+    op: flash_attention
+    args: --op flash_attention --baseline flash_v3 --metrics tflops,speedup --bwd --only triton_tutorial_flash_v2,flash_v3 --causal
