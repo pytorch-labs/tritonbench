@@ -3,7 +3,12 @@ import triton
 import triton.language as tl
 import itertools
 
-from triton.language.core import _aggregate as aggregate
+from .attention_utils import (
+    SUPPORT_GLUON,
+)
+
+if SUPPORT_GLUON:
+    from triton.language.core import _aggregate as aggregate
 
 from triton.experimental import gluon
 from triton.experimental.gluon import language as gl
