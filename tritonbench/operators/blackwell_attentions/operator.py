@@ -20,7 +20,7 @@ from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
 
-from .attention_utils import (
+from tritonbench.kernels.attention_utils import (
     SUPPORT_GLUON,
 )
 
