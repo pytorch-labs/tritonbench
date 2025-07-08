@@ -285,6 +285,7 @@ class Operator(BenchmarkOperator):
 
         return lambda: flex_attention(q, k, v, block_mask=block_mask)
 
+    # use Meta's warpspec + on device TMA + persistent
     @register_benchmark(enabled=False)
     def triton_tutorial_flash_v2_tma_ws_persistent_blackwell(
         self,
@@ -294,6 +295,29 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         return lambda: triton_tutorial_FA2_opt(
             q, k, v, self.causal, self.sm_scale, "tma_ws_persistent_blackwell"
+        )
+
+    @register_benchmark(enabled=False)
+    def triton_tutorial_flash_v2_blackwell(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "base_opt"
+        )
+
+    # use OSS warpspec + on host TMA
+    @register_benchmark(enabled=False)
+    def triton_tutorial_flash_v2_on_host_tma_ws_oss_blackwell(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        return lambda: triton_tutorial_FA2_opt(
+            q, k, v, self.causal, self.sm_scale, "on_host_tma_ws_oss"
         )
 
     # Only works with triton main, forward only.
