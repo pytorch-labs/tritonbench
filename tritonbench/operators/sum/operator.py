@@ -73,9 +73,9 @@ def parse_op_args(args: List[str]):
 def execute_kernel_scalar_result(x):
     kernel_input = x.view(-1)
     M = kernel_input.shape[0]
-    BLOCK_SIZE_M = triton.next_power_of_2(
-        M
-    )  # race condition in cases where BLOCK_SIZE < n_elements^2
+    # Limit block size to avoid exceeding Triton's maximum tensor size (1048576)
+    MAX_BLOCK_SIZE = 1048576
+    BLOCK_SIZE_M = min(triton.next_power_of_2(M), MAX_BLOCK_SIZE)
     grid = lambda meta: (triton.cdiv(M, meta["BLOCK_SIZE_M"]),)
     kernel_output = torch.zeros(
         (), device=x.device, dtype=x.dtype
