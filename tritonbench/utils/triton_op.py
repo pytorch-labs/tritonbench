@@ -95,6 +95,8 @@ BASELINE_SKIP_METRICS = {
 }
 X_ONLY_METRICS = set(["hw_roofline"])
 PRECISION_DTYPE_MAPPING = {
+    "torch.float32": torch.float32,
+    "torch.bfloat16": torch.bfloat16,
     "fp32": torch.float32,
     "tf32": torch.float32,
     "fp16": torch.float16,
