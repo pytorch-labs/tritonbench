@@ -16,12 +16,10 @@ import torch
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
 
+from tritonbench.kernels.attention_utils import SUPPORT_GLUON
+
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
-)
-
-from tritonbench.kernels.attention_utils import (
-    SUPPORT_GLUON,
 )
 
 if SUPPORT_GLUON:
@@ -303,9 +301,7 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        return lambda: gluon_blackwell_fwd(
-            q, k, v, self.causal, self.sm_scale
-        )
+        return lambda: gluon_blackwell_fwd(q, k, v, self.causal, self.sm_scale)
 
     @register_metric(x_only=True)
     def flops(
