@@ -36,7 +36,8 @@ def triton_sum_kernel_scalar_result(
     )  # create offsets for scalar output pointer (output shape == (1,))
 
     # stored pointers have shape equal to output shape
-    tl.store(
+    # Use atomic add to accumulate results from multiple blocks
+    tl.atomic_add(
         output_ptr + output_offsets, output
     )  # store output, where the stored pointers are in the desired output shape
 
