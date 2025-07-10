@@ -12,5 +12,5 @@ liger_operators = [
 ]
 
 
-def get_operators():
+def get_liger_operators():
     return liger_operators

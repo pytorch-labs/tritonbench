@@ -196,7 +196,7 @@ def _split_params_by_comma(params: Optional[str]) -> List[str]:
 def _find_op_name_from_module_path(module_path: str) -> str:
     PATH_PREFIX = "tritonbench.operators."
     # We have a separate operator loader for aten operator benchmark.
-    PATH_PREFIX_LOADER = "tritonbench.operator_loader."
+    PATH_PREFIX_LOADER = "tritonbench.operator_loader.loaders."
     assert (
         PATH_PREFIX in module_path or PATH_PREFIX_LOADER in module_path
     ), f"We rely on module path prefix to identify operator name. Expected {PATH_PREFIX}<operator_name>, get {module_path}."
@@ -580,25 +580,32 @@ def register_x_val(label: str = "x_val"):
 
 
 def register_benchmark(
+    operator_name: Optional[str] = None,
+    func_name: Optional[str] = None,
     baseline: bool = False,
     enabled: bool = True,
     fwd_only: bool = False,
     label: Optional[str] = None,
 ):
     def decorator(function):
-        operator_name = _find_op_name_from_module_path(function.__module__)
+        op_name = (
+            _find_op_name_from_module_path(function.__module__)
+            if not operator_name
+            else operator_name
+        )
+        fn_name = function.__name__ if not func_name else func_name
         backend_config = BenchmarkOperatorBackend(
-            name=function.__name__,
-            label=label if label else function.__name__,
+            name=fn_name,
+            label=label if label else fn_name,
             baseline=baseline,
             enabled=enabled,
             fwd_only=fwd_only,
         )
-        if not operator_name in REGISTERED_BENCHMARKS:
-            REGISTERED_BENCHMARKS[operator_name] = OrderedDict()
-        REGISTERED_BENCHMARKS[operator_name][function.__name__] = backend_config
+        if op_name not in REGISTERED_BENCHMARKS:
+            REGISTERED_BENCHMARKS[op_name] = OrderedDict()
+        REGISTERED_BENCHMARKS[op_name][fn_name] = backend_config
         if backend_config.baseline:
-            BASELINE_BENCHMARKS[operator_name] = function.__name__
+            BASELINE_BENCHMARKS[op_name] = fn_name
 
         def _inner(self, *args, **kwargs):
             return function(self, *args, **kwargs)
@@ -608,41 +615,16 @@ def register_benchmark(
     return decorator
 
 
-def register_benchmark_mannually(
+def register_benchmark_manually(
     operator_name: str,
     func_name: str,
     baseline: bool = False,
     enabled: bool = True,
     label: Optional[str] = None,
 ):
-    """
-    Manually register a benchmark function for a given operator.
-
-    Args:
-        operator_name (str): The name of the operator for which the benchmark is being registered.
-        func_name (str): The name of the benchmark function to register. eager or
-        inductor for aten op benchmark.
-        baseline (bool, optional): If True, this benchmark function is considered the baseline. Defaults to False.
-        enabled (bool, optional): If True, this benchmark function is enabled. Defaults to True.
-        label (Optional[str], optional): An optional label for the benchmark function. Defaults to None.
-
-    This function updates the global dictionaries REGISTERED_BENCHMARKS and BASELINE_BENCHMARKS,
-    to include the new benchmark function. If the operator or function
-    is already registered, it updates the existing entries.
-
-    We need this manually register function because decorator doesn't work for
-    dynamically created classes (operator_loader/__init__.py).
-    """
-    if not operator_name in REGISTERED_BENCHMARKS:
-        REGISTERED_BENCHMARKS[operator_name] = OrderedDict()
-    REGISTERED_BENCHMARKS[operator_name][func_name] = BenchmarkOperatorBackend(
-        name=func_name,
-        label=label if label else func_name,
-        baseline=baseline,
-        enabled=enabled,
+    return register_benchmark(
+        operator_name, func_name, baseline, enabled, fwd_only=False, label=label
     )
-    if baseline:
-        BASELINE_BENCHMARKS[operator_name] = func_name
 
 
 def register_metric(
@@ -771,12 +753,19 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     # Run the post initialization
     def __post__init__(self):
-        if is_fbcode() and self.tb_args.input_loader:
-            from tritonbench.data.fb.input_loader import get_input_loader
+        if self.tb_args.input_loader:
+            if is_fbcode() and not hasattr(self, "aten_op_name"):
+                from tritonbench.data.fb.input_loader import get_input_loader
 
-            self.get_input_iter = get_input_loader(
-                self, self.name, self.tb_args.input_loader
-            )
+                self.get_input_iter = get_input_loader(
+                    self, self.name, self.tb_args.input_loader
+                )
+            else:
+                from tritonbench.data import get_input_loader
+
+                self._get_input_iter = get_input_loader(
+                    self, self.name, self.tb_args.input_loader
+                )
         self._available_num_inputs = self.count_example_inputs()
         if self._num_inputs is None:
             self._num_inputs = self._available_num_inputs - self._input_id
@@ -880,7 +869,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     benchmarks = find_enabled_benchmarks(
                         self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
                     )
-
                 # Run the baseline first, if baseline exists
                 baseline_name = (
                     BASELINE_BENCHMARKS[self.name]

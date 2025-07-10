@@ -10,7 +10,7 @@ import os
 import sys
 from typing import List
 
-from tritonbench.operator_loader import load_opbench_by_name_from_loader
+from tritonbench.operator_loader import get_op_loader_bench_cls_by_name, is_loader_op
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.env_utils import is_fbcode
@@ -31,8 +31,8 @@ except ImportError:
 
 
 def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorResult:
-    if args.operator_loader:
-        Opbench = load_opbench_by_name_from_loader(args)
+    if is_loader_op(args.op):
+        Opbench = get_op_loader_bench_cls_by_name(args.op)
     else:
         Opbench = load_opbench_by_name(args.op)
     opbench = Opbench(

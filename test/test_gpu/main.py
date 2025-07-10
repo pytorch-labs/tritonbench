@@ -44,7 +44,7 @@ FWD_ONLY_OPS = skip_tests.get("fwd_only_ops", [])
 # Ops that require special arguments in backwards
 BWD_ARGS_OPS: Dict[str, List[str]] = skip_tests.get("bwd_args", {})
 
-TEST_OPERATORS = set(list_operators_by_collection(op_collection="default"))
+TEST_OPERATORS = set(list_operators_by_collection(op_collection="buck"))
 
 
 def check_ci_output(op):

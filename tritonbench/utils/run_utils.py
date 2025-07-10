@@ -114,10 +114,10 @@ def run_in_task(
         op_task_cmd.extend(copy_sys_argv)
     else:
         op_task_cmd.extend(op_args)
-        if benchmark_name:
-            op_args.extend(["--benchmark-name", benchmark_name])
-        else:
-            benchmark_name = op
+    if benchmark_name:
+        op_args.extend(["--benchmark-name", benchmark_name])
+    else:
+        benchmark_name = op
 
     # Remove "TRITONBENCH_RUN_CONFIG" env
     if "TRITONBENCH_RUN_CONFIG" in os.environ:
@@ -127,7 +127,10 @@ def run_in_task(
     if not is_fbcode() and not op_task_cmd[1] == "run.py":
         op_task_cmd.insert(1, "run.py")
     try:
-        print(f"[tritonbench] Running {benchmark_name}: " + " ".join(op_task_cmd))
+        print(
+            f"[tritonbench] Running {benchmark_name}: " + " ".join(op_task_cmd),
+            flush=True,
+        )
         subprocess.check_call(
             op_task_cmd, stdout=sys.stdout, stderr=sys.stderr, cwd=REPO_PATH
         )

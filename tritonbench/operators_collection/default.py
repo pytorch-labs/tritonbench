@@ -1,5 +1,4 @@
-from tritonbench.operators_collection.all import get_operators as get_all_operators
-from tritonbench.operators_collection.liger import get_operators as get_liger_operators
+from tritonbench.operators import list_operators
 
 
 def get_operators():
@@ -21,6 +20,4 @@ def get_operators():
     Returns:
         List[str]: A list of operator names for the default collection.
     """
-    all_operators = get_all_operators()
-    liger_operators = get_liger_operators()
-    return [item for item in all_operators if item not in liger_operators]
+    return list_operators()

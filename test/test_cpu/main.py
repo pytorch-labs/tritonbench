@@ -65,10 +65,10 @@ class TestTritonbenchCpu(unittest.TestCase):
         )  # default benchmark label should not be present in headers
 
     def test_cpu_list_operators_by_collection(self):
-        all_ops = list_operators_by_collection()
+        all_ops = list_operators_by_collection(op_collection="all")
+        self.assertTrue("aten.add.Tensor" in all_ops)
         self.assertTrue(len(all_ops) > 0)
         default_ops = list_operators_by_collection("default")
         self.assertTrue(len(default_ops) > 0)
         liger_ops = list_operators_by_collection("liger")
         self.assertTrue(len(liger_ops) > 0)
-        self.assertTrue(liger_ops[0] not in default_ops)
