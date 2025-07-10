@@ -351,11 +351,10 @@ class BenchmarkOperatorResult:
                 if len(avg_row) <= col_num:
                     avg_row.append(next_val if isinstance(next_val, Number) else None)
                 else:
-                    avg_row[col_num] = (
-                        avg_row[col_num] + next_val
-                        if isinstance(next_val, Number)
-                        else None
-                    )
+                    if avg_row[col_num] is None:
+                        avg_row[col_num] = next_val
+                    elif isinstance(next_val, Number):
+                        avg_row[col_num] = avg_row[col_num] + next_val
                 col_num += 1
             for backend in backends:
                 if x_val == "hashes" and len(hashes) > 0:
@@ -381,11 +380,10 @@ class BenchmarkOperatorResult:
                             metric_val if isinstance(metric_val, Number) else None
                         )
                     else:
-                        avg_row[col_num] = (
-                            avg_row[col_num] + metric_val
-                            if isinstance(metric_val, Number)
-                            else None
-                        )
+                        if avg_row[col_num] is None:
+                            avg_row[col_num] = metric_val
+                        elif isinstance(metric_val, Number):
+                            avg_row[col_num] = avg_row[col_num] + metric_val
                     col_num += 1
             table.append(row)
 
