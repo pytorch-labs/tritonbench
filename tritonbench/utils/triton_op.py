@@ -9,6 +9,7 @@ import os
 import random
 import shlex
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -21,8 +22,6 @@ from itertools import product
 from numbers import Number
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
-
-import numpy
 
 import psutil
 import tabulate
@@ -413,7 +412,7 @@ class BenchmarkOperatorResult:
             if isinstance(table_cell, list):
                 # Check if all elements are numbers before calculating median
                 if all(isinstance(x, Number) for x in table_cell):
-                    return numpy.median(table_cell)
+                    return statistics.median(table_cell)
                 else:
                     # For non-numeric lists, convert to string representation
                     table_cell_str = str(table_cell)

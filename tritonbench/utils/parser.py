@@ -218,13 +218,13 @@ def get_parser(args=None):
         default=None,
         help="Enable tritonparse structured logging. Optionally specify log directory path (default: ./tritonparse_logs/).",
     )
-
+    parser.add_argument(
+        "--input-loader",
+        type=str,
+        help="Load input file from Tritonbench data JSON.",
+    )
+ 
     if is_fbcode():
-        parser.add_argument(
-            "--input-loader",
-            type=str,
-            help="Load input file from Tritonbench data JSON.",
-        )
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
         parser.add_argument(
             "--logging-group",
