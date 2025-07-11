@@ -751,7 +751,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     # Run the post initialization
     def __post__init__(self):
-        if self.tb_args.input_loader:
+        if hasattr(self.tb_args, "input_loader") and self.tb_args.input_loader:
             if is_fbcode() and not hasattr(self, "aten_op_name"):
                 from tritonbench.data.fb.input_loader import get_input_loader
 
