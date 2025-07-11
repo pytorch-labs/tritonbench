@@ -314,7 +314,9 @@ class Operator(BenchmarkOperator):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> Callable:
-        return lambda: gluon_blackwell_persistent_fwd(q, k, v, self.causal, self.sm_scale)
+        return lambda: gluon_blackwell_persistent_fwd(
+            q, k, v, self.causal, self.sm_scale
+        )
 
     @register_metric(x_only=True)
     def flops(
