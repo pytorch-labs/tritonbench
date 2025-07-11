@@ -20,6 +20,14 @@ nsys_metrics_to_reports = {
 }
 
 
+def get_nsys_metrics(metrics: List[str]) -> List[str]:
+    nsys_metrics = []
+    for metric_name in nsys_metrics_to_reports.keys():
+        if metric_name in metrics:
+            nsys_metrics.append(metric_name)
+    return nsys_metrics
+
+
 def read_nsys_report(
     report_path: str, required_metrics: List[str]
 ) -> Dict[str, List[float]]:

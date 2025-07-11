@@ -59,7 +59,29 @@ bench_metric_to_short_ncu_metric = {
 }
 
 
-def import_ncu_python_path():
+def get_ncu_metrics(metrics: List[str]) -> List[str]:
+    """
+    This function returns a list of all the NCU metrics used in the benchmark.
+
+    Returns:
+        list: A list of all the NCU metrics used in the benchmark.
+    """
+    ncu_metrics = []
+    for (
+        bench_metric,
+        short_ncu_metrics,
+    ) in bench_metric_to_short_ncu_metric.items():
+        # Only process metrics that are required
+        if bench_metric in metrics:
+            # For each short metric name in the list of metrics for this benchmark metric
+            for short_ncu_metric in short_ncu_metrics:
+                # Get the full NCU metric name and add it to our list
+                full_metric_name = short_ncu_metric_name[short_ncu_metric]
+                ncu_metrics.append(full_metric_name)
+    return ncu_metrics
+
+
+def _import_ncu_python_path():
     """
     This function modifies the Python path to include the NVIDIA Nsight Compute (NCU) Python modules.
     It searches for the 'ncu' command in the system PATH, determines its location, and appends the
@@ -153,7 +175,7 @@ def read_ncu_report(report_path: str, required_metrics: List[str]):
     assert os.path.exists(
         report_path
     ), f"The NCU report at {report_path} does not exist."
-    import_ncu_python_path()
+    _import_ncu_python_path()
     import ncu_report
 
     # save all kernels' metrics. {metric_name: [kernel1_metric_value, kernel2_metric_value, ...]}
