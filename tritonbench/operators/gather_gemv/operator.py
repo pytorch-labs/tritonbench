@@ -5,14 +5,9 @@ gather + gemv is the primary kernel driving mixtral perf.
 """
 
 import argparse
-import csv
-import os
-import statistics
-from typing import Any, Callable, Generator, List, Optional
+from typing import Callable, Generator, List, Optional
 
-import numpy
 import torch
-import triton
 from torch._dynamo.testing import rand_strided
 
 from tritonbench.utils.triton_op import (
@@ -27,7 +22,7 @@ from .triton_gather_gemv import triton_gemv_0 as triton_test_0
 
 class Operator(BenchmarkOperator):
     @register_metric()
-    def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
+    def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics):
         arg0_1, arg1_1, arg2_1 = example_inputs
         return (
             2

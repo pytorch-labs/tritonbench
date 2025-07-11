@@ -227,7 +227,7 @@ class Operator(BenchmarkOperator):
         )
 
     @register_metric()
-    def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
+    def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics):
         return (
             example_inputs[0].element_size()
             * example_inputs[0].numel()

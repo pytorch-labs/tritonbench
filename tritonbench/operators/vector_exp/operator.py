@@ -17,7 +17,7 @@ class Operator(BenchmarkOperator):
     DEFAULT_METRICS = ["latency", "gbps"]
 
     @register_metric()
-    def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
+    def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics):
         def normalize(lat):
             return (
                 3

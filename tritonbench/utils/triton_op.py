@@ -254,8 +254,6 @@ class BenchmarkOperatorMetrics:
     extra_metrics: Optional[Dict[str, float]] = None
     # mem footprint
     mem_footprint_compression_ratio: Optional[float] = None
-    # gbps
-    gbps: Optional[float] = None
     # speedup for the summary of kernel GPU time only
     nsys_gpu_speedup: Optional[float] = None
     # hashed source code for the kernel
@@ -1218,8 +1216,6 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if "tflops" in self.required_metrics and metrics.latency:
                 # cannot compute tflops without latency so adding latency to the check here
                 metrics.tflops = self.tflops(fn_name, self.example_inputs, metrics)
-            if "gbps" in self.required_metrics:
-                metrics.gbps = self.gbps(fn, self.example_inputs, metrics)
             if "compile_time" in self.required_metrics:
                 compile_time, compile_time_by_stage = self.compile_time(
                     input_id, fn_name, metrics

@@ -15,7 +15,7 @@ from .kernels import _seeded_triton_dropout, _triton_dropout
 
 class Operator(BenchmarkOperator):
     @register_metric()
-    def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics):
+    def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics):
         return (
             3
             * example_inputs[1].element_size()

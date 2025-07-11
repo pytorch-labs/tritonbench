@@ -88,7 +88,7 @@ class Operator(BenchmarkOperator):
         return N
 
     @register_metric()
-    def gbps(self, fn_name, args, metrics: BenchmarkOperatorMetrics) -> float:
+    def gbps(self, fn, args, metrics: BenchmarkOperatorMetrics) -> float:
         x = args[0]
         base = x.numel() * x.element_size() / metrics.latency * 1e-6
         return {

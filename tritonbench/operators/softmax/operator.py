@@ -122,7 +122,7 @@ class Operator(BenchmarkOperator):
         return [shape[0], shape[1]]
 
     @register_metric()
-    def gbps(self, fn_name, example_inputs, metrics: BenchmarkOperatorMetrics) -> float:
+    def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics) -> float:
         return (
             2
             * example_inputs[0].nelement()
