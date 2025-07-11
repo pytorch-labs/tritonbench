@@ -11,6 +11,24 @@ import sys
 from typing import List
 
 from tritonbench.operator_loader import get_op_loader_bench_cls_by_name, is_loader_op
+
+# Apply async_task patch for Triton 3.4+ compatibility
+import triton.language as tl
+if not hasattr(tl, 'async_task'):
+    class _AsyncTaskContext:
+        """A no-op context manager to replace tl.async_task"""
+        def __init__(self, task_ids):
+            self.task_ids = task_ids
+        
+        def __enter__(self):
+            return self
+        
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
+    
+    # Add async_task to triton.language
+    tl.async_task = lambda task_ids: _AsyncTaskContext(task_ids)
+
 from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.env_utils import is_fbcode

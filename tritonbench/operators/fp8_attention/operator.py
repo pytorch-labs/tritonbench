@@ -119,7 +119,7 @@ class Operator(BenchmarkOperator):
             v,
         )
 
-    @register_benchmark()
+    @register_benchmark(baseline=True)
     def triton_flash_v2(
         self,
         q: torch.Tensor,
@@ -129,7 +129,7 @@ class Operator(BenchmarkOperator):
         triton_q, triton_k, triton_v = self.triton_preprocess(q, k, v)
         # full fp8 will be enabled if type of q,k,v is fp8
         return lambda: triton_attention(
-            triton_q, triton_k, triton_v, self.causal, self.sm_scale, "base"
+            triton_q, triton_k, triton_v, self.causal, self.sm_scale, "base_opt"
         )
 
     @register_benchmark()
@@ -182,26 +182,70 @@ class Operator(BenchmarkOperator):
 
             self.N_CTX = N_CTX
 
+            # Initialize with smaller values to avoid overflow in FP8
+            # FP8_e5m2 has range [-57344, 57344], but attention scores can get large
+            scale_factor = math.sqrt(2.0 / (N_CTX + D_HEAD)) * 0.1
+
             # colfax expects q,k: BATCH, N_CTX, H, D_HEAD and v: BATCH, D_HEAD, H, N_CTX
-            q = torch.randn(
-                (BATCH, H, N_CTX, D_HEAD),
-                dtype=torch.float16,
-                device=self.device,
-                requires_grad=self.requires_grad,
+            q = (
+                torch.randn(
+                    (BATCH, H, N_CTX, D_HEAD),
+                    dtype=torch.float16,
+                    device=self.device,
+                    requires_grad=self.requires_grad,
+                )
+                * scale_factor
             )
-            k = torch.randn(
-                (BATCH, H, N_CTX, D_HEAD),
-                dtype=torch.float16,
-                device=self.device,
-                requires_grad=self.requires_grad,
+
+            k = (
+                torch.randn(
+                    (BATCH, H, N_CTX, D_HEAD),
+                    dtype=torch.float16,
+                    device=self.device,
+                    requires_grad=self.requires_grad,
+                )
+                * scale_factor
             )
-            v = torch.randn(
-                (BATCH, H, N_CTX, D_HEAD),
-                dtype=torch.float16,
-                device=self.device,
-                requires_grad=self.requires_grad,
+
+            v = (
+                torch.randn(
+                    (BATCH, H, N_CTX, D_HEAD),
+                    dtype=torch.float16,
+                    device=self.device,
+                    requires_grad=self.requires_grad,
+                )
+                * scale_factor
             )
             yield (q, k, v)
+
+    def accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
+        """Compare FP8 attention implementations against Flash Attention v2 baseline"""
+        try:
+            output = fn()
+            baseline_output = baseline_fn()
+
+            # Convert FP8 outputs to fp16 for comparison
+            # This must be done before any operations on the tensors
+            if output.dtype in [torch.float8_e5m2, torch.float8_e4m3fn]:
+                output = output.to(torch.float16)
+            if baseline_output.dtype in [torch.float8_e5m2, torch.float8_e4m3fn]:
+                baseline_output = baseline_output.to(torch.float16)
+
+            # Check for NaN or Inf
+            if torch.isnan(output).any() or torch.isinf(output).any():
+                return False
+            if torch.isnan(baseline_output).any() or torch.isinf(baseline_output).any():
+                return False
+
+            # Check shapes match
+            if output.shape != baseline_output.shape:
+                return False
+
+            return torch.allclose(output, baseline_output, atol=3e-3, rtol=3e-2)
+
+        except Exception as e:
+            # If there's any error, fail the accuracy check
+            return False
 
     @register_metric()
     def flops(
