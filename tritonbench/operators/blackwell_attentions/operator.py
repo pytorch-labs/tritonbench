@@ -16,9 +16,16 @@ import torch
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from torch.nn.functional import scaled_dot_product_attention as sdpa
 
+from tritonbench.kernels.attention_utils import SUPPORT_GLUON
+
 from tritonbench.kernels.triton_fused_attention import (
     attention_opt as triton_tutorial_FA2_opt,
 )
+
+if SUPPORT_GLUON:
+    from tritonbench.kernels.gluon_attention_forward import (
+        attention_forward as gluon_blackwell_fwd,
+    )
 
 from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
 
@@ -285,6 +292,16 @@ class Operator(BenchmarkOperator):
         return lambda: triton_tutorial_FA2_opt(
             q, k, v, self.causal, self.sm_scale, "tma_ws_persistent_blackwell"
         )
+
+    # Only works with triton main, forward only.
+    @register_benchmark(enabled=False)
+    def gluon_blackwell_tutorial_fwd(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> Callable:
+        return lambda: gluon_blackwell_fwd(q, k, v, self.causal, self.sm_scale)
 
     @register_metric(x_only=True)
     def flops(
