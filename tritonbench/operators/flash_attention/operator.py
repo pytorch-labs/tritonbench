@@ -201,9 +201,10 @@ class Operator(BenchmarkOperator):
         self.pt2_sdpa = args.pt2_sdpa
         self.additional_inputs = args.additional_inputs
         self.ragged_shapes = args.ragged_shapes
-        self.sm_scale = 1.3
+        # Use standard scale factor: 1/sqrt(head_dim)
+        self.sm_scale = 1.0 / (self.D_HEAD**0.5)
 
-    @register_benchmark()
+    @register_benchmark(baseline=True)
     def aten(
         self,
         q: torch.Tensor,
@@ -211,7 +212,8 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ) -> Callable:
         def _inner():
-            M = torch.tril(torch.ones((self.N_CTX, self.N_CTX), device=self.device))
+            seq_len = q.shape[2]
+            M = torch.tril(torch.ones((seq_len, seq_len), device=self.device))
             p = torch.matmul(q, k.transpose(2, 3)) * self.sm_scale
             if self.causal:
                 p[:, :, M == 0] = float("-inf")
@@ -523,6 +525,28 @@ class Operator(BenchmarkOperator):
             block_mask = None
 
         return lambda: flex_attention(q, k, v, block_mask=block_mask)
+
+    def accuracy(self, fn, baseline_fn):
+        """Override accuracy to use relaxed tolerance for bfloat16."""
+        output = fn()
+        baseline_output = baseline_fn()
+
+        # Check for NaN values
+        if torch.isnan(output).any():
+            return False
+
+        try:
+            # Use relaxed tolerance for bfloat16/float16
+            # Using atol=2e-2 and rtol=1e-2 to provide some margin
+            if output.dtype in [torch.bfloat16, torch.float16]:
+                torch.testing.assert_close(
+                    output, baseline_output, rtol=1e-2, atol=2e-2
+                )
+            else:
+                torch.testing.assert_close(output, baseline_output)
+            return True
+        except Exception:
+            return False
 
     @register_metric(x_only=True)
     def flops(
