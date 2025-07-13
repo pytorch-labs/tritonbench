@@ -1432,7 +1432,7 @@ def _attn_fwd_base_opt(
     tl.assume(H >= 0)
 
     tl.static_assert(BLOCK_N <= HEAD_DIM)
-    pid = tl.program_id(0)
+    start_m = tl.program_id(0)
     off_hz = tl.program_id(1)
 
     # Both base and opt use the same compute function
@@ -1464,7 +1464,7 @@ def _attn_fwd_base_opt(
         stride_om,
         stride_on,
         off_hz,
-        pid,
+        start_m,
         Z,
         H,
         N_CTX,
@@ -1752,6 +1752,12 @@ def _attn_fwd_tma_ws_persistent(  # Q, V, desc_k, desc_v, sm_scale, M, Out,  #
         tiles_per_sm += 1
 
     tile_idx = prog_id
+
+    # Initialize descriptors as None
+    desc_q = None
+    desc_k = None
+    desc_v = None
+    desc_o = None
 
     if ENABLE_TMA:
         desc_k = tl.make_tensor_descriptor(
