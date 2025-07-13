@@ -359,8 +359,16 @@ class BenchmarkOperatorResult:
                 if "kernel_source_hash" in metrics_dict:
                     hashes[backend] = metrics_dict.pop("kernel_source_hash")
                 if metrics_dict["error_msg"]:
+                    # Add error message to the display row
                     row.append(metrics_dict["error_msg"])
                     row.extend([None] * (len(key_metrics[backend]) - 1))
+
+                    # Skip this backend's metrics in the average row to maintain alignment
+                    num_metrics_to_skip = len(key_metrics[backend])
+                    for _ in range(num_metrics_to_skip):
+                        if len(avg_row) <= col_num:
+                            avg_row.append(None)
+                        col_num += 1
                     continue
                 for metric in key_metrics[backend]:
                     _metrics_dict = (
