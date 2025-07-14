@@ -20,18 +20,34 @@ except ModuleNotFoundError:
 # blob/main/benchmark/scripts/benchmark_cross_entropy.py
 
 
+def parse_op_args(args: List[str]):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--B", type=int, default=8, help="Batch size")
+    parser.add_argument("--T", type=int, default=2048, help="Sequence length")
+    parser.add_argument(
+        "--v-range",
+        type=str,
+        default="12,18",
+        help="Vocabulary size range as 'start,end' (e.g., '10,15' for 2^10 to 2^14)",
+    )
+    return parser.parse_args(args)
+
+
 class Operator(BenchmarkOperator):
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
-        self.B = 8
-        self.T = 2048
+        args = parse_op_args(self.extra_args)
+        self.B = args.B
+        self.T = args.T
+        start, end = map(int, args.v_range.split(","))
+        self.v_range = range(start, end)
         self.baseline_model = CrossEntropyLoss()
         self.liger_model = LigerCrossEntropyLoss()
 
     def get_input_iter(self) -> Generator:
-        for V in [2**i for i in range(12, 18)]:
+        for V in [2**i for i in self.v_range]:
             _input = torch.randn(
                 self.B * self.T,
                 V,
