@@ -30,38 +30,30 @@ def parse_op_args(args: List[str]):
 class TorchLMHeadCE(torch.nn.Module):
     """Ground truth implementation of the linear fused with torch based cross entropy loss.
 
-    :param H: hidden size
-    :param V: vocab size
     :param ignore_index: index to ignore
     :param reduction: reduction method
     """
 
-    def __init__(self, H: int, V: int, dtype: torch.dtype, ignore_index: int = -100):
+    def __init__(self, ignore_index: int = -100):
         super().__init__()
-        self.lin = torch.nn.Linear(
-            in_features=H, out_features=V, bias=False, dtype=dtype
-        )
         self.ce_loss = torch.nn.CrossEntropyLoss(
             ignore_index=ignore_index, reduction="mean"
         )
 
-    def forward(self, input, target):
-        logits = self.lin(input)
+    def forward(self, input, weight, target):
+        logits = torch.nn.functional.linear(input, weight)
         return self.ce_loss(logits, target)
 
 
 class LigerLMHeadCE(torch.nn.Module):
-    def __init__(self, H: int, V: int, dtype: torch.dtype, ignore_index: int = -100):
+    def __init__(self, ignore_index: int = -100):
         super().__init__()
-        self.lin = torch.nn.Linear(
-            in_features=H, out_features=V, bias=False, dtype=dtype
-        )
         self.ce_loss = LigerFusedLinearCrossEntropyLoss(
             ignore_index=ignore_index, reduction="mean"
         )
 
-    def forward(self, input, target):
-        return self.ce_loss(self.lin.weight, input, target)
+    def forward(self, input, weight, target):
+        return self.ce_loss(weight, input, target)
 
 
 class Operator(BenchmarkOperator):
@@ -72,12 +64,17 @@ class Operator(BenchmarkOperator):
         op_args = parse_op_args(self.extra_args)
         self.hidden_size = op_args.hidden_size
         self.vocab_size = op_args.vocab_size
-        self.baseline_model = TorchLMHeadCE(
-            H=self.hidden_size, V=self.vocab_size, dtype=self.dtype
-        ).to(self.device)
-        self.liger_model = LigerLMHeadCE(
-            H=self.hidden_size, V=self.vocab_size, dtype=self.dtype
-        ).to(self.device)
+        # Create the shared weight tensor
+        self.weight = torch.randn(
+            self.vocab_size,
+            self.hidden_size,
+            dtype=self.dtype,
+            device=self.device,
+            requires_grad=True,
+        )
+
+        self.baseline_model = TorchLMHeadCE().to(self.device)
+        self.liger_model = LigerLMHeadCE().to(self.device)
 
     def get_input_iter(self) -> Generator:
         for BT in [2**i for i in range(12, 16)]:
@@ -91,20 +88,20 @@ class Operator(BenchmarkOperator):
             target = torch.randint(
                 self.vocab_size, (BT, 1), dtype=torch.long, device=self.device
             ).squeeze(1)
-            yield _input, target
+            yield _input, self.weight, target
 
     @register_benchmark(baseline=True)
-    def torch_lm_head_ce(self, input, target) -> Callable:
-        return lambda: self.baseline_model(input, target)
+    def torch_lm_head_ce(self, input, weight, target) -> Callable:
+        return lambda: self.baseline_model(input, weight, target)
 
     @register_benchmark()
-    def liger_lm_head_ce(self, input, target) -> Callable:
-        return lambda: self.liger_model(input, target)
+    def liger_lm_head_ce(self, input, weight, target) -> Callable:
+        return lambda: self.liger_model(input, weight, target)
 
     @register_benchmark()
-    def inductor_fused_linear_cross_entropy(self, input, target) -> Callable:
+    def inductor_fused_linear_cross_entropy(self, input, weight, target) -> Callable:
         compiled = torch.compile(self.baseline_model)
-        return lambda: compiled(input, target)
+        return lambda: compiled(input, weight, target)
 
     @register_x_val(label="(B*T, H)")
     def get_x_val(self, example_inputs) -> Tuple[int, int]:
