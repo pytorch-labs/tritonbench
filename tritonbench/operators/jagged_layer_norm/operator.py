@@ -30,6 +30,8 @@ from tritonbench.utils.triton_op import (
     register_metric,
 )
 
+from .triton_jagged_layer_norm import triton_jagged_layer_norm
+
 
 def parse_op_args(args: List[str]):
     parser = get_parse_op_args("B", "M", "seqlen", "sparsity", "plot_benchmarks")
@@ -126,6 +128,12 @@ class Operator(BenchmarkOperator):
         return _inner
 
     @register_benchmark()
+    def triton_jagged_layer_norm(
+        self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
+    ):
+        return lambda: triton_jagged_layer_norm(x._values, x._offsets[0], eps=EPSILON)
+
+    @register_benchmark()
     def torch_compile_nested_tensor_integration(
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
@@ -205,10 +213,12 @@ class Operator(BenchmarkOperator):
 
         line_vals_all = [
             "torch_jagged_layer_norm_torch_sum",
+            "triton_jagged_layer_norm",
             "torch_compile_nested_tensor_integration",
         ]
         line_names_all = [
             "PyTorch jagged layer norm, torch.sum",
+            "Triton jagged layer norm",
             "Inductor, NestedTensor integration",
         ]
         styles_all = get_styles(len(line_vals_all))
