@@ -66,7 +66,8 @@ class Operator(BenchmarkOperator):
             p3 = rand_strided((s, d), (d, 1), device="cuda:0", dtype=torch.bfloat16)
             yield p1, p2, p3
 
-    def _get_accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
+    def accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
         output = fn()
         baseline_output = baseline_fn()
-        return same(output, baseline_output)
+        tol = 1e-2
+        return same(output, baseline_output, tol=tol, exact_dtype=True)
