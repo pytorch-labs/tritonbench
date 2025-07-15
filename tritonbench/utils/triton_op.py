@@ -1087,7 +1087,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
 
     def get_temp_path(
         self,
-        fn_name: Optional[str]=None,
+        fn_name: Optional[str] = None,
     ) -> Path:
         unix_user: Optional[str] = os.environ.get("USER", None)
         logging_group: Optional[str] = self.logging_group
@@ -1095,7 +1095,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         tritonbench_dir_name = "_".join(parts)
         benchmark_name = self.benchmark_name
         fn_part = f"{fn_name}_{self._input_id}" if fn_name else ""
-        out_part = Path(tempfile.gettempdir()) / tritonbench_dir_name / benchmark_name 
+        out_part = Path(tempfile.gettempdir()) / tritonbench_dir_name / benchmark_name
         return out_part / fn_part if fn_part else out_part
 
     @property
@@ -1105,7 +1105,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         return self.tb_args.precision
 
     @property
-    def benchmark_name(self, default: bool=False) -> str:
+    def benchmark_name(self, default: bool = False) -> str:
         if not default and self.tb_args.benchmark_name:
             return self.tb_args.benchmark_name
         return f"{self.precision}_{self.name}_{self.mode}"
