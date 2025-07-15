@@ -223,15 +223,13 @@ def get_parser(args=None):
         type=str,
         help="Load input file from Tritonbench data JSON.",
     )
+    parser.add_argument(
+        "--logging-group", type=str, default=None, help="Name of group for benchmarking."
+    )
+
 
     if is_fbcode():
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")
-        parser.add_argument(
-            "--logging-group",
-            type=str,
-            default=None,
-            help="Override default name for logging in scuba.",
-        )
         parser.add_argument(
             "--production-shapes",
             action="store_true",
