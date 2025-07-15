@@ -23,6 +23,11 @@ try:
 except ModuleNotFoundError:
     HAS_AITER = False
 
+try:
+    from .quack import QuackRMSNorm
+except ModuleNotFoundError:
+    QuackRMSNorm = None
+
 
 # Reference: https://github.com/linkedin/Liger-Kernel/
 # blob/main/benchmark/scripts/benchmark_rms_norm.py
@@ -71,6 +76,11 @@ class Operator(BenchmarkOperator):
     def liger_rms(self, H, input) -> Callable:
         self.liger_rms_op = LigerRMSNorm(hidden_size=H, eps=self.eps).to(self.device)
         return lambda: self.liger_rms_op(input)
+
+    @register_benchmark(enabled=QuackRMSNorm)
+    def quack_rms(self, H, input) -> Callable:
+        self.quack_rms_op = QuackRMSNorm(hidden_size=H, eps=self.eps).to(self.device)
+        return lambda: self.quack_rms_op(input)
 
     @register_benchmark()
     def inductor_rms(self, H, input) -> Callable:

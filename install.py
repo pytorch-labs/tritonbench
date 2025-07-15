@@ -198,6 +198,11 @@ if __name__ == "__main__":
     if args.liger or args.all:
         logger.info("[tritonbench] installing liger-kernels...")
         install_liger()
+    if args.quack or args.all:
+        logger.info("[tritonbench] installing quack...")
+        from tools.quack.install import install_quack
+
+        install_quack()
     if args.xformers:
         logger.info("[tritonbench] installing xformers...")
         from tools.xformers.install import install_xformers

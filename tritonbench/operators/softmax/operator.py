@@ -15,6 +15,13 @@ from tritonbench.utils.triton_op import (
     register_metric,
 )
 
+try:
+    from quack.softmax import softmax as quack_softmax
+
+    HAS_QUACK = True
+except ImportError:
+    HAS_QUACK = False
+
 
 class Operator(BenchmarkOperator):
     is_compute_bound = False
@@ -104,6 +111,11 @@ class Operator(BenchmarkOperator):
             return ret
 
         return _inner
+
+    @register_benchmark(enabled=HAS_QUACK)
+    def quack(self, x):
+        inner = lambda: quack_softmax(x)
+        return inner
 
     def get_input_iter(self):
         M = 4096
