@@ -20,6 +20,8 @@ import torch
 import triton
 import triton.language as tl
 
+from ..utils.triton_utils import AsyncTaskContext
+
 from .attention_utils import (
     HAS_EXPLICIT_WS,  # guard new tuning configs such as num_consumer_groups
     HAS_TMA_DESC,
@@ -273,14 +275,14 @@ def _attn_fwd_inner_ws(
     for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
-        with tl.async_task([0]):
+        with AsyncTaskContext([0]):
             if ENABLE_TMA:
                 k = desc_k.load(
                     [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
                 )
             else:
                 k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
-        with tl.async_task([1, 2]):
+        with AsyncTaskContext([1, 2]):
             if ENABLE_TMA:
                 k = tl.trans(k)
             qk = tl.dot(q, k)
@@ -300,7 +302,7 @@ def _attn_fwd_inner_ws(
             # -- update output accumulator --
             acc = acc * alpha[:, None]
             # update acc
-        with tl.async_task([0]):
+        with AsyncTaskContext([0]):
             if ENABLE_TMA:
                 if fp8_v:
                     v = desc_v.load(
@@ -312,7 +314,7 @@ def _attn_fwd_inner_ws(
                     )
             else:
                 v = tl.load(V_block_ptr, boundary_check=(0,), padding_option="zero")
-        with tl.async_task([1, 2]):
+        with AsyncTaskContext([1, 2]):
             if fp8_v:
                 if ENABLE_TMA:
                     v = tl.trans(v)
@@ -386,7 +388,7 @@ def _attn_fwd_inner_ws_with_dp(
     for start_n in tl.range(lo, hi, BLOCK_N):  # , loop_schedule=LOOP_SCHEDULE):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
-        with tl.async_task([LOAD_K]):
+        with AsyncTaskContext([LOAD_K]):
             if ENABLE_TMA:
                 k = desc_k.load(
                     [start_n.to(tl.int32) + (qvk_offset // stride_kn).to(tl.int32), 0]
@@ -394,12 +396,12 @@ def _attn_fwd_inner_ws_with_dp(
             else:
                 k = tl.load(K_block_ptr, boundary_check=(1,), padding_option="zero")
 
-        with tl.async_task([FIRST_MMA]):
+        with AsyncTaskContext([FIRST_MMA]):
             if ENABLE_TMA:  # feeds into gemm
                 k = tl.trans(k)
             qk0 = tl.dot(q0, k)
             qk1 = tl.dot(q1, k)
-        with tl.async_task([FIRST_SOFTMAX]):
+        with AsyncTaskContext([FIRST_SOFTMAX]):
             if STAGE == 2:
                 mask = offs_m0[:, None] >= (start_n + offs_n[None, :])
                 qk0 = qk0 * qk_scale + tl.where(mask, 0, -1.0e6)
@@ -413,14 +415,14 @@ def _attn_fwd_inner_ws_with_dp(
             # -- update m_i and l_i
             alpha0 = tl.math.exp2(m_i0 - m_ij0)
             l_i0 = l_i0 * alpha0 + l_ij0
-        with tl.async_task([FIRST_CORRECTION]):
+        with AsyncTaskContext([FIRST_CORRECTION]):
             if ALPHA_REMAT:
                 alpha0_re = tl.math.exp2(m_i0 - m_ij0)
                 # -- update output accumulator --
                 acc0 = acc0 * alpha0_re[:, None]
             else:
                 acc0 = acc0 * alpha0[:, None]
-        with tl.async_task([FIRST_SOFTMAX]):
+        with AsyncTaskContext([FIRST_SOFTMAX]):
             # update acc
             if fp8_v:
                 p0 = p0.to(tl.float8e5)
@@ -428,7 +430,7 @@ def _attn_fwd_inner_ws_with_dp(
                 p0 = p0.to(tl.bfloat16)
             # update m_i and l_i
             m_i0 = m_ij0
-        with tl.async_task([LAST_SOFTMAX]):
+        with AsyncTaskContext([LAST_SOFTMAX]):
             if STAGE == 2:
                 mask = offs_m1[:, None] >= (start_n + offs_n[None, :])
                 qk1 = qk1 * qk_scale + tl.where(mask, 0, -1.0e6)
@@ -442,14 +444,14 @@ def _attn_fwd_inner_ws_with_dp(
             # -- update m_i and l_i
             alpha1 = tl.math.exp2(m_i1 - m_ij1)
             l_i1 = l_i1 * alpha1 + l_ij1
-        with tl.async_task([LAST_CORRECTION]):
+        with AsyncTaskContext([LAST_CORRECTION]):
             if ALPHA_REMAT:
                 alpha1_re = tl.math.exp2(m_i1 - m_ij1)
                 # -- update output accumulator --
                 acc1 = acc1 * alpha1_re[:, None]
             else:
                 acc1 = acc1 * alpha1[:, None]
-        with tl.async_task([LAST_SOFTMAX]):
+        with AsyncTaskContext([LAST_SOFTMAX]):
             # update acc
             if fp8_v:
                 p1 = p1.to(tl.float8e5)
@@ -457,7 +459,7 @@ def _attn_fwd_inner_ws_with_dp(
                 p1 = p1.to(tl.bfloat16)
             # update m_i and l_i
             m_i1 = m_ij1
-        with tl.async_task([LOAD_V]):
+        with AsyncTaskContext([LOAD_V]):
             if ENABLE_TMA:
                 if fp8_v:
                     v = desc_v.load(
@@ -469,7 +471,7 @@ def _attn_fwd_inner_ws_with_dp(
                     )
             else:
                 v = tl.load(V_block_ptr, boundary_check=(0,), padding_option="zero")
-        with tl.async_task([LAST_MMA]):
+        with AsyncTaskContext([LAST_MMA]):
             if fp8_v:
                 if ENABLE_TMA:
                     v = tl.trans(v)
@@ -941,7 +943,7 @@ def _attn_fwd_compute_ws(
     qk_scale = sm_scale
     qk_scale *= 1.44269504  # 1/log(2)
     # load q: it will stay in SRAM throughout
-    with tl.async_task([0]):
+    with AsyncTaskContext([0]):
         if ENABLE_TMA:
             q = desc_q.load(
                 [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0]
@@ -1011,7 +1013,7 @@ def _attn_fwd_compute_ws(
             LOOP_SCHEDULE,
         )
     # epilogue
-    with tl.async_task([1, 2]):
+    with AsyncTaskContext([1, 2]):
         m_i += tl.math.log2(l_i)
         acc = acc / l_i[:, None]
         m_ptrs = M + off_hz * N_CTX + offs_m
@@ -1104,14 +1106,14 @@ def _attn_fwd_compute_ws_with_dp(
     qk_scale *= 1.44269504  # 1/log(2)
     # load q: it will stay in SRAM throughout
     # q0 will be BLOCK_M, each kernel invocation will handle 2 * BLOCK_M
-    with tl.async_task([FIRST_LOADQ]):
+    with AsyncTaskContext([FIRST_LOADQ]):
         if ENABLE_TMA:
             q0 = desc_q.load(
                 [(qvk_offset // stride_qm + start_m * BLOCK_M).to(tl.int32), 0]
             )
         else:
             q0 = tl.load(Q_block_ptr)
-    with tl.async_task([LAST_LOADQ]):
+    with AsyncTaskContext([LAST_LOADQ]):
         if ENABLE_TMA:
             q1 = desc_q.load(
                 [
@@ -1214,7 +1216,7 @@ def _attn_fwd_compute_ws_with_dp(
             ALPHA_REMAT,
         )
     # epilogue
-    with tl.async_task([FIRST_SOFTMAX]):
+    with AsyncTaskContext([FIRST_SOFTMAX]):
         m_i0 += tl.math.log2(l_i0)
         acc0 = acc0 / l_i0[:, None]
         m_ptrs0 = M + off_hz * N_CTX + offs_m0
@@ -1226,7 +1228,7 @@ def _attn_fwd_compute_ws_with_dp(
             )
         else:
             tl.store(O_block_ptr, acc.to(Out.type.element_ty))
-    with tl.async_task([LAST_SOFTMAX]):
+    with AsyncTaskContext([LAST_SOFTMAX]):
         m_i1 += tl.math.log2(l_i1)
         acc1 = acc1 / l_i1[:, None]
         m_ptrs1 = M + off_hz * N_CTX + offs_m1
