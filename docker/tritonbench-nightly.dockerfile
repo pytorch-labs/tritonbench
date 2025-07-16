@@ -44,7 +44,7 @@ RUN cd /workspace && \
 # Test activate miniconda
 RUN . /workspace/miniconda3/etc/profile.d/conda.sh && \
     conda activate base && \
-    conda init
+    conda init && conda tos accept
 
 RUN echo "\
 . /workspace/miniconda3/etc/profile.d/conda.sh\n\
