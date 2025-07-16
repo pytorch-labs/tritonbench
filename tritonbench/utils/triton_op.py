@@ -1108,7 +1108,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
     def benchmark_name(self, default: bool = False) -> str:
         if not default and self.tb_args.benchmark_name:
             return self.tb_args.benchmark_name
-        return f"{self.precision}_{self.name}_{self.mode}"
+        parts = [x for x in [self.precision, self.name, self.mode.value] if x]
+        return "_".join(parts)
 
     @property
     def logging_group(self) -> Optional[str]:
