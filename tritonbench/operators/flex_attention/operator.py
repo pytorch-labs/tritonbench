@@ -5,6 +5,7 @@ from itertools import product
 from typing import Any, Callable, Generator, List, NamedTuple, Optional, Tuple, Union
 
 import torch
+from torch.nn.attention import sdpa_kernel, SDPBackend
 
 # from attn_gym.masks.document_mask import length_to_offsets
 # from attn_gym.mods import generate_alibi_bias, generate_tanh_softcap
@@ -14,6 +15,16 @@ from torch.nn.attention.flex_attention import (
     create_block_mask,
     flex_attention,
 )
+from torch.nn.functional import scaled_dot_product_attention as sdpa
+
+# Optional Flash Attention v3 import
+HAS_FLASH_V3 = False
+try:
+    from flash_attn.flash_attn_interface import flash_attn_func, flash_attn_varlen_func
+
+    HAS_FLASH_V3 = True
+except ImportError:
+    pass
 
 from tritonbench.utils.input import input_filter
 from tritonbench.utils.triton_op import (
@@ -65,11 +76,23 @@ class FullShape(NamedTuple):
         return f"({self.B}, {self.Hq}, {self.M}, {self.Hkv}, {self.N}, {self.D})"
 
 
+def unsupported_fn():
+    raise NotImplementedError("not supported")
+
+
 def parse_op_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=8, help="Batch size")
     parser.add_argument("--seq-len", type=int, default=None, help="Sequence length")
-    parser.add_argument("--n-heads", type=int, default=16, help="Number of heads")
+    parser.add_argument(
+        "--n-heads-q", type=int, default=16, help="Number of query heads"
+    )
+    parser.add_argument(
+        "--n-heads-kv",
+        type=int,
+        default=None,
+        help="Number of key/value heads (defaults to n-heads-q)",
+    )
     parser.add_argument(
         "--d-head", type=int, default=128, help="specify head dimension"
     )
@@ -88,12 +111,20 @@ def parse_op_args(args: List[str]):
         "--sliding-window-size", type=int, default=128, help="sliding window size"
     )
     parser.add_argument("--prefix-length", type=int, default=128, help="prefix length")
+    parser.add_argument(
+        "--decoding",
+        action="store_true",
+        help="Benchmark decoding mode (query seq len = 1)",
+    )
+    parser.add_argument(
+        "--dynamic", action="store_true", help="Enable dynamic shapes compilation"
+    )
     return parser.parse_args(args)
 
 
 class Operator(BenchmarkOperator):
     DEFAULT_PRECISION = "bf16"
-    DEFAULT_METRICS = ["latency", "tflops"]
+    DEFAULT_METRICS = ["latency", "tflops", "tbps"]
 
     def __init__(
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
@@ -103,32 +134,74 @@ class Operator(BenchmarkOperator):
 
         self.batch_size = args.batch
         self.seq_len = args.seq_len
-        self.num_heads = args.n_heads
+        self.num_heads_q = args.n_heads_q
+        self.num_heads_kv = (
+            args.n_heads_kv if args.n_heads_kv is not None else args.n_heads_q
+        )
         self.head_dim = args.d_head
         self.max_autotune = args.max_autotune
         self.mod_type = args.mod_type
         self.sliding_window_size = args.sliding_window_size
         self.prefix_length = args.prefix_length
+        self.decoding = args.decoding
+        self.dynamic = args.dynamic
 
     def get_input_iter(self) -> Generator:
         """Generate a single input configuration for benchmarking."""
+        # Set seed for reproducibility
+        random.seed(42)
+        torch.manual_seed(42)
 
         def get_ctx_vals():
             if self.seq_len:
-                q_shape = (self.batch_size, self.num_heads, self.seq_len, self.head_dim)
-                kv_shape = (
-                    self.batch_size,
-                    self.num_heads,
-                    self.seq_len,
-                    self.head_dim,
-                )
+                if self.decoding:
+                    # Decoding mode: query length = 1, kv length = seq_len
+                    q_shape = (self.batch_size, self.num_heads_q, 1, self.head_dim)
+                    kv_shape = (
+                        self.batch_size,
+                        self.num_heads_kv,
+                        self.seq_len,
+                        self.head_dim,
+                    )
+                else:
+                    q_shape = (
+                        self.batch_size,
+                        self.num_heads_q,
+                        self.seq_len,
+                        self.head_dim,
+                    )
+                    kv_shape = (
+                        self.batch_size,
+                        self.num_heads_kv,
+                        self.seq_len,
+                        self.head_dim,
+                    )
                 yield (q_shape, kv_shape)
                 return
             # 128 -> 32768
             for i in range(7, 15):
                 seq_len = 2**i
-                q_shape = (self.batch_size, self.num_heads, seq_len, self.head_dim)
-                kv_shape = (self.batch_size, self.num_heads, seq_len, self.head_dim)
+                if self.decoding:
+                    q_shape = (self.batch_size, self.num_heads_q, 1, self.head_dim)
+                    kv_shape = (
+                        self.batch_size,
+                        self.num_heads_kv,
+                        seq_len,
+                        self.head_dim,
+                    )
+                else:
+                    q_shape = (
+                        self.batch_size,
+                        self.num_heads_q,
+                        seq_len,
+                        self.head_dim,
+                    )
+                    kv_shape = (
+                        self.batch_size,
+                        self.num_heads_kv,
+                        seq_len,
+                        self.head_dim,
+                    )
                 yield (q_shape, kv_shape)
 
         shapes = get_ctx_vals()
@@ -198,7 +271,7 @@ class Operator(BenchmarkOperator):
         block_mask: Optional[BlockMask],
         mod_type: str,
         kernel_options: dict[str, Any],
-    ) -> Callable:
+    ) -> Optional[Callable]:
         """Baseline implementation using eager mode."""
         # Get shape information
         B, H, S, D = q.shape
@@ -234,10 +307,12 @@ class Operator(BenchmarkOperator):
         block_mask: Optional[BlockMask],
         mod_type: str,
         kernel_options: dict[str, Any],
-    ) -> Callable:
+    ) -> Optional[Callable]:
         """Compiled implementation using torch.compile."""
         mode = "default" if not self.max_autotune else "max-autotune-no-cudagraphs"
-        compiled_fn = torch.compile(flex_attention, fullgraph=True, mode=mode)
+        compiled_fn = torch.compile(
+            flex_attention, fullgraph=True, mode=mode, dynamic=self.dynamic
+        )
 
         return lambda: compiled_fn(
             q,
@@ -247,6 +322,103 @@ class Operator(BenchmarkOperator):
             block_mask=block_mask,
             kernel_options=kernel_options,
         )
+
+    @register_benchmark(enabled=HAS_FLASH_V3)
+    def flash_v3(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        score_mod: Optional[_score_mod_signature],
+        block_mask: Optional[BlockMask],
+        mod_type: str,
+        kernel_options: dict[str, Any],
+    ) -> Optional[Callable]:
+        """Flash Attention v3 implementation."""
+        # Check dtype compatibility
+        if q.dtype not in [torch.float16, torch.bfloat16]:
+            print(f"[SKIP] Flash Attention v3 only supports fp16/bf16, got {q.dtype}")
+            raise NotImplementedError(
+                f"Flash Attention v3 only supports fp16/bf16, got {q.dtype}"
+            )
+
+        # Get shape info
+        B, Hq, M, D = q.shape
+        _, Hkv, N, _ = k.shape
+
+        # Flash attention expects [B, S, H, D] layout, while flex_attention uses [B, H, S, D]
+        q_flash = q.transpose(1, 2).contiguous()
+        k_flash = k.transpose(1, 2).contiguous()
+        v_flash = v.transpose(1, 2).contiguous()
+
+        # Prepare Flash Attention kwargs based on attention type
+        FA_kwargs = {}
+
+        if mod_type == "alibi":
+            h = torch.arange(Hq, dtype=torch.float32, device="cuda")
+            alibi_slopes = torch.exp2(-((h + 1) * 8.0 / Hq))
+            FA_kwargs["alibi_slopes"] = alibi_slopes
+
+        # Build the appropriate Flash Attention callable
+        if mod_type == "noop":
+            fa_fn = partial(flash_attn_func, causal=False)
+        elif mod_type in ["causal", "prefix_lm", "softcap"]:
+            fa_fn = partial(flash_attn_func, causal=True)
+        elif mod_type == "alibi":
+            fa_fn = partial(flash_attn_func, causal=True, **FA_kwargs)
+        elif mod_type == "sliding_window":
+            fa_fn = partial(
+                flash_attn_func, window_size=(self.sliding_window_size, 0), causal=True
+            )
+        elif mod_type == "document_mask":
+            # Document mask requires special handling with varlen function
+            print(f"[SKIP] Flash Attention v3 document_mask not implemented yet")
+            raise NotImplementedError(
+                "Flash Attention v3 document_mask not implemented yet"
+            )
+        else:
+            # Unsupported attention types for Flash Attention
+            print(
+                f"[SKIP] Flash Attention v3 does not support {mod_type} attention type"
+            )
+            raise NotImplementedError(
+                f"Flash Attention v3 does not support {mod_type} attention type"
+            )
+
+        def flash_v3_fn():
+            out = fa_fn(q_flash, k_flash, v_flash)
+            # Transpose back to [B, H, S, D]
+            return out.transpose(1, 2).contiguous()
+
+        return flash_v3_fn
+
+    @register_benchmark(enabled=torch.backends.cudnn.is_available())
+    def sdpa_cudnn(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        score_mod: Optional[_score_mod_signature],
+        block_mask: Optional[BlockMask],
+        mod_type: str,
+        kernel_options: dict[str, Any],
+    ) -> Optional[Callable]:
+        """SDPA with cuDNN backend."""
+        supported_mods = ["noop", "causal"]
+        if mod_type not in supported_mods:
+            return unsupported_fn
+
+        is_causal = mod_type == "causal"
+
+        def sdpa_fn():
+            try:
+                with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
+                    return sdpa(q, k, v, is_causal=is_causal)
+            except RuntimeError as e:
+                print(f"[SKIP] cuDNN backend failed: {e}")
+                return None
+
+        return sdpa_fn
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         o = fwd_fn()
@@ -273,6 +445,8 @@ class Operator(BenchmarkOperator):
         full_shape = self.get_full_shape(q, v)
         flops_per_matmul = 2.0 * BATCH * H * N_CTX * N_CTX * D_HEAD
         flops = 2 * flops_per_matmul
+        if fn_name == "sdpa_cudnn":
+            flops *= 0.5 if mod_type == "causal" else 1.0
         if self.mode in (BenchmarkMode.FWD, BenchmarkMode.FWD_NO_GRAD):
             if fn_name == "compiled":
                 return self.calculate_flops(full_shape, block_mask)
@@ -282,6 +456,28 @@ class Operator(BenchmarkOperator):
         elif self.mode == BenchmarkMode.FWD_BWD:
             flops *= 3.5  # 1.0(fwd) + 2.0(bwd) + 0.5(recompute)
         return flops
+
+    @register_metric()
+    def tbps(
+        self, fn_name: str, example_inputs: Tuple, metrics: BenchmarkOperatorMetrics
+    ) -> float:
+        """Calculate memory bandwidth in TB/s for flex_attention."""
+        q, k, v, score_mod, block_mask, mod_type, *_ = example_inputs
+
+        def nbytes(t):
+            """Calculate the number of bytes occupied by a tensor."""
+            return t.numel() * t.element_size()
+
+        total_bytes = nbytes(q) + nbytes(k) + nbytes(v)
+
+        # Add output tensor size (same shape as q for attention output)
+        output_bytes = nbytes(q)
+        total_bytes += output_bytes
+
+        # Convert to TB and calculate bandwidth
+        tb = total_bytes / 1e12
+        tbps = tb / metrics.latency * 1e3  # latency is in ms, convert to seconds
+        return tbps
 
     ### -------------------- Utilities for benchmarking ------------------- ###
     @staticmethod

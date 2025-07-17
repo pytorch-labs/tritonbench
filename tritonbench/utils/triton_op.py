@@ -1454,6 +1454,8 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.dump_ir(input_id, fn)
         except torch.cuda.OutOfMemoryError:
             metrics.error_msg = "CUDA OOM"
+        except NotImplementedError:
+            metrics.error_msg = "not supported"
         except Exception as e:
             if not self.tb_args.keep_going:
                 raise
