@@ -924,6 +924,17 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 benchmarks_dict = functools.reduce(_reduce_benchmarks, benchmarks, {})
                 if benchmarks_dict:
                     metrics.append((x_val, benchmarks_dict))
+                    # Print speedup table immediately after processing each input
+                    if "speedup" in self.required_metrics or not hasattr(self.tb_args, 'metrics'):
+                        partial_result = BenchmarkOperatorResult(
+                            benchmark_name=getattr(self.tb_args, 'benchmark_name', 'tritonbench'),
+                            op_name=self.name,
+                            op_mode=self.mode.value,
+                            metrics=self.required_metrics,
+                            simple_mode=getattr(self.tb_args, 'simple_output', False),
+                            result=metrics.copy(),  # Use copy to avoid modifying the original
+                        )
+                        print(f"\n{partial_result}")
         except KeyboardInterrupt:
             logger.warning("KeyboardInterrupt received, exiting...")
             self.output = BenchmarkOperatorMetrics(self.name, None, self.unique_name)
