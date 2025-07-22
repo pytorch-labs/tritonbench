@@ -97,6 +97,11 @@ def get_parser(args=None):
         help="Metrics to collect, split with comma. E.g., --metrics latency,tflops,speedup.",
     )
     parser.add_argument(
+        "--list-metrics",
+        action="store_true",
+        help="List all available metrics. Can be used with --op or --op-collection to show operator-specific metrics.",
+    )
+    parser.add_argument(
         "--metrics-gpu-backend",
         choices=["torch", "nvml"],
         default="torch",
