@@ -127,6 +127,12 @@ def get_parser(args=None):
         help="Number of example inputs.",
     )
     parser.add_argument(
+        "--sample-seed",
+        type=int,
+        help="Random seed for deterministic input sampling. When used with --num-inputs, "
+        "samples N inputs deterministically from the full input pool.",
+    )
+    parser.add_argument(
         "--keep-going",
         action="store_true",
     )

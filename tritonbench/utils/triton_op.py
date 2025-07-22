@@ -750,6 +750,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self._skip = _split_params_by_comma(self.tb_args.skip)
         self._input_id = self.tb_args.input_id
         self._num_inputs = self.tb_args.num_inputs
+        self._sample_seed = getattr(self.tb_args, 'sample_seed', None)
         self.prod_shapes = self.tb_args.prod_shapes
 
     # Run the post initialization
@@ -768,10 +769,47 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     self, self.name, self.tb_args.input_loader
                 )
         self._available_num_inputs = self.count_example_inputs()
-        if self._num_inputs is None:
-            self._num_inputs = self._available_num_inputs - self._input_id
-        if self._num_inputs > self._available_num_inputs:
-            self._num_inputs = self._available_num_inputs
+        
+        # Handle deterministic sampling
+        if self._sample_seed is not None and self._num_inputs is not None:
+            # Store original input iterator for sampling
+            self._sampled_indices = None
+            self._setup_deterministic_sampling()
+        else:
+            if self._num_inputs is None:
+                self._num_inputs = self._available_num_inputs - self._input_id
+            if self._num_inputs > self._available_num_inputs:
+                self._num_inputs = self._available_num_inputs
+
+    def _setup_deterministic_sampling(self):
+        """Setup deterministic sampling of inputs based on sample seed."""
+        import random
+        
+        # Set the random seed for reproducibility
+        random.seed(self._sample_seed)
+        
+        # Generate list of all available indices
+        all_indices = list(range(self._available_num_inputs))
+        
+        # Sample N indices without replacement
+        num_to_sample = min(self._num_inputs, self._available_num_inputs)
+        self._sampled_indices = sorted(random.sample(all_indices, num_to_sample))
+        
+        # Update num_inputs to the actual number sampled
+        self._num_inputs = len(self._sampled_indices)
+        
+        # Reset input_id to 0 since we'll be using sampled indices
+        self._original_input_id = self._input_id
+        self._input_id = 0
+
+    def _create_sampled_iterator(self):
+        """Create an iterator that yields inputs at the sampled indices."""
+        # Get all inputs into a list first
+        all_inputs = list(self.get_input_iter())
+        
+        # Yield inputs at sampled indices
+        for idx in self._sampled_indices:
+            yield all_inputs[idx]
 
     def _get_bm_func(self, bm_func_name: str):
         fwd_fn_lambda = getattr(self, bm_func_name, None)
@@ -818,6 +856,79 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             setattr(fwd_no_grad_fn, "_name", bm_func_name)
             return fwd_no_grad_fn
 
+    def _run_single_input(self, warmup, rep, quantiles, metrics):
+        """Run benchmarks for a single input."""
+        if self.reset_dynamo:
+            torch._dynamo.reset()
+        x_val = self.get_x_val(self.example_inputs)
+        if "proton" in self.required_metrics:
+            import triton.profiler as proton
+            proton.activate(self._proton_session_id)
+            proton.enter_scope(f"x_val_{x_val}")
+            proton.deactivate(self._proton_session_id)
+        if self.example_inputs is None:
+            logger.warning(
+                f"The input generator get_input_iter() has depleted at id {self._cur_input_id}. Available number of "
+                f"inputs: {self._available_num_inputs}.",
+                stacklevel=1,
+            )
+            return
+        # Move inputs to the device
+        self.example_inputs = input_cast(
+            lambda x: isinstance(x, torch.Tensor),
+            lambda x: x.to(self.device),
+            self.example_inputs,
+        )
+        # Handle the input data types with best effort
+        apply_precision(self, self.tb_args.precision)
+        self.baseline_fn = None
+        self.baseline_metrics = None
+        self._op_flops = {}
+        if self._only:
+            benchmarks = list(set(self._only))  # remove duplicates
+        else:
+            benchmarks = find_enabled_benchmarks(
+                self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
+            )
+        # Run the baseline first, if baseline exists
+        baseline_name = (
+            BASELINE_BENCHMARKS[self.name]
+            if self.name in BASELINE_BENCHMARKS
+            else None
+        )
+        if baseline_name and baseline_name in benchmarks:
+            benchmarks.remove(baseline_name)
+            benchmarks.insert(0, baseline_name)
+
+        # get metrics for for each registered benchmark
+        def _reduce_benchmarks(acc, bm_name: str):
+            baseline = (
+                bm_name == BASELINE_BENCHMARKS[self.name]
+                if self.name in BASELINE_BENCHMARKS
+                else False
+            )
+            acc[bm_name] = self._do_bench(
+                input_id=self._cur_input_id,
+                fn_name=bm_name,
+                warmup=warmup,
+                rep=rep,
+                quantiles=quantiles,
+                baseline=baseline,
+            )
+            return acc
+
+        try:
+            if hasattr(self.tb_args, 'run_batch') and self.tb_args.run_batch:
+                self.run_batch(warmup, rep, quantiles)
+            else:
+                benchmarks_dict = functools.reduce(_reduce_benchmarks, benchmarks, {})
+                if benchmarks_dict:
+                    metrics.append((x_val, benchmarks_dict))
+        except KeyboardInterrupt:
+            logger.warning("KeyboardInterrupt received, exiting...")
+            self.output = BenchmarkOperatorMetrics(self.name, None, self.unique_name)
+            return
+
     def run(
         self, warmup=DEFAULT_WARMUP, rep=DEFAULT_RUN_ITERS, quantiles=DEFAULT_QUANTILES
     ) -> None:
@@ -830,84 +941,29 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self._proton_session_id = proton.start()
                 proton.enter_scope(f"tritonbench_run_op_{self.name}")
                 proton.deactivate(self._proton_session_id)
-            input_id_range = range(self._input_id, self._input_id + self._num_inputs)
-            if tqdm is not None:
-                input_id_range = tqdm(input_id_range)
-            if self._input_id:
-                for _dryrun_input_id in range(self._input_id):
+            # Handle deterministic sampling
+            if hasattr(self, '_sampled_indices') and self._sampled_indices is not None:
+                # Create a new iterator for sampled inputs
+                self._sampled_input_iter = self._create_sampled_iterator()
+                input_id_range = range(self._num_inputs)
+                if tqdm is not None:
+                    input_id_range = tqdm(input_id_range)
+                for idx in input_id_range:
+                    self._cur_input_id = self._sampled_indices[idx]
+                    self.example_inputs = next(self._sampled_input_iter)
+                    self._run_single_input(warmup, rep, quantiles, metrics)
+            else:
+                # Original logic for sequential access
+                input_id_range = range(self._input_id, self._input_id + self._num_inputs)
+                if tqdm is not None:
+                    input_id_range = tqdm(input_id_range)
+                if self._input_id:
+                    for _dryrun_input_id in range(self._input_id):
+                        self.example_inputs = self.get_example_inputs()
+                for input_id in input_id_range:
+                    self._cur_input_id = input_id
                     self.example_inputs = self.get_example_inputs()
-            for input_id in input_id_range:
-                self._cur_input_id = input_id
-                self.example_inputs = self.get_example_inputs()
-                if self.reset_dynamo:
-                    torch._dynamo.reset()
-                x_val = self.get_x_val(self.example_inputs)
-                if "proton" in self.required_metrics:
-                    proton.activate(self._proton_session_id)
-                    proton.enter_scope(f"x_val_{x_val}")
-                    proton.deactivate(self._proton_session_id)
-                if self.example_inputs is None:
-                    logger.warning(
-                        f"The input generator get_input_iter() has depleted at id {input_id}. Available number of "
-                        f"inputs: {self._available_num_inputs}.",
-                        stacklevel=1,
-                    )
-                    break
-                # Move inputs to the device
-                self.example_inputs = input_cast(
-                    lambda x: isinstance(x, torch.Tensor),
-                    lambda x: x.to(self.device),
-                    self.example_inputs,
-                )
-                # Handle the input data types with best effort
-                apply_precision(self, self.tb_args.precision)
-                self.baseline_fn = None
-                self.baseline_metrics = None
-                self._op_flops = {}
-                if self._only:
-                    benchmarks = list(set(self._only))  # remove duplicates
-                else:
-                    benchmarks = find_enabled_benchmarks(
-                        self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
-                    )
-                # Run the baseline first, if baseline exists
-                baseline_name = (
-                    BASELINE_BENCHMARKS[self.name]
-                    if self.name in BASELINE_BENCHMARKS
-                    else None
-                )
-                if baseline_name and baseline_name in benchmarks:
-                    benchmarks.remove(baseline_name)
-                    benchmarks.insert(0, baseline_name)
-
-                # get metrics for for each registered benchmark
-                def _reduce_benchmarks(acc, bm_name: str):
-                    baseline = (
-                        bm_name == BASELINE_BENCHMARKS[self.name]
-                        if self.name in BASELINE_BENCHMARKS
-                        else False
-                    )
-                    acc[bm_name] = self._do_bench(
-                        input_id=input_id,
-                        fn_name=bm_name,
-                        warmup=warmup,
-                        rep=rep,
-                        quantiles=quantiles,
-                        baseline=baseline,
-                    )
-                    if baseline:
-                        self.baseline_metrics = acc[bm_name]
-                    return acc
-
-                y_vals: Dict[str, BenchmarkOperatorMetrics] = functools.reduce(
-                    _reduce_benchmarks, benchmarks, {}
-                )
-                metrics.append((x_val, y_vals))
-                del self.example_inputs  # save some memory
-                if "proton" in self.required_metrics:
-                    proton.activate(self._proton_session_id)
-                    proton.exit_scope()
-                    proton.deactivate(self._proton_session_id)
+                    self._run_single_input(warmup, rep, quantiles, metrics)
             if "proton" in self.required_metrics:
                 proton.activate(self._proton_session_id)
                 proton.exit_scope()
