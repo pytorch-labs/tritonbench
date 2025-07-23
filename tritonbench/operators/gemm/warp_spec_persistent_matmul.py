@@ -3,6 +3,9 @@ This is copied from Triton matmul tutorial 9 and reduced to just the persistent 
 on blackwell with/without warpspec.
 """
 
+import functools
+import logging
+import os
 from typing import Optional
 
 import torch
@@ -13,6 +16,27 @@ from triton.tools.tensor_descriptor import TensorDescriptor
 # TODO: Add proton support
 
 
+def torch_dtype_to_triton_dtype(dtype):
+    if dtype == torch.float16:
+        return tl.float16
+    elif dtype == torch.float32:
+        return tl.float32
+    elif dtype == torch.float8_e4m3fn:
+        return tl.float8e4nv
+    elif dtype == torch.bfloat16:
+        return tl.bfloat16
+    else:
+        raise ValueError(f"Unsupported dtype: {dtype}")
+
+
+def check_tma_alignment(strides, elem_bytes):
+    for stride in strides[:-1]:
+        if (stride * elem_bytes) % 16 != 0:
+            raise RuntimeError("strides must be 16-byte aligned")
+    if strides[-1] != 1:
+        raise RuntimeError("Last dimension must be contiguous")
+
+
 def _matmul_launch_metadata(grid, kernel, args):
     ret = {}
     M, N, K, WS = args["M"], args["N"], args["K"], args.get("WARP_SPECIALIZE", False)
@@ -21,10 +45,28 @@ def _matmul_launch_metadata(grid, kernel, args):
     if "c_ptr" in args:
         bytes_per_elem = args["c_ptr"].element_size()
     else:
-        bytes_per_elem = 1 if args["FP8_OUTPUT"] else 2
+        # ceil division to capture the correct number of bytes
+        bytes_per_elem = (args["DTYPE"].int_bitwidth + 7) // 8
     ret[f"flops{bytes_per_elem * 8}"] = 2.0 * M * N * K
     ret["bytes"] = bytes_per_elem * (M * K + N * K + M * N)
     return ret
+
+
+small_block_range = [32, 64, 128]
+small_stage_range = [1, 2, 3, 4]
+include_small_configs = os.environ.get("INCLUDE_SMALL_CONFIGS", "0") == "1"
+if include_small_configs:
+    bm_range = small_block_range
+    bn_range = small_block_range + [256]
+    bk_range = small_block_range
+    default_s_range = small_stage_range
+    tma_persistent_s_range = small_stage_range
+else:
+    bm_range = [128]
+    bn_range = [128, 256]
+    bk_range = [64, 128]
+    default_s_range = [3, 4]
+    tma_persistent_s_range = [2, 3, 4]
 
 
 def matmul_get_configs(pre_hook=None):
@@ -40,10 +82,10 @@ def matmul_get_configs(pre_hook=None):
             num_warps=w,
             pre_hook=pre_hook,
         )
-        for BM in [128]
-        for BN in [128, 256]
-        for BK in [64, 128]
-        for s in ([3, 4])
+        for BM in bm_range
+        for BN in bn_range
+        for BK in bk_range
+        for s in default_s_range
         for w in [4, 8]
     ]
 
@@ -77,10 +119,11 @@ def matmul_kernel_tma(
     BLOCK_SIZE_N: tl.constexpr,  #
     BLOCK_SIZE_K: tl.constexpr,  #
     GROUP_SIZE_M: tl.constexpr,  #
-    FP8_OUTPUT: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
+    DTYPE: tl.constexpr,
+    IS_TRANSPOSE: tl.constexpr,
 ):
-    dtype = tl.float8e4nv if FP8_OUTPUT else tl.float16
+    dtype = DTYPE
 
     pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
@@ -103,7 +146,11 @@ def matmul_kernel_tma(
         offs_k = k * BLOCK_SIZE_K
         a = a_desc.load([offs_am, offs_k])
         b = b_desc.load([offs_bn, offs_k])
-        accumulator = tl.dot(a, b.T, accumulator)
+        if IS_TRANSPOSE:
+            arg2 = b
+        else:
+            arg2 = b.T
+        accumulator = tl.dot(a, arg2, accumulator)
 
     c = accumulator.to(dtype)
 
@@ -112,9 +159,19 @@ def matmul_kernel_tma(
     c_desc.store([offs_cm, offs_cn], c)
 
 
+@functools.lru_cache
+def warn_once(msg: str):
+    """
+    Wrapper around logging.warning to try minimize the number of warnings when
+    a function is repeatedly called.
+    """
+    logging.warning(
+        "Incompatible dimensions, B is transposed. We are transposing B which may impact results"
+    )
+
+
 def blackwell_matmul_tma(a, b, warp_specialize: bool):
-    # Check constraints.
-    assert a.shape[1] == b.shape[1], "Incompatible dimensions"  # b is transposed
+    is_transpose = a.shape[1] != b.shape[1]
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
     M, K = a.shape
@@ -141,8 +198,9 @@ def blackwell_matmul_tma(a, b, warp_specialize: bool):
         M,
         N,
         K,  #
-        FP8_OUTPUT=dtype == torch.float8_e4m3fn,  #
         WARP_SPECIALIZE=warp_specialize,  #
+        DTYPE=torch_dtype_to_triton_dtype(dtype),  #
+        IS_TRANSPOSE=is_transpose,
     )
     return c
 
@@ -171,10 +229,10 @@ def matmul_tma_persistent_get_configs(pre_hook=None):
             num_warps=w,
             pre_hook=pre_hook,
         )  #
-        for BM in [128]  #
-        for BN in [128, 256]  #
-        for BK in [64, 128]  #
-        for s in ([2, 3, 4])  #
+        for BM in bm_range  #
+        for BN in bn_range  #
+        for BK in bk_range  #
+        for s in tma_persistent_s_range  #
         for w in [4, 8]  #
         for SUBTILE in [True, False]  #
     ]
@@ -196,12 +254,13 @@ def matmul_kernel_tma_persistent(
     BLOCK_SIZE_N: tl.constexpr,  #
     BLOCK_SIZE_K: tl.constexpr,  #
     GROUP_SIZE_M: tl.constexpr,  #
-    FP8_OUTPUT: tl.constexpr,  #
     EPILOGUE_SUBTILE: tl.constexpr,  #
     NUM_SMS: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
+    DTYPE: tl.constexpr,
+    IS_TRANSPOSE: tl.constexpr,
 ):
-    dtype = tl.float8e4nv if FP8_OUTPUT else tl.float16
+    dtype = DTYPE
     start_pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
@@ -228,7 +287,11 @@ def matmul_kernel_tma_persistent(
             offs_k = ki * BLOCK_SIZE_K
             a = a_desc.load([offs_am, offs_k])
             b = b_desc.load([offs_bn, offs_k])
-            accumulator = tl.dot(a, b.T, accumulator)
+            if IS_TRANSPOSE:
+                arg2 = b
+            else:
+                arg2 = b.T
+            accumulator = tl.dot(a, arg2, accumulator)
 
         tile_id_c += NUM_SMS
         pid_m, pid_n = _compute_pid(
@@ -255,9 +318,11 @@ def matmul_kernel_tma_persistent(
 
 
 def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
-    # Check constraints.
-    assert a.shape[1] == b.shape[1], "Incompatible dimensions"  # b is transposed
+    is_transpose = a.shape[1] != b.shape[1]
     assert a.dtype == b.dtype, "Incompatible dtypes"
+
+    check_tma_alignment(a.stride(), (torch.finfo(a.dtype).bits + 7) // 8)
+    check_tma_alignment(b.stride(), (torch.finfo(b.dtype).bits + 7) // 8)
 
     M, K = a.shape
     N, K = b.shape
@@ -291,9 +356,10 @@ def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
         M,
         N,
         K,  #
-        FP8_OUTPUT=dtype == torch.float8_e4m3fn,  #
         NUM_SMS=NUM_SMS,  #
         WARP_SPECIALIZE=warp_specialize,  #
+        DTYPE=torch_dtype_to_triton_dtype(dtype),  #
+        IS_TRANSPOSE=is_transpose,
     )
     return c
 
@@ -329,6 +395,7 @@ def matmul_kernel_descriptor_persistent(
     NUM_SMS: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     FLATTEN: tl.constexpr,
+    TRANSPOSE_B: tl.constexpr,
 ):
     # Matmul using TMA and device-side descriptor creation
     dtype = c_ptr.dtype.element_ty
@@ -344,12 +411,20 @@ def matmul_kernel_descriptor_persistent(
         strides=[K, 1],
         block_shape=[BLOCK_SIZE_M, BLOCK_SIZE_K],
     )
-    b_desc = tl.make_tensor_descriptor(
-        b_ptr,
-        shape=[N, K],
-        strides=[K, 1],
-        block_shape=[BLOCK_SIZE_N, BLOCK_SIZE_K],
-    )
+    if TRANSPOSE_B:
+        b_desc = tl.make_tensor_descriptor(
+            b_ptr,
+            shape=[N, K],
+            strides=[K, 1],
+            block_shape=[BLOCK_SIZE_N, BLOCK_SIZE_K],
+        )
+    else:
+        b_desc = tl.make_tensor_descriptor(
+            b_ptr,
+            shape=[K, N],
+            strides=[N, 1],
+            block_shape=[BLOCK_SIZE_K, BLOCK_SIZE_N],
+        )
     c_desc = tl.make_tensor_descriptor(
         c_ptr,
         shape=[M, N],
@@ -379,7 +454,11 @@ def matmul_kernel_descriptor_persistent(
             offs_k = ki * BLOCK_SIZE_K
             a = a_desc.load([offs_am, offs_k])
             b = b_desc.load([offs_bn, offs_k])
-            accumulator = tl.dot(a, b.T, accumulator)
+            if TRANSPOSE_B:
+                arg2 = b.T
+            else:
+                arg2 = b
+            accumulator = tl.dot(a, arg2, accumulator)
 
         tile_id_c += NUM_SMS
         pid_m, pid_n = _compute_pid(
@@ -402,12 +481,23 @@ def matmul_kernel_descriptor_persistent(
 
 
 def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
-    # Check constraints.
-    assert a.shape[1] == b.shape[1], "Incompatible dimensions"  # b is transposed
+    # High-Level Options for B's layout
+    # 1. (K, N) contiguous in N
+    # 2. (K, N) contiguous in K
+    # 3. (N, K) contiguous in N
+    # 4. (N, K) contiguous in K
+    # In practice, since you always load in the contiguous dimension
+    # there are actually only 2 options
+    # 1. Load in the K stride 1 (2 and 4)
+    # 2. Load in the N stride 1 (1 and 3)
+    transpose_b = (a.shape[1] != b.shape[1] and b.stride()[-1] != 1) or (a.shape[1] == b.shape[1] and b.stride()[-1] == 1)
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
     M, K = a.shape
-    N, K = b.shape
+    if a.shape[1] != b.shape[1]:
+        K, N = b.shape
+    else:
+        N, K = b.shape
     dtype = a.dtype
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
@@ -436,5 +526,6 @@ def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
         WARP_SPECIALIZE=warp_specialize,  #
         # Note: This assumes blackwell.
         FLATTEN=True,
+        TRANSPOSE_B=transpose_b,
     )
     return c
