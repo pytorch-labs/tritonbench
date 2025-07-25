@@ -16,7 +16,7 @@ from tritonbench.operators import load_opbench_by_name
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.gpu_utils import gpu_lockdown
-from tritonbench.utils.list_metrics import list_metrics
+from tritonbench.utils.list_operator_details import list_operator_details
 from tritonbench.utils.parser import get_parser
 from tritonbench.utils.run_utils import run_config, run_in_task
 
@@ -114,9 +114,15 @@ def run(args: List[str] = []):
     else:
         ops = list_operators_by_collection(args.op_collection)
 
-    # Handle --list-metrics after determining operators list
-    if args.list_metrics:
-        print(list_metrics(operators=ops if ops else []))
+    # Handle --list-metrics and --list-backends after determining operators list
+    if args.list_metrics or args.list_backends:
+        print(
+            list_operator_details(
+                operators=ops if ops else None,
+                show_metrics=args.list_metrics,
+                show_backends=args.list_backends,
+            )
+        )
         return
 
     # Force isolation in subprocess if testing more than one op.

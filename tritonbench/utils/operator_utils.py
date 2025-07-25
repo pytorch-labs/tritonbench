@@ -2,6 +2,7 @@
 Utilities for getting operator details.
 """
 
+import sys
 from typing import Dict, List, Optional, OrderedDict, Union
 
 from tritonbench.operators import load_opbench_by_name

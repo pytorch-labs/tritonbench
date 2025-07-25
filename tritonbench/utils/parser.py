@@ -102,6 +102,11 @@ def get_parser(args=None):
         help="List all available metrics. Can be used with --op or --op-collection to show operator-specific metrics.",
     )
     parser.add_argument(
+        "--list-backends",
+        action="store_true",
+        help="List all registerd backends per operator.",
+    )
+    parser.add_argument(
         "--metrics-gpu-backend",
         choices=["torch", "nvml"],
         default="torch",
