@@ -14,7 +14,9 @@ def tritonparse_init(tritonparse_log_path):
                 return
             import tritonparse.structured_logging
 
-            tritonparse.structured_logging.init(tritonparse_log_path)
+            tritonparse.structured_logging.init(
+                tritonparse_log_path, enable_launch_trace=True
+            )
             print(
                 f"TritonParse structured logging initialized with log path: {tritonparse_log_path}"
             )
