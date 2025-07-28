@@ -6,6 +6,10 @@ import sys
 from dataclasses import fields
 from typing import Dict, List, Optional
 
+# Indentation constants for consistent formatting
+INDENT = "  "  # Base indentation unit (2 spaces)
+INDENT2 = INDENT * 2  # Double indentation (4 spaces)
+
 from tritonbench.operators_collection import list_operators_by_collection
 from tritonbench.utils.operator_utils import (
     batch_load_operators,
@@ -67,7 +71,7 @@ def format_builtin_metrics_header(builtin_metrics: List[str]) -> List[str]:
     """Format the built-in metrics header section."""
     output = ["Built-in metrics (available for all operators):"]
     for metric in sorted(builtin_metrics):
-        output.append(f"\t{metric}")
+        output.append(f"{INDENT}{metric}")
     return output
 
 
@@ -89,9 +93,9 @@ def format_backend_entry(backend_name: str, backend_info: Dict[str, any]) -> str
     status_str = f" [{', '.join(status_indicators)}]" if status_indicators else ""
 
     if label != backend_name:
-        return f"\t\t{backend_name} (label: {label}){status_str}"
+        return f"{INDENT2}{backend_name} (label: {label}){status_str}"
     else:
-        return f"\t\t{backend_name}{status_str}"
+        return f"{INDENT2}{backend_name}{status_str}"
 
 
 def format_metrics_section(
@@ -107,14 +111,14 @@ def format_metrics_section(
     overridden = metrics_data[op_name].get("overridden", [])
 
     if custom:
-        output.append("\tCustom metrics:")
+        output.append(f"{INDENT}Custom metrics:")
         for metric in sorted(custom):
-            output.append(f"\t\t{metric}")
+            output.append(f"{INDENT2}{metric}")
 
     if overridden:
-        output.append("\tOverridden metrics:")
+        output.append(f"{INDENT}Overridden metrics:")
         for metric in sorted(overridden):
-            output.append(f"\t\t{metric}")
+            output.append(f"{INDENT2}{metric}")
 
     return output
 
@@ -128,7 +132,7 @@ def format_backends_section(
     if op_name not in backends_data or not backends_data[op_name]:
         return output
 
-    output.append("\tBackends:")
+    output.append(f"{INDENT}Backends:")
     backends = backends_data[op_name]
 
     for backend_name in sorted(backends.keys()):
@@ -277,7 +281,7 @@ def list_operator_details(
             output = []
             output.append("Built-in metrics (available for all operators):")
             for metric in sorted(builtin_metrics):
-                output.append(f"\t{metric}")
+                output.append(f"{INDENT}{metric}")
             output.append(
                 "\nNote: Use --op or --op-collection to show operator-specific details."
             )
@@ -287,7 +291,7 @@ def list_operator_details(
             output = []
             output.append("Built-in metrics (available for all operators):")
             for metric in sorted(builtin_metrics):
-                output.append(f"\t{metric}")
+                output.append(f"{INDENT}{metric}")
             return "\n".join(output)
         elif show_backends:
             # Global backends case - no global backends exist
