@@ -5,6 +5,7 @@ on blackwell with/without warpspec.
 
 import functools
 import logging
+import os
 from typing import Optional
 
 import torch
@@ -51,6 +52,23 @@ def _matmul_launch_metadata(grid, kernel, args):
     return ret
 
 
+small_block_range = [32, 64, 128]
+small_stage_range = [1, 2, 3, 4]
+include_small_configs = os.environ.get("INCLUDE_SMALL_CONFIGS", "0") == "1"
+if include_small_configs:
+    bm_range = small_block_range
+    bn_range = small_block_range + [256]
+    bk_range = small_block_range
+    default_s_range = small_stage_range
+    tma_persistent_s_range = small_stage_range
+else:
+    bm_range = [128]
+    bn_range = [128, 256]
+    bk_range = [64, 128]
+    default_s_range = [3, 4]
+    tma_persistent_s_range = [2, 3, 4]
+
+
 def matmul_get_configs(pre_hook=None):
     return [
         triton.Config(
@@ -64,10 +82,10 @@ def matmul_get_configs(pre_hook=None):
             num_warps=w,
             pre_hook=pre_hook,
         )
-        for BM in [128]
-        for BN in [128, 256]
-        for BK in [64, 128]
-        for s in ([3, 4])
+        for BM in bm_range
+        for BN in bn_range
+        for BK in bk_range
+        for s in default_s_range
         for w in [4, 8]
     ]
 
@@ -211,10 +229,10 @@ def matmul_tma_persistent_get_configs(pre_hook=None):
             num_warps=w,
             pre_hook=pre_hook,
         )  #
-        for BM in [128]  #
-        for BN in [128, 256]  #
-        for BK in [64, 128]  #
-        for s in ([2, 3, 4])  #
+        for BM in bm_range  #
+        for BN in bn_range  #
+        for BK in bk_range  #
+        for s in tma_persistent_s_range  #
         for w in [4, 8]  #
         for SUBTILE in [True, False]  #
     ]
