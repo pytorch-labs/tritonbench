@@ -5,17 +5,29 @@ Implementation from: https://github.com/ROCm/triton/blob/902b8329cadfb23b8ff4cbb
 
 This kernel has some known numerical issues due to the use of atomic_add.
 """
-
 import os
 
 import torch
 
 import triton
 import triton.language as tl
+from triton.tools.tensor_descriptor import TensorDescriptor
 
-from tritonbench.utils.env_utils import is_hip_mi300
+from tritonbench.utils.env_utils import is_cuda, is_fbcode, is_hip_mi300
 
 from .triton_matmul_configs import get_full_amd_config_space
+
+if not is_fbcode():
+    if is_cuda():
+        from triton._C.libtriton import nvidia
+
+        cublas_workspace = torch.empty(
+            32 * 1024 * 1024, device="cuda", dtype=torch.uint8
+        )
+        cublas = nvidia.cublas.CublasLt(cublas_workspace)
+    else:
+        cublas = None
+
 
 if os.environ.get("FULL_AUTOTUNING_AMD", "0") == "1" and torch.version.hip is not None:
     tuning_configs = get_full_amd_config_space(False)
@@ -56,7 +68,7 @@ else:
     }
 )
 @triton.jit
-def streamk_gemm(
+def streamk_amd_gemm(
     A,
     B,
     C,
@@ -274,7 +286,7 @@ def streamk_gemm(
         start_iter = end_iter
 
 
-def streamk_matmul(a, b, bias=None):
+def streamk_amd_matmul(a, b, bias=None):
     M, K = a.shape
     _, N = b.shape
     dtype = a.dtype
@@ -350,7 +362,7 @@ def streamk_matmul(a, b, bias=None):
         and c.stride(0) >= 0
         and c.stride(1) >= 0
     )
-    streamk_gemm[(grids,)](
+    streamk_amd_gemm[(grids,)](
         a,
         b,
         c,
@@ -375,4 +387,189 @@ def streamk_matmul(a, b, bias=None):
 
     # print(c)
     # print(a @ b)
+    return c
+
+def _matmul_launch_metadata(grid, kernel, args):
+    ret = {}
+    M, N, K = args["M"], args["N"], args["K"]
+    ret["name"] = f"{kernel.name} [M={M}, N={N}, K={K}]"
+    ret["flops8"] = 2.0 * M * N * K
+    if "c_ptr" in args:
+        bytes_per_elem = args["c_ptr"].element_size()
+    else:
+        bytes_per_elem = 1 if args["FP8_OUTPUT"] else 2
+    ret["bytes"] = bytes_per_elem * (M * K + N * K)
+    return ret
+
+def matmul_get_configs(pre_hook=None):
+    return [
+        triton.Config({'BLOCK_M': BM, 'BLOCK_N': BN, "BLOCK_K": BK, "GROUP_M": 8}, num_stages=s, num_warps=w, pre_hook=pre_hook)  #
+        for BM in [128, 256]  #
+        for BN in [128, 256]  #
+        for BK in [64, 128]  #
+        for s in ([2, 3, 4])  #
+        for w in [1, 4, 8]  #
+    ]
+
+def matmul_tma_set_block_size_hook(nargs):
+    BLOCK_M = nargs["BLOCK_M"]
+    BLOCK_N = nargs["BLOCK_N"]
+    BLOCK_K = nargs["BLOCK_K"]
+    nargs["a_desc"].block_shape = [BLOCK_M, BLOCK_K]
+    nargs["b_desc"].block_shape = [BLOCK_N, BLOCK_K]
+    nargs["c_desc"].block_shape = [BLOCK_M, BLOCK_N]
+
+    M = nargs["M"]
+    N = nargs["N"]
+
+    num_sms = torch.cuda.get_device_properties("cuda").multi_processor_count
+    num_tiles = triton.cdiv(M, BLOCK_M) * triton.cdiv(N, BLOCK_N)
+    nargs["NUM_PID"] = (min(num_sms, num_tiles),)
+
+@triton.autotune(
+    configs=matmul_get_configs(pre_hook=matmul_tma_set_block_size_hook),
+    key=["M", "N", "K"]
+)
+@triton.jit(launch_metadata=_matmul_launch_metadata)
+def streamk_cuda_gemm(
+    a_desc,
+    b_desc,
+    c_desc,  #
+    M,
+    N,
+    K,  #
+    BLOCK_M: tl.constexpr,  #
+    BLOCK_N: tl.constexpr,  #
+    BLOCK_K: tl.constexpr,  #
+    GROUP_M: tl.constexpr,  #
+    FP8_OUTPUT: tl.constexpr,  #
+    ENABLE_BUFFER_OPS_ASSUMES: tl.constexpr,  #
+    NUM_PID: tl.constexpr,  #
+):
+    if ENABLE_BUFFER_OPS_ASSUMES:
+        tl.assume(M >= 0)
+        tl.assume(N >= 0)
+        tl.assume(K >= 0)
+
+    dtype = tl.float8e4nv if FP8_OUTPUT else tl.float16
+
+    pid = tl.program_id(0)
+    num_tile_m = tl.cdiv(M, BLOCK_M)
+    num_tile_n = tl.cdiv(N, BLOCK_N)
+    num_tile_in_group = GROUP_M * num_tile_n
+
+    total_tiles = num_tile_m * num_tile_n
+
+    #----------------------------------------------------------------------------
+    # DDP phase
+    #----------------------------------------------------------------------------
+    total_full_waves = total_tiles // NUM_PID
+    total_ddp_waves = tl.where(total_full_waves > 0, total_full_waves - 1, 0)
+
+    st_tile_ddp = total_ddp_waves * pid
+    en_tile_ddp = st_tile_ddp + total_ddp_waves
+    for curr_tile in tl.range(st_tile_ddp, en_tile_ddp, flatten=True, warp_specialize=True):
+        group_id = curr_tile // num_tile_in_group
+        first_tile_m = group_id * GROUP_M
+        group_size_m = min(num_tile_m - first_tile_m, GROUP_M)
+        tile_m = first_tile_m + (curr_tile % group_size_m)
+        tile_n = (curr_tile % num_tile_in_group) // group_size_m
+
+        offs_am = tile_m * BLOCK_M
+        offs_bn = tile_n * BLOCK_N
+
+        accumulator = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
+
+        for k in tl.range(0, K):
+            offs_k = k * BLOCK_K
+            a = a_desc.load([offs_am, offs_k])
+            b = b_desc.load([offs_bn, offs_k])
+            accumulator = tl.dot(a, b.T, accumulator)
+
+        c = accumulator.to(dtype)
+        c_desc.store([offs_am, offs_bn], c)
+
+    #----------------------------------------------------------------------------
+    # Stream-K phase
+    #----------------------------------------------------------------------------
+    total_streamk_tiles = total_tiles - total_ddp_waves * NUM_PID
+    work_units_per_tile = tl.cdiv(K, BLOCK_K)
+
+    total_work = total_streamk_tiles * work_units_per_tile
+    min_work_per_pid = total_work // NUM_PID
+    rem_work_per_pid  = total_work - min_work_per_pid * NUM_PID
+
+    extra_work = tl.where(pid < rem_work_per_pid, 1, 0)
+    work_for_pid = min_work_per_pid + extra_work
+
+    start_idx = pid * min_work_per_pid + tl.minimum(pid, rem_work_per_pid)
+    end_idx   = start_idx + work_for_pid - 1
+
+    st_tile_streamk = start_idx // work_units_per_tile + total_ddp_waves
+    st_k_streamk    = start_idx %  work_units_per_tile
+    en_tile_streamk = end_idx   // work_units_per_tile + total_ddp_waves
+    en_k_streamk    = end_idx   %  work_units_per_tile
+
+    for curr_tile in tl.range(st_tile_streamk, en_tile_streamk + 1, flatten=True, warp_specialize=True):
+        group_id = curr_tile // num_tile_in_group
+        first_tile_m = group_id * GROUP_M
+        group_size_m = min(num_tile_m - first_tile_m, GROUP_M)
+        tile_m = first_tile_m + (curr_tile % group_size_m)
+        tile_n = (curr_tile % num_tile_in_group) // group_size_m
+
+        offs_am = tile_m * BLOCK_M
+        offs_bn = tile_n * BLOCK_N
+
+        accumulator = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
+
+        curr_st_k = tl.where(curr_tile == st_tile_streamk, st_k_streamk, 0)
+        curr_en_k = tl.where(curr_tile == en_tile_streamk, en_k_streamk, K - 1)
+
+        for k in tl.range(curr_st_k, curr_en_k + 1):
+            offs_k = k * BLOCK_K
+            a = a_desc.load([offs_am, offs_k])
+            b = b_desc.load([offs_bn, offs_k])
+            accumulator = tl.dot(a, b.T, accumulator)
+
+        c = accumulator.to(dtype)
+        if curr_st_k == 0 and curr_en_k == work_units_per_tile - 1:
+            c_desc.store([offs_am, offs_bn], c)
+        else:
+            c_desc.atomic_add([offs_am, offs_bn], c)
+
+def streamk_cuda_matmul(a, b):
+    assert a.dtype == b.dtype, "Incompatible dtypes"
+
+    M, K = a.shape
+    N, K = b.shape
+    dtype = a.dtype
+
+    c = torch.empty((M, N), device=a.device, dtype=dtype)
+
+    b = b.T.contiguous()
+
+    dummy_block = [1, 1]
+    a_desc = TensorDescriptor(a, a.shape, a.stride(), dummy_block)
+    b_desc = TensorDescriptor(b, b.shape, b.stride(), dummy_block)
+    c_desc = TensorDescriptor(c, c.shape, c.stride(), dummy_block)
+
+    def grid(META):
+        nonlocal a_desc, b_desc, c_desc
+        BLOCK_M = META["BLOCK_M"]
+        BLOCK_N = META["BLOCK_N"]
+        num_sms = torch.cuda.get_device_properties("cuda").multi_processor_count
+        num_tiles = triton.cdiv(M, BLOCK_M) * triton.cdiv(N, BLOCK_N)
+        return (min(num_sms, num_tiles),)
+
+    streamk_cuda_gemm[grid](
+        a_desc,
+        b_desc,
+        c_desc,  #
+        M,
+        N,
+        K,  #
+        FP8_OUTPUT=dtype == torch.float8_e4m3fn,  #
+        ENABLE_BUFFER_OPS_ASSUMES=False,  #
+        NUM_PID=torch.cuda.get_device_properties("cuda").multi_processor_count
+    )
     return c

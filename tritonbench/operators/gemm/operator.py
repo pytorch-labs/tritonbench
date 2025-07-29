@@ -10,7 +10,7 @@ import triton
 
 from tritonbench.operators.gemm.kernels import matmul as kernels
 from tritonbench.operators.gemm.partition_k import matmul_partition_k
-from tritonbench.operators.gemm.stream_k import streamk_matmul
+from tritonbench.operators.gemm.stream_k import streamk_amd_matmul, streamk_cuda_matmul
 from tritonbench.operators.gemm.warp_spec_persistent_matmul import (
     blackwell_matmul_descriptor_persistent,
     blackwell_matmul_tma,
@@ -313,10 +313,11 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def streamk_matmul(self, a, b, bias) -> Callable:
-        if bias is not None:
-            return lambda: streamk_matmul(a, b, bias)
+        if is_cuda():
+            # assert torch.allclose(streamk_cuda_matmul(a, b), torch.matmul(a, b), rtol=1e-4, atol=1e-6), "streamk matmul failed"
+            return lambda: streamk_cuda_matmul(a, b) + bias if bias else streamk_cuda_matmul(a, b)
         else:
-            return lambda: streamk_matmul(a, b)
+            return lambda: streamk_amd_matmul(a, b, bias) if bias else streamk_amd_matmul(a, b)
 
     @register_benchmark(enabled=is_cuda())
     def pt2_cutlass_matmul(self, a, b, bias) -> Callable:
@@ -335,32 +336,32 @@ class Operator(BenchmarkOperator):
             compiled(a, b)
         return lambda: compiled(a, b)
 
-    @register_benchmark()
-    def matmul_decompose_k(self, a, b, bias) -> Callable:
-        def decompose_func(a_in, b_in):
-            M, K = a_in.shape
-            K, N = b_in.shape
+    # @register_benchmark()
+    # def matmul_decompose_k(self, a, b, bias) -> Callable:
+    #     def decompose_func(a_in, b_in):
+    #         M, K = a_in.shape
+    #         K, N = b_in.shape
 
-            # TODO: Ideally we want to autotune over this parameter
-            kPartitions = 256
-            assert K % kPartitions == 0, "K must be divisible by Kmini"
-            B = K // kPartitions
+    #         # TODO: Ideally we want to autotune over this parameter
+    #         kPartitions = 256
+    #         assert K % kPartitions == 0, "K must be divisible by Kmini"
+    #         B = K // kPartitions
 
-            a_reshaped = a.reshape(M, B, kPartitions).transpose(
-                0, 1
-            )  # Shape: (B, M, kPartitions)
-            b_reshaped = b.reshape(B, kPartitions, N)  # Shape: (B, kPartitions, N)
-            result = torch.bmm(a_reshaped, b_reshaped).to(
-                torch.float32
-            )  # Shape: (B, M, N)
-            return result.sum(dim=0)  # Sum over B dimension, Shape: (M, N)
+    #         a_reshaped = a.reshape(M, B, kPartitions).transpose(
+    #             0, 1
+    #         )  # Shape: (B, M, kPartitions)
+    #         b_reshaped = b.reshape(B, kPartitions, N)  # Shape: (B, kPartitions, N)
+    #         result = torch.bmm(a_reshaped, b_reshaped).to(
+    #             torch.float32
+    #         )  # Shape: (B, M, N)
+    #         return result.sum(dim=0)  # Sum over B dimension, Shape: (M, N)
 
-        compiled_decompose_k = torch.compile(decompose_func)
-        compiled_decompose_k(a, b)
-        if bias is not None:
-            return lambda: compiled_decompose_k(a, b) + bias
-        else:
-            return lambda: compiled_decompose_k(a, b)
+        # compiled_decompose_k = torch.compile(decompose_func)
+        # compiled_decompose_k(a, b)
+        # if bias is not None:
+        #     return lambda: compiled_decompose_k(a, b) + bias
+        # else:
+        #     return lambda: compiled_decompose_k(a, b)
 
     if IS_B200:
 
