@@ -129,6 +129,12 @@ def get_parser(args=None):
         help="Specify one or multiple kernel implementations to skip.",
     )
     parser.add_argument(
+        "--only-match-mode",
+        default="exact",
+        choices=["exact", "prefix-with-baseline"],
+        help="Match mode for --only argument. 'exact' for full string match, 'prefix-with-baseline' for prefix match as well as the existing baseline. Default: exact",
+    )
+    parser.add_argument(
         "--baseline", type=str, default=None, help="Override default baseline."
     )
     parser.add_argument(
