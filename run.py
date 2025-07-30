@@ -88,7 +88,7 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
             if args.csv:
                 output_file = os.path.join(args.output_dir, f"{args.op}.csv")
                 with open(output_file, "w") as f:
-                    metrics.write_json_to_file(f)
+                    metrics.write_csv_to_file(f)
             else:
                 output_file = os.path.join(args.output_dir, f"{args.op}.json")
                 with open(output_file, "w") as f:
