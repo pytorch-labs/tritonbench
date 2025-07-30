@@ -1,17 +1,22 @@
 # TLX GDPA kernel optimized for Blackwell Warp Specialization
 
+import math
+
 import torch
 import triton
 import triton.language as tl
 import triton.tlx.language as tlx
+
+from .gdpa_utils import get_num_sms
+from .math import activation_string_to_int
 
 
 def get_cuda_autotune_config():
     return [
         triton.Config(
             {
-                "BLOCK_SIZE_M": BM,
-                "BLOCK_SIZE_N": BN,
+                "BLOCK_M": BM,
+                "BLOCK_N": BN,
                 "NUM_BUFFERS_Q": bq,
                 "NUM_BUFFERS_K": bk,
                 "NUM_BUFFERS_QK": bq,
@@ -404,7 +409,6 @@ def gdpa_kernel_tma_ws_blackwell(
     K,
     K_offsets,
     V,
-    workspace_ptr,
     Out,  #
     Out_offsets,
     ad_to_request_offset_ptr,
@@ -438,9 +442,6 @@ def gdpa_kernel_tma_ws_blackwell(
     BLOCK_D: tl.constexpr,  #
     STAGE: tl.constexpr,  #
     USE_START_END_OFFSETS: tl.constexpr,
-    enable_tma: tl.constexpr,
-    enable_ws: tl.constexpr,
-    NUM_CONSUMER_GROUPS: tl.constexpr,
     WINDOW_SIZE: tl.constexpr,
     BROADCAST_Q: tl.constexpr,
     IS_DENSE_KV: tl.constexpr,
@@ -824,6 +825,16 @@ def gdpa_kernel_tma_ws_blackwell(
                     accum_cnt_outer += 1
 
 
+def next_power_of_2(x):
+    return 2 ** (math.ceil(math.log(x, 2)))
+
+
+def expect_contiguous(x: torch.Tensor) -> torch.Tensor:
+    if x is not None and x.stride(-1) != 1:
+        return x.contiguous()
+    return x
+
+
 # assume is_predict: tl.constexpr,  #  false
 #    FUSED_QKV: tl.constexpr,  # false
 #    FUSED_KV: tl.constexpr,  # false
@@ -939,7 +950,6 @@ def gdpa_forward_tlx(
         k,
         key_offset,
         v,
-        workspace,
         o,  #
         output_offset,
         ad_to_request_offset,
@@ -962,10 +972,10 @@ def gdpa_forward_tlx(
         N_CTX=max_seq_len_q,
         N_CTX_KV=max_seq_len_kv,  #
         qk_scale=qk_scale,
-        is_predict=is_predict,
+        is_predict=False,
         Q_SHAPE_0=query.shape[0],
-        FUSED_QKV=fused_qkv,
-        FUSED_KV=fused_kv,
+        FUSED_QKV=False,  # fused_qkv,
+        FUSED_KV=False,  # fused_kv,
         SORT_BY_SEQ_LENGTH=sort_by_seq_length,
         HEAD_DIM=HEAD_DIM_K,  #
         BLOCK_D=BLOCK_D,
