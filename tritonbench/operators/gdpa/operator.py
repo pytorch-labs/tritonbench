@@ -18,13 +18,9 @@ buck2 run @mode/opt //pytorch/tritonbench:run -- \
 
 import argparse
 import gc
-import re
 from typing import Any, Callable, Generator, List, Optional
 
 import torch
-
-from .gdpa import gdpa
-from .gdpa_utils import generate_jagged_data
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -34,6 +30,9 @@ from tritonbench.utils.triton_op import (
     register_metric,
     register_x_val,
 )
+
+from .gdpa import gdpa
+from .gdpa_utils import generate_jagged_data
 
 
 def calculate_memory_size(jagged_q, jagged_k, jagged_v, real_output, run_fwd, run_bwd):
@@ -103,19 +102,19 @@ def parse_args(args):
         "--max_seq_len",
         default=1000,
         type=str,
-        help=f"Max sequence length for Q",
+        help="Max sequence length for Q",
     )
     parser.add_argument(
         "--dim",
         default=512,
         type=str,
-        help=f"Query dimension",
+        help="Query dimension",
     )
     parser.add_argument(
         "--head",
         default=4,
         type=str,
-        help=f"Multi head number",
+        help="Multi head number",
     )
     parser.add_argument(
         "--kv_len",
