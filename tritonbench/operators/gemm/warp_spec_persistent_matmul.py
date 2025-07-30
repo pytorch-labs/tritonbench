@@ -121,6 +121,7 @@ def matmul_kernel_tma(
     GROUP_SIZE_M: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     DTYPE: tl.constexpr,
+    IS_TRANSPOSE: tl.constexpr,
 ):
     dtype = DTYPE
 
@@ -145,7 +146,11 @@ def matmul_kernel_tma(
         offs_k = k * BLOCK_SIZE_K
         a = a_desc.load([offs_am, offs_k])
         b = b_desc.load([offs_bn, offs_k])
-        accumulator = tl.dot(a, b.T, accumulator)
+        if IS_TRANSPOSE:
+            arg2 = b
+        else:
+            arg2 = b.T
+        accumulator = tl.dot(a, arg2, accumulator)
 
     c = accumulator.to(dtype)
 
@@ -166,13 +171,7 @@ def warn_once(msg: str):
 
 
 def blackwell_matmul_tma(a, b, warp_specialize: bool):
-    # Check constraints.
-    if a.shape[1] != b.shape[1]:
-        warn_once(
-            "Incompatible dimensions, B is transposed. We are transposing B which may impact results"
-        )
-        b = b.T.contiguous()
-    assert a.shape[1] == b.shape[1], "Incompatible dimensions"  # b is transposed
+    is_transpose = a.shape[1] != b.shape[1]
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
     M, K = a.shape
@@ -201,6 +200,7 @@ def blackwell_matmul_tma(a, b, warp_specialize: bool):
         K,  #
         WARP_SPECIALIZE=warp_specialize,  #
         DTYPE=torch_dtype_to_triton_dtype(dtype),  #
+        IS_TRANSPOSE=is_transpose,
     )
     return c
 
@@ -258,6 +258,7 @@ def matmul_kernel_tma_persistent(
     NUM_SMS: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     DTYPE: tl.constexpr,
+    IS_TRANSPOSE: tl.constexpr,
 ):
     dtype = DTYPE
     start_pid = tl.program_id(axis=0)
@@ -286,7 +287,11 @@ def matmul_kernel_tma_persistent(
             offs_k = ki * BLOCK_SIZE_K
             a = a_desc.load([offs_am, offs_k])
             b = b_desc.load([offs_bn, offs_k])
-            accumulator = tl.dot(a, b.T, accumulator)
+            if IS_TRANSPOSE:
+                arg2 = b
+            else:
+                arg2 = b.T
+            accumulator = tl.dot(a, arg2, accumulator)
 
         tile_id_c += NUM_SMS
         pid_m, pid_n = _compute_pid(
@@ -313,13 +318,7 @@ def matmul_kernel_tma_persistent(
 
 
 def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
-    # Check constraints.
-    if a.shape[1] != b.shape[1]:
-        warn_once(
-            "Incompatible dimensions, B is transposed. We are transposing B which may impact results"
-        )
-        b = b.T.contiguous()
-    assert a.shape[1] == b.shape[1], "Incompatible dimensions"  # b is transposed
+    is_transpose = a.shape[1] != b.shape[1]
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
     check_tma_alignment(a.stride(), (torch.finfo(a.dtype).bits + 7) // 8)
@@ -360,6 +359,7 @@ def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
         NUM_SMS=NUM_SMS,  #
         WARP_SPECIALIZE=warp_specialize,  #
         DTYPE=torch_dtype_to_triton_dtype(dtype),  #
+        IS_TRANSPOSE=is_transpose,
     )
     return c
 
@@ -395,6 +395,7 @@ def matmul_kernel_descriptor_persistent(
     NUM_SMS: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     FLATTEN: tl.constexpr,
+    TRANSPOSE_B: tl.constexpr,
 ):
     # Matmul using TMA and device-side descriptor creation
     dtype = c_ptr.dtype.element_ty
@@ -410,12 +411,20 @@ def matmul_kernel_descriptor_persistent(
         strides=[K, 1],
         block_shape=[BLOCK_SIZE_M, BLOCK_SIZE_K],
     )
-    b_desc = tl.make_tensor_descriptor(
-        b_ptr,
-        shape=[N, K],
-        strides=[K, 1],
-        block_shape=[BLOCK_SIZE_N, BLOCK_SIZE_K],
-    )
+    if TRANSPOSE_B:
+        b_desc = tl.make_tensor_descriptor(
+            b_ptr,
+            shape=[N, K],
+            strides=[K, 1],
+            block_shape=[BLOCK_SIZE_N, BLOCK_SIZE_K],
+        )
+    else:
+        b_desc = tl.make_tensor_descriptor(
+            b_ptr,
+            shape=[K, N],
+            strides=[N, 1],
+            block_shape=[BLOCK_SIZE_K, BLOCK_SIZE_N],
+        )
     c_desc = tl.make_tensor_descriptor(
         c_ptr,
         shape=[M, N],
@@ -445,7 +454,11 @@ def matmul_kernel_descriptor_persistent(
             offs_k = ki * BLOCK_SIZE_K
             a = a_desc.load([offs_am, offs_k])
             b = b_desc.load([offs_bn, offs_k])
-            accumulator = tl.dot(a, b.T, accumulator)
+            if TRANSPOSE_B:
+                arg2 = b.T
+            else:
+                arg2 = b
+            accumulator = tl.dot(a, arg2, accumulator)
 
         tile_id_c += NUM_SMS
         pid_m, pid_n = _compute_pid(
@@ -468,17 +481,25 @@ def matmul_kernel_descriptor_persistent(
 
 
 def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
-    # Check constraints.
-    if a.shape[1] != b.shape[1]:
-        warn_once(
-            "Incompatible dimensions, B is transposed. We are transposing B which may impact results"
-        )
-        b = b.T.contiguous()
-    assert a.shape[1] == b.shape[1], "Incompatible dimensions"  # b is transposed
+    # High-Level Options for B's layout
+    # 1. (K, N) contiguous in N
+    # 2. (K, N) contiguous in K
+    # 3. (N, K) contiguous in N
+    # 4. (N, K) contiguous in K
+    # In practice, since you always load in the contiguous dimension
+    # there are actually only 2 options
+    # 1. Load in the K stride 1 (2 and 4)
+    # 2. Load in the N stride 1 (1 and 3)
+    transpose_b = (a.shape[1] != b.shape[1] and b.stride()[-1] != 1) or (
+        a.shape[1] == b.shape[1] and b.stride()[-1] == 1
+    )
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
     M, K = a.shape
-    N, K = b.shape
+    if a.shape[1] != b.shape[1]:
+        K, N = b.shape
+    else:
+        N, K = b.shape
     dtype = a.dtype
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
@@ -507,5 +528,6 @@ def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
         WARP_SPECIALIZE=warp_specialize,  #
         # Note: This assumes blackwell.
         FLATTEN=True,
+        TRANSPOSE_B=transpose_b,
     )
     return c
