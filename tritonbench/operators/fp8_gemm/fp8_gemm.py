@@ -37,6 +37,7 @@ except Exception as e:
 def parse_args(args):
     parser = argparse.ArgumentParser(description="TritonBench fp8_gemm")
     parser.add_argument("--llama", action="store_true")
+    parser.add_argument("--scaling_rowwise", action="store_true")
     parser.add_argument("--m", type=int)
     parser.add_argument("--k", type=int)
     parser.add_argument("--n", type=int)
@@ -85,10 +86,18 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(baseline=True)
     def torch_fp8_gemm(self, a, b):
-        scale_a = torch.tensor(1.0, device=a.device)
-        scale_b = torch.tensor(1.0, device=a.device)
+        if self.extra_args.scaling_rowwise:
+            M, N = a.shape[0], b.shape[1]
+            scale_a = torch.ones((M, 1), dtype=torch.float32, device=a.device)
+            scale_b = torch.ones((1, N), dtype=torch.float32, device=b.device)
+            out_dtype = torch.bfloat16
+        else:
+            scale_a = torch.tensor(1.0, device=a.device)
+            scale_b = torch.tensor(1.0, device=a.device)
+            out_dtype = torch.float16
+
         return lambda: torch._scaled_mm(
-            a, b, scale_a, scale_b, use_fast_accum=True, out_dtype=torch.float16
+            a, b, scale_a, scale_b, use_fast_accum=True, out_dtype=out_dtype
         )
 
     @register_benchmark()
@@ -99,10 +108,17 @@ class Operator(BenchmarkOperator):
             max_autotune_gemm_backends="TRITON",
             autotune_fallback_to_aten=False,
         ):
-            scale_a = torch.tensor(1.0, device=a.device)
-            scale_b = torch.tensor(1.0, device=a.device)
+            if self.extra_args.scaling_rowwise:
+                M, N = a.shape[0], b.shape[1]
+                scale_a = torch.ones((M, 1), dtype=torch.float32, device=a.device)
+                scale_b = torch.ones((1, N), dtype=torch.float32, device=b.device)
+                out_dtype = torch.bfloat16
+            else:
+                scale_a = torch.tensor(1.0, device=a.device)
+                scale_b = torch.tensor(1.0, device=a.device)
+                out_dtype = torch.float16
             f = lambda a, b: torch._scaled_mm(
-                a, b, scale_a, scale_b, use_fast_accum=True, out_dtype=torch.float16
+                a, b, scale_a, scale_b, use_fast_accum=True, out_dtype=out_dtype
             )
             compiled = torch.compile(f, dynamic=False)
             compiled(a, b)
