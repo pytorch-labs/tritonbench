@@ -23,9 +23,6 @@ from typing import Any, Callable, Generator, List, Optional
 
 import torch
 
-from .gdpa import gdpa
-from .gdpa_utils import generate_jagged_data
-
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
     BenchmarkOperatorMetrics,
@@ -34,6 +31,9 @@ from tritonbench.utils.triton_op import (
     register_metric,
     register_x_val,
 )
+
+from .gdpa import gdpa
+from .gdpa_utils import generate_jagged_data
 
 
 def calculate_memory_size(jagged_q, jagged_k, jagged_v, real_output, run_fwd, run_bwd):
