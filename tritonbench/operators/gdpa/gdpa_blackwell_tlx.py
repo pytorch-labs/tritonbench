@@ -1,5 +1,6 @@
 # TLX GDPA kernel optimized for Blackwell Warp Specialization
 
+import torch
 import triton
 import triton.language as tl
 import triton.tlx.language as tlx
@@ -11,8 +12,6 @@ def get_cuda_autotune_config():
             {
                 "BLOCK_SIZE_M": BM,
                 "BLOCK_SIZE_N": BN,
-                "NUM_SMEM_BUFFERS": s,
-                "NUM_TMEM_BUFFERS": t,
                 "NUM_BUFFERS_Q": bq,
                 "NUM_BUFFERS_K": bk,
                 "NUM_BUFFERS_QK": bq,
@@ -26,7 +25,7 @@ def get_cuda_autotune_config():
         for bq in [1]
         for bk in [2]
         for bqk in [1]  # in tmem
-        for bk in [1]  # in tmem
+        for bo in [1]  # in tmem
     ]
 
 

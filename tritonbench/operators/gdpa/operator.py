@@ -21,6 +21,7 @@ import gc
 from typing import Any, Callable, Generator, List, Optional
 
 import torch
+from tritonbench.operators.gdpa.gdpa_blackwell_tlx import gdpa_forward_tlx
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -32,7 +33,6 @@ from tritonbench.utils.triton_op import (
 )
 
 from .gdpa import gdpa
-from .gdpa.gdpa_blackwell_tlx import gdpa_forward_tlx
 from .gdpa_utils import generate_jagged_data
 
 
@@ -147,7 +147,7 @@ class Operator(BenchmarkOperator):
     ):
         super().__init__(tb_args, extra_args=extra_args)
         args = parse_args(self.extra_args)
-        self.config_names = args.config.split(",")
+        self.config_names = ["default"]  # args.config.split(",")
         self.sparsity = args.sparsity
         self.batch = args.batch
         self.max_seq_len = args.max_seq_len
