@@ -35,6 +35,7 @@ jagged_layer_norm:
 jagged_mean:
 jagged_softmax:
 jagged_sum:
+gdpa:
 ragged_attention:
 # cpu-op for testing
 test_op:

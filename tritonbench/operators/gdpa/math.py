@@ -1,4 +1,4 @@
-# (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+# (c) Meta Platforms, Inc. and affiliates.
 
 # pyre-unsafe
 
@@ -84,6 +84,7 @@ if is_hip_or_a100():
     @triton.jit
     def tanh_approx_fp32(x):
         return tanh(x)
+
 else:
 
     @triton.jit
