@@ -1,9 +1,10 @@
 import argparse
 import logging
 
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 import torch
+import torch._inductor.config as inductor_config
 import triton
 
 from tritonbench.utils.triton_op import (
@@ -89,6 +90,24 @@ class Operator(BenchmarkOperator):
         return lambda: torch._scaled_mm(
             a, b, scale_a, scale_b, use_fast_accum=True, out_dtype=torch.float16
         )
+
+    @register_benchmark()
+    def pt2_fp8_gemm(self, a, b) -> Callable:
+        torch._dynamo.reset()
+        with inductor_config.patch(
+            max_autotune=True,
+            max_autotune_gemm_backends="TRITON",
+            autotune_fallback_to_aten=False,
+        ):
+            scale_a = torch.tensor(1.0, device=a.device)
+            scale_b = torch.tensor(1.0, device=a.device)
+            f = lambda a, b: torch._scaled_mm(
+                a, b, scale_a, scale_b, use_fast_accum=True, out_dtype=torch.float16
+            )
+            compiled = torch.compile(f, dynamic=False)
+            compiled(a, b)
+
+        return lambda: compiled(a, b)
 
     @register_benchmark()
     def triton_fp8_gemm(self, a, b):
