@@ -38,8 +38,8 @@ from .math import (
     fast_gelu_grad,
     gelu,
     gelu_grad,
-    raw,
-    raw_grad,
+    # raw,
+    # raw_grad,
     tanh_approx_fp32,
 )
 
@@ -215,8 +215,8 @@ configsWS = [
             {"BLOCK_M": BM, "BLOCK_N": BN, "NUM_CONSUMER_GROUPS": 2},
             num_stages=s,
             num_warps=w,
-            num_buffers_warp_spec=2,
-            num_consumer_groups=2,
+            # num_buffers_warp_spec=2,
+            # num_consumer_groups=2,
         )
     )
     for BM in [128]
@@ -1147,8 +1147,8 @@ bwd_configs_ws = [
             },
             num_stages=s,
             num_warps=w,
-            num_buffers_warp_spec=buf,
-            num_consumer_groups=2,
+            # num_buffers_warp_spec=buf,
+            # num_consumer_groups=2,
         )
     )
     for buf in [2]
