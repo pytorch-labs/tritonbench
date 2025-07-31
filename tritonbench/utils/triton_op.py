@@ -736,6 +736,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             BASELINE_BENCHMARKS[self.name] = self.tb_args.baseline
         self._only = _split_params_by_comma(self.tb_args.only)
         self._skip = _split_params_by_comma(self.tb_args.skip)
+        self._only_match_mode = self.tb_args.only_match_mode
         self._input_id = self.tb_args.input_id
         self._num_inputs = self.tb_args.num_inputs
         self.prod_shapes = self.tb_args.prod_shapes
@@ -853,11 +854,33 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 self.baseline_metrics = None
                 self._op_flops = {}
                 if self._only:
-                    benchmarks = list(set(self._only))  # remove duplicates
+                    if self._only_match_mode == "prefix-with-baseline":
+                        # Find all benchmarks that match any of the prefixes
+                        all_benchmarks = find_enabled_benchmarks(
+                            self.mode, REGISTERED_BENCHMARKS[self.name], []
+                        )
+                        benchmarks = []
+                        for bm in all_benchmarks:
+                            for prefix in self._only:
+                                if bm.startswith(prefix):
+                                    benchmarks.append(bm)
+                                    break
+                    else:  # exact mode (default)
+                        benchmarks = list(set(self._only))  # remove duplicates
                 else:
                     benchmarks = find_enabled_benchmarks(
                         self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
                     )
+
+                # Handle prefix-with-baseline mode
+                if (
+                    self._only_match_mode == "prefix-with-baseline"
+                    and self.name in BASELINE_BENCHMARKS
+                ):
+                    baseline_name = BASELINE_BENCHMARKS[self.name]
+                    if baseline_name not in benchmarks:
+                        benchmarks.append(baseline_name)
+
                 # Run the baseline first, if baseline exists
                 baseline_name = (
                     BASELINE_BENCHMARKS[self.name]
