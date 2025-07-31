@@ -387,6 +387,9 @@ def matmul_kernel_descriptor_persistent(
     M,
     N,
     K,  #
+    a_stride,
+    b_stride,
+    c_stride,
     BLOCK_SIZE_M: tl.constexpr,  #
     BLOCK_SIZE_N: tl.constexpr,  #
     BLOCK_SIZE_K: tl.constexpr,  #
@@ -395,6 +398,7 @@ def matmul_kernel_descriptor_persistent(
     NUM_SMS: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     FLATTEN: tl.constexpr,
+    TRANSPOSE_A: tl.constexpr,
     TRANSPOSE_B: tl.constexpr,
 ):
     # Matmul using TMA and device-side descriptor creation
@@ -405,30 +409,38 @@ def matmul_kernel_descriptor_persistent(
     k_tiles = tl.cdiv(K, BLOCK_SIZE_K)
     num_tiles = num_pid_m * num_pid_n
 
-    a_desc = tl.make_tensor_descriptor(
-        a_ptr,
-        shape=[M, K],
-        strides=[K, 1],
-        block_shape=[BLOCK_SIZE_M, BLOCK_SIZE_K],
-    )
+    if TRANSPOSE_A:
+        a_desc = tl.make_tensor_descriptor(
+            a_ptr,
+            shape=[K, M],
+            strides=[a_stride, 1],
+            block_shape=[BLOCK_SIZE_K, BLOCK_SIZE_M],
+        )
+    else:
+        a_desc = tl.make_tensor_descriptor(
+            a_ptr,
+            shape=[M, K],
+            strides=[a_stride, 1],
+            block_shape=[BLOCK_SIZE_M, BLOCK_SIZE_K],
+        )
     if TRANSPOSE_B:
         b_desc = tl.make_tensor_descriptor(
             b_ptr,
             shape=[N, K],
-            strides=[K, 1],
+            strides=[b_stride, 1],
             block_shape=[BLOCK_SIZE_N, BLOCK_SIZE_K],
         )
     else:
         b_desc = tl.make_tensor_descriptor(
             b_ptr,
             shape=[K, N],
-            strides=[N, 1],
+            strides=[b_stride, 1],
             block_shape=[BLOCK_SIZE_K, BLOCK_SIZE_N],
         )
     c_desc = tl.make_tensor_descriptor(
         c_ptr,
         shape=[M, N],
-        strides=[N, 1],
+        strides=[c_stride, 1],
         block_shape=[
             BLOCK_SIZE_M,
             BLOCK_SIZE_N if not EPILOGUE_SUBTILE else BLOCK_SIZE_N // 2,
@@ -454,11 +466,15 @@ def matmul_kernel_descriptor_persistent(
             offs_k = ki * BLOCK_SIZE_K
             a = a_desc.load([offs_am, offs_k])
             b = b_desc.load([offs_bn, offs_k])
+            if TRANSPOSE_A:
+                arg1 = a.T
+            else:
+                arg1 = a
             if TRANSPOSE_B:
                 arg2 = b.T
             else:
                 arg2 = b
-            accumulator = tl.dot(a, arg2, accumulator)
+            accumulator = tl.dot(arg1, arg2, accumulator)
 
         tile_id_c += NUM_SMS
         pid_m, pid_n = _compute_pid(
@@ -490,6 +506,7 @@ def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
     # there are actually only 2 options
     # 1. Load in the K stride 1 (2 and 4)
     # 2. Load in the N stride 1 (1 and 3)
+    transpose_a = a.stride()[-1] != 1
     transpose_b = (a.shape[1] != b.shape[1] and b.stride()[-1] != 1) or (
         a.shape[1] == b.shape[1] and b.stride()[-1] == 1
     )
@@ -500,9 +517,22 @@ def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
         K, N = b.shape
     else:
         N, K = b.shape
+
     dtype = a.dtype
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
+    if a.stride()[0] == 1:
+        a_stride = a.stride()[1]
+    else:
+        a_stride = a.stride()[0]
+    if b.stride()[0] == 1:
+        b_stride = b.stride()[1]
+    else:
+        b_stride = b.stride()[0]
+    if c.stride()[0] == 1:
+        c_stride = c.stride()[1]
+    else:
+        c_stride = c.stride()[0]
     NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
 
     # TMA descriptors require a global memory allocation
@@ -524,10 +554,14 @@ def blackwell_matmul_descriptor_persistent(a, b, warp_specialize: bool):
         M,
         N,
         K,  #
+        a_stride,  #
+        b_stride,  #
+        c_stride,  #
         NUM_SMS=NUM_SMS,  #
         WARP_SPECIALIZE=warp_specialize,  #
         # Note: This assumes blackwell.
         FLATTEN=True,
+        TRANSPOSE_A=transpose_a,
         TRANSPOSE_B=transpose_b,
     )
     return c
