@@ -719,7 +719,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self.requires_grad = not (self.mode == Mode.FWD_NO_GRAD)
         self.device = tb_args.device
         self.required_metrics = (
-            list(set(tb_args.metrics.split(",")))
+            list(dict.fromkeys(tb_args.metrics.split(",")))
             if tb_args.metrics
             else self.DEFAULT_METRICS
         )
@@ -866,7 +866,9 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                                     benchmarks.append(bm)
                                     break
                     else:  # exact mode (default)
-                        benchmarks = list(set(self._only))  # remove duplicates
+                        benchmarks = list(
+                            dict.fromkeys(self._only)
+                        )  # remove duplicates while preserving order
                 else:
                     benchmarks = find_enabled_benchmarks(
                         self.mode, REGISTERED_BENCHMARKS[self.name], self._skip
