@@ -134,6 +134,12 @@ def parse_args(args):
         type=float,
         help="Sparsity of the jagged tensor",
     )
+    parser.add_argument(
+        "--config",
+        default=all_configs[0],
+        type=str,
+        help="list of configs to run, separated by comma",
+    )
     args = parser.parse_args(args)
     return args
 
@@ -214,7 +220,7 @@ class Operator(BenchmarkOperator):
                 # Will add more combinations in the future.
                 enable_persistent=True,
                 enable_tma=True,
-                enable_ws=True,
+                enable_ws=False,
                 use_dq_atomic_add=True,
                 bwd_opt_tech="base",
             )
@@ -249,7 +255,7 @@ class Operator(BenchmarkOperator):
                 window_size=jagged_data["window_size"],
                 enable_persistent=True,
                 enable_tma=True,
-                enable_ws=True,
+                enable_ws=False,
                 use_dq_atomic_add=True,
                 seq_index=jagged_data["seq_index"],
                 bwd_opt_tech="base",

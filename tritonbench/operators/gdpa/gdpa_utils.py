@@ -165,7 +165,10 @@ def generate_jagged_data(
     v_weights.requires_grad = True
 
     attn_lengths = num_objects_q * num_objects
-    attn_offsets = torch.ops.fbgemm.asynchronous_complete_cumsum(attn_lengths)
+    attn_offsets = torch.cat(
+        [torch.tensor([0], dtype=dtype, device=device), attn_lengths.cumsum(dim=0)],
+        dim=0,
+    )
 
     invalid_attn_mask = (
         torch.tril(
