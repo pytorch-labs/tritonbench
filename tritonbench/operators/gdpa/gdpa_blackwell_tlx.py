@@ -5,7 +5,7 @@ import math
 import torch
 import triton
 import triton.language as tl
-import triton.tlx.language as tlx
+import triton.language.extra.tlx as tlx
 
 from .gdpa_utils import get_num_sms
 from .math import activation_string_to_int
@@ -76,7 +76,7 @@ def _get_bufidx_phase(accum_cnt, NUM_BUFFERS):
 
 @triton.jit
 def _reinterpret(qk_buf, bufIdx_qk):
-    qk_view = tl.local_view(qk_buf, bufIdx_qk)
+    qk_view = tlx.local_view(qk_buf, bufIdx_qk)
     p_view = tlx.local_reinterpret(qk_view, tl.float16)
     return p_view
 
@@ -311,7 +311,7 @@ def _do_dots(
 
     # epilogue
     # commit to release q0, q1? FIXME
-    release_q0_view = tlx.local_viwe(consumer_release_q0, bufIdx_q)
+    release_q0_view = tlx.local_view(consumer_release_q0, bufIdx_q)
     tlx.gen5_commit(release_q0_view)
     release_q1_view = tlx.local_viwe(consumer_release_q1, bufIdx_q)
     tlx.gen5_commit(release_q1_view)
