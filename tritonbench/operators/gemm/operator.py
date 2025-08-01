@@ -10,7 +10,7 @@ import triton
 
 from tritonbench.operators.gemm.kernels import matmul as kernels
 from tritonbench.operators.gemm.partition_k import matmul_partition_k
-from tritonbench.operators.gemm.stream_k import streamk_matmul
+from tritonbench.operators.gemm.stream_k import streamk_amd_matmul, streamk_cuda_matmul
 from tritonbench.operators.gemm.warp_spec_persistent_matmul import (
     blackwell_matmul_descriptor_persistent,
     blackwell_matmul_tma,
@@ -311,12 +311,19 @@ class Operator(BenchmarkOperator):
 
         return lambda: compiled(a, b)
 
-    @register_benchmark()
+    @register_benchmark(enabled=not is_cuda())
     def streamk_matmul(self, a, b, bias) -> Callable:
-        if bias is not None:
-            return lambda: streamk_matmul(a, b, bias)
-        else:
-            return lambda: streamk_matmul(a, b)
+        return lambda: streamk_amd_matmul(a, b, bias) if bias else streamk_amd_matmul(a, b)
+
+    @register_benchmark(enabled=is_cuda())
+    def streamk_matmul(self, a, b, bias) -> Callable:
+        print(f"Testing shape: {a.shape} x {b.shape}...")
+        streamk = torch.matmul(a, b)
+        b = b.T.contiguous()
+        baseline = streamk_cuda_matmul(a, b)
+        if not torch.allclose(streamk, baseline):
+            print(f"StreamK matmul on {a.shape} x {b.shape} result does not match baseline matmul result. Max abs(streamk/baseline - 1):  {torch.max(torch.abs(streamk / baseline - 1))}")
+        return lambda: streamk_cuda_matmul(a, b) + bias if bias else streamk_cuda_matmul(a, b)
 
     @register_benchmark(enabled=is_cuda())
     def pt2_cutlass_matmul(self, a, b, bias) -> Callable:
@@ -335,7 +342,7 @@ class Operator(BenchmarkOperator):
             compiled(a, b)
         return lambda: compiled(a, b)
 
-    @register_benchmark()
+    @register_benchmark(enabled=False)
     def matmul_decompose_k(self, a, b, bias) -> Callable:
         def decompose_func(a_in, b_in):
             M, K = a_in.shape
