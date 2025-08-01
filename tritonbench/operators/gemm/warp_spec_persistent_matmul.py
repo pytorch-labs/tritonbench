@@ -3,8 +3,6 @@ This is copied from Triton matmul tutorial 9 and reduced to just the persistent 
 on blackwell with/without warpspec.
 """
 
-import functools
-import logging
 import os
 from typing import Optional
 
@@ -95,8 +93,16 @@ def matmul_tma_set_block_size_hook(nargs):
     BLOCK_M = nargs["BLOCK_SIZE_M"]
     BLOCK_N = nargs["BLOCK_SIZE_N"]
     BLOCK_K = nargs["BLOCK_SIZE_K"]
-    nargs["a_desc"].block_shape = [BLOCK_M, BLOCK_K]
-    nargs["b_desc"].block_shape = [BLOCK_N, BLOCK_K]
+    if nargs["TRANSPOSE_A"]:
+        a_block_shape = [BLOCK_K, BLOCK_M]
+    else:
+        a_block_shape = [BLOCK_M, BLOCK_K]
+    nargs["a_desc"].block_shape = a_block_shape
+    if nargs["TRANSPOSE_B"]:
+        b_block_shape = [BLOCK_N, BLOCK_K]
+    else:
+        b_block_shape = [BLOCK_K, BLOCK_N]
+    nargs["b_desc"].block_shape = b_block_shape
     if EPILOGUE_SUBTILE:
         nargs["c_desc"].block_shape = [BLOCK_M, BLOCK_N // 2]
     else:
@@ -121,7 +127,8 @@ def matmul_kernel_tma(
     GROUP_SIZE_M: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     DTYPE: tl.constexpr,
-    IS_TRANSPOSE: tl.constexpr,
+    TRANSPOSE_A: tl.constexpr,
+    TRANSPOSE_B: tl.constexpr,
 ):
     dtype = DTYPE
 
@@ -144,13 +151,19 @@ def matmul_kernel_tma(
 
     for k in tl.range(k_tiles, warp_specialize=WARP_SPECIALIZE):
         offs_k = k * BLOCK_SIZE_K
-        a = a_desc.load([offs_am, offs_k])
-        b = b_desc.load([offs_bn, offs_k])
-        if IS_TRANSPOSE:
-            arg2 = b
+        if TRANSPOSE_A:
+            a = a_desc.load([offs_k, offs_am])
+            arg1 = a.T
         else:
+            a = a_desc.load([offs_am, offs_k])
+            arg1 = a
+        if TRANSPOSE_B:
+            b = b_desc.load([offs_bn, offs_k])
             arg2 = b.T
-        accumulator = tl.dot(a, arg2, accumulator)
+        else:
+            b = b_desc.load([offs_k, offs_bn])
+            arg2 = b
+        accumulator = tl.dot(arg1, arg2, accumulator)
 
     c = accumulator.to(dtype)
 
@@ -159,31 +172,45 @@ def matmul_kernel_tma(
     c_desc.store([offs_cm, offs_cn], c)
 
 
-@functools.lru_cache
-def warn_once(msg: str):
-    """
-    Wrapper around logging.warning to try minimize the number of warnings when
-    a function is repeatedly called.
-    """
-    logging.warning(
-        "Incompatible dimensions, B is transposed. We are transposing B which may impact results"
-    )
-
-
 def blackwell_matmul_tma(a, b, warp_specialize: bool):
-    is_transpose = a.shape[1] != b.shape[1]
+    # High-Level Options for B's layout
+    # 1. (K, N) contiguous in N
+    # 2. (K, N) contiguous in K
+    # 3. (N, K) contiguous in N
+    # 4. (N, K) contiguous in K
+    # In practice, since you always load in the contiguous dimension
+    # there are actually only 2 options
+    # 1. Load in the K stride 1 (2 and 4)
+    # 2. Load in the N stride 1 (1 and 3)
+    transpose_a = a.stride()[-1] != 1
+    transpose_b = (a.shape[1] != b.shape[1] and b.stride()[-1] != 1) or (
+        a.shape[1] == b.shape[1] and b.stride()[-1] == 1
+    )
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
     M, K = a.shape
-    N, K = b.shape
+    if a.shape[1] != b.shape[1]:
+        K, N = b.shape
+    else:
+        N, K = b.shape
     dtype = a.dtype
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
 
     # A dummy block value that will be overwritten when we have the real block size
     dummy_block = [1, 1]
-    a_desc = TensorDescriptor(a, a.shape, a.stride(), dummy_block)
-    b_desc = TensorDescriptor(b, b.shape, b.stride(), dummy_block)
+    a_strides = [a.stride()[1] if transpose_a else a.stride()[0], 1]
+    check_tma_alignment(a_strides, (torch.finfo(a.dtype).bits + 7) // 8)
+    if transpose_a:
+        a_desc = TensorDescriptor(a, [K, M], a_strides, dummy_block)
+    else:
+        a_desc = TensorDescriptor(a, [M, K], a_strides, dummy_block)
+    b_strides = [b.stride()[1] if b.stride()[0] == 1 else b.stride()[0], 1]
+    check_tma_alignment(b_strides, (torch.finfo(b.dtype).bits + 7) // 8)
+    if transpose_b:
+        b_desc = TensorDescriptor(b, [N, K], b_strides, dummy_block)
+    else:
+        b_desc = TensorDescriptor(b, [K, N], b_strides, dummy_block)
     c_desc = TensorDescriptor(c, c.shape, c.stride(), dummy_block)
 
     def grid(META):
@@ -200,7 +227,8 @@ def blackwell_matmul_tma(a, b, warp_specialize: bool):
         K,  #
         WARP_SPECIALIZE=warp_specialize,  #
         DTYPE=torch_dtype_to_triton_dtype(dtype),  #
-        IS_TRANSPOSE=is_transpose,
+        TRANSPOSE_A=transpose_a,
+        TRANSPOSE_B=transpose_b,
     )
     return c
 
@@ -258,7 +286,8 @@ def matmul_kernel_tma_persistent(
     NUM_SMS: tl.constexpr,  #
     WARP_SPECIALIZE: tl.constexpr,  #
     DTYPE: tl.constexpr,
-    IS_TRANSPOSE: tl.constexpr,
+    TRANSPOSE_A: tl.constexpr,
+    TRANSPOSE_B: tl.constexpr,
 ):
     dtype = DTYPE
     start_pid = tl.program_id(axis=0)
@@ -285,13 +314,19 @@ def matmul_kernel_tma_persistent(
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
         for ki in range(k_tiles):
             offs_k = ki * BLOCK_SIZE_K
-            a = a_desc.load([offs_am, offs_k])
-            b = b_desc.load([offs_bn, offs_k])
-            if IS_TRANSPOSE:
-                arg2 = b
+            if TRANSPOSE_A:
+                a = a_desc.load([offs_k, offs_am])
+                arg1 = a.T
             else:
+                a = a_desc.load([offs_am, offs_k])
+                arg1 = a
+            if TRANSPOSE_B:
+                b = b_desc.load([offs_bn, offs_k])
                 arg2 = b.T
-            accumulator = tl.dot(a, arg2, accumulator)
+            else:
+                b = b_desc.load([offs_k, offs_bn])
+                arg2 = b
+            accumulator = tl.dot(arg1, arg2, accumulator)
 
         tile_id_c += NUM_SMS
         pid_m, pid_n = _compute_pid(
@@ -318,14 +353,26 @@ def matmul_kernel_tma_persistent(
 
 
 def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
-    is_transpose = a.shape[1] != b.shape[1]
+    # High-Level Options for B's layout
+    # 1. (K, N) contiguous in N
+    # 2. (K, N) contiguous in K
+    # 3. (N, K) contiguous in N
+    # 4. (N, K) contiguous in K
+    # In practice, since you always load in the contiguous dimension
+    # there are actually only 2 options
+    # 1. Load in the K stride 1 (2 and 4)
+    # 2. Load in the N stride 1 (1 and 3)
+    transpose_a = a.stride()[-1] != 1
+    transpose_b = (a.shape[1] != b.shape[1] and b.stride()[-1] != 1) or (
+        a.shape[1] == b.shape[1] and b.stride()[-1] == 1
+    )
     assert a.dtype == b.dtype, "Incompatible dtypes"
 
-    check_tma_alignment(a.stride(), (torch.finfo(a.dtype).bits + 7) // 8)
-    check_tma_alignment(b.stride(), (torch.finfo(b.dtype).bits + 7) // 8)
-
     M, K = a.shape
-    N, K = b.shape
+    if a.shape[1] != b.shape[1]:
+        K, N = b.shape
+    else:
+        N, K = b.shape
     dtype = a.dtype
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
@@ -334,8 +381,18 @@ def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
 
     # A dummy block value that will be overwritten when we have the real block size
     dummy_block = [1, 1]
-    a_desc = TensorDescriptor(a, a.shape, a.stride(), dummy_block)
-    b_desc = TensorDescriptor(b, b.shape, b.stride(), dummy_block)
+    a_strides = [a.stride()[1] if transpose_a else a.stride()[0], 1]
+    check_tma_alignment(a_strides, (torch.finfo(a.dtype).bits + 7) // 8)
+    if transpose_a:
+        a_desc = TensorDescriptor(a, [K, M], a_strides, dummy_block)
+    else:
+        a_desc = TensorDescriptor(a, [M, K], a_strides, dummy_block)
+    b_strides = [b.stride()[1] if b.stride()[0] == 1 else b.stride()[0], 1]
+    check_tma_alignment(b_strides, (torch.finfo(b.dtype).bits + 7) // 8)
+    if transpose_b:
+        b_desc = TensorDescriptor(b, [N, K], b_strides, dummy_block)
+    else:
+        b_desc = TensorDescriptor(b, [K, N], b_strides, dummy_block)
     c_desc = TensorDescriptor(c, c.shape, c.stride(), dummy_block)
 
     def grid(META):
@@ -359,7 +416,8 @@ def blackwell_matmul_tma_persistent(a, b, warp_specialize: bool):
         NUM_SMS=NUM_SMS,  #
         WARP_SPECIALIZE=warp_specialize,  #
         DTYPE=torch_dtype_to_triton_dtype(dtype),  #
-        IS_TRANSPOSE=is_transpose,
+        TRANSPOSE_A=transpose_a,
+        TRANSPOSE_B=transpose_b,
     )
     return c
 
@@ -464,15 +522,17 @@ def matmul_kernel_descriptor_persistent(
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
         for ki in range(k_tiles):
             offs_k = ki * BLOCK_SIZE_K
-            a = a_desc.load([offs_am, offs_k])
-            b = b_desc.load([offs_bn, offs_k])
             if TRANSPOSE_A:
+                a = a_desc.load([offs_k, offs_am])
                 arg1 = a.T
             else:
+                a = a_desc.load([offs_am, offs_k])
                 arg1 = a
             if TRANSPOSE_B:
+                b = b_desc.load([offs_bn, offs_k])
                 arg2 = b.T
             else:
+                b = b_desc.load([offs_k, offs_bn])
                 arg2 = b
             accumulator = tl.dot(arg1, arg2, accumulator)
 
