@@ -25,6 +25,7 @@ import triton  # @manual=//triton:triton
 import triton.language as tl  # @manual=//triton:triton
 
 from torch._library.triton import capture_triton
+from triton.tools.tensor_descriptor import TensorDescriptor
 
 from .gdpa_utils import (
     custom_triton_op,
@@ -38,8 +39,6 @@ from .math import (
     fast_gelu_grad,
     gelu,
     gelu_grad,
-    raw,
-    raw_grad,
     tanh_approx_fp32,
 )
 
@@ -120,72 +119,51 @@ def _gdpa_fwd_inner_ws(
     for start_n in range(lo, hi, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
-        with tl.async_task([0]):
-            if enable_tma:
-                k = tl._experimental_descriptor_load(
-                    desc_k,
-                    [
-                        (begin_k + start_n).to(tl.int32),
-                        kv_offset.to(tl.int32),
-                    ],
-                    [BLOCK_N, BLOCK_D],
-                    q.dtype,
-                )
-                k = tl.trans(k)
-            else:
-                k = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero")
+        if enable_tma:
+            k = desc_k.load(
+                [
+                    (begin_k + start_n).to(tl.int32),
+                    kv_offset.to(tl.int32),
+                ],
+            )
+            k = tl.trans(k)
+        else:
+            k = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero")
 
         q = q.to(k.dtype)
-        with tl.async_task([1, 2]):
-            qk = tl.dot(q, k)
-            if WINDOW_SIZE is not None:
-                window_mask = (
-                    tl.abs(offs_m[:, None] - (start_n + offs_n[None, :])) <= WINDOW_SIZE
-                )
-                qk = tl.where(window_mask, qk, 0.0)
-            # activation = gelu
-            if activation_enum_int == 0:
-                p = raw(qk)
-            elif activation_enum_int == 1:
-                # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
-                p = gelu(qk)
-            elif activation_enum_int == 2:
-                p = gelu_approx(qk)
-            elif activation_enum_int == 3:
-                p = fast_gelu(qk)
-            elif activation_enum_int == 4:
-                p = leaky_relu(qk)
-            elif activation_enum_int == 5:
-                p = relu(qk)
-            elif activation_enum_int == 6:
-                qk = qk.to(v_dtype)
-                p = fast_gelu_bf16(qk)
-            elif activation_enum_int == 7:
-                p = silu(qk)
-            elif activation_enum_int == 8:
-                p = fast_silu(qk)
-            else:
-                p = qk
+        qk = tl.dot(q, k)
+        if WINDOW_SIZE is not None:
+            window_mask = (
+                tl.abs(offs_m[:, None] - (start_n + offs_n[None, :])) <= WINDOW_SIZE
+            )
+            qk = tl.where(window_mask, qk, 0.0)
+        # activation = gelu
+        if activation_enum_int == 0:
+            p = qk
+        elif activation_enum_int == 1:
+            # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
+            p = gelu(qk)
+        elif activation_enum_int == 2:
+            p = fast_gelu(qk)
+        else:
+            # rest of the enums are not supported yet
+            p = qk
 
-            p *= qk_scale
-            p = p.to(v_dtype)
+        p *= qk_scale
+        p = p.to(v_dtype)
 
-        with tl.async_task([0]):
-            if enable_tma:
-                v = tl._experimental_descriptor_load(
-                    desc_v,
-                    [
-                        (begin_k + start_n).to(tl.int32),
-                        kv_offset.to(tl.int32),
-                    ],
-                    [BLOCK_N, BLOCK_D],
-                    q.dtype,
-                )
-            else:
-                v = tl.load(V_block_ptr, boundary_check=(0, 1), padding_option="zero")
-        with tl.async_task([1, 2]):
-            p = p.to(v_dtype)
-            acc = tl.dot(p, v, acc)
+        if enable_tma:
+            v = desc_v.load(
+                [
+                    (begin_k + start_n).to(tl.int32),
+                    kv_offset.to(tl.int32),
+                ],
+            )
+        else:
+            v = tl.load(V_block_ptr, boundary_check=(0, 1), padding_option="zero")
+
+        p = p.to(v_dtype)
+        acc = tl.dot(p, v, acc)
 
         if not enable_tma:
             V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
@@ -212,11 +190,9 @@ configs = [
 configsWS = [
     (
         triton_config(
-            {"BLOCK_M": BM, "BLOCK_N": BN, "NUM_CONSUMER_GROUPS": 2},
+            {"BLOCK_M": BM, "BLOCK_N": BN, "NUM_CONSUMER_GROUPS": 1},
             num_stages=s,
             num_warps=w,
-            num_buffers_warp_spec=2,
-            num_consumer_groups=2,
         )
     )
     for BM in [128]
@@ -274,7 +250,6 @@ def _gdpa_fwd_compute(
     K,
     K_offsets,
     V,
-    workspace_ptr,
     Out,  #
     Out_offsets,
     ad_to_request_offset_ptr,
@@ -386,38 +361,25 @@ def _gdpa_fwd_compute(
                 order=(0, 1),
             )
         else:
-            with tl.async_task([0]):
-                TMA_SIZE: tl.constexpr = 128
-                workspace_base = workspace_ptr
-                desc_q = workspace_base
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_q,
-                    global_address=Q,
-                    load_size=[BLOCK_M // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                    element_ty=Q.dtype.element_ty,
+            desc_q = tl.make_tensor_descriptor(
+                Q,
+                block_shape=[BLOCK_M // NUM_CONSUMER_GROUPS, BLOCK_D],
+                shape=[end_q.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_qm, stride_qk],
+            )
+            if not IS_DENSE_KV:
+                desc_k_tmp = tl.make_tensor_descriptor(
+                    K,
+                    block_shape=[BLOCK_N, BLOCK_D],
+                    shape=[end_k.to(tl.int32), HEAD_DIM * H // G],
+                    strides=[stride_kn, stride_kk],
                 )
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_q)
-                if not IS_DENSE_KV:
-                    desc_k_tmp = workspace_base + TMA_SIZE
-                    desc_v_tmp = workspace_base + 2 * TMA_SIZE
-                    tl.extra.cuda.experimental_device_tensormap_create2d(
-                        desc_ptr=desc_k_tmp,
-                        global_address=K,
-                        load_size=[BLOCK_N, BLOCK_D],
-                        global_size=[end_k.to(tl.int32), HEAD_DIM * H // G],
-                        element_ty=K.dtype.element_ty,
-                    )
-                    tl.extra.cuda.experimental_device_tensormap_create2d(
-                        desc_ptr=desc_v_tmp,
-                        global_address=V,
-                        load_size=[BLOCK_N, BLOCK_D],
-                        global_size=[end_k.to(tl.int32), HEAD_DIM * H // G],
-                        element_ty=V.dtype.element_ty,
-                    )
-
-                    tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k_tmp)
-                    tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v_tmp)
+                desc_v_tmp = tl.make_tensor_descriptor(
+                    V,
+                    block_shape=[BLOCK_N, BLOCK_D],
+                    shape=[end_k.to(tl.int32), HEAD_DIM * H // G],
+                    strides=[stride_kn, stride_kk],
+                )
 
         # initialize offsets
         offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
@@ -432,20 +394,17 @@ def _gdpa_fwd_compute(
         )
 
         acc = tl.zeros([BLOCK_M, BLOCK_D], dtype=tl.float32)
-        with tl.async_task([0]):
-            # load q: it will stay in SRAM throughout
-            if enable_tma:
-                q = tl._experimental_descriptor_load(
-                    desc_q,
-                    [
-                        (begin_q + start_m * BLOCK_M).to(tl.int32),
-                        (q_offset).to(tl.int32),
-                    ],
-                    [BLOCK_M, BLOCK_D],
-                    Q.dtype.element_ty,
-                )
-            else:
-                q = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero")
+
+        # load q: it will stay in SRAM throughout
+        if enable_tma:
+            q = desc_q.load(
+                [
+                    (begin_q + start_m * BLOCK_M).to(tl.int32),
+                    (q_offset).to(tl.int32),
+                ],
+            )
+        else:
+            q = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero")
 
         # stage 1: off-band
         # For causal = True, STAGE = 3 and _gdpa_fwd_inner gets 1 as its STAGE
@@ -482,12 +441,11 @@ def _gdpa_fwd_compute(
         )
 
         # epilogue
-        with tl.async_task([1, 2]):
-            o_mask = (offs_m[:, None] < qlen) & (offs_d[None, :] < HEAD_DIM)
-            if WINDOW_SIZE is not None:
-                acc = tl.where(offs_m[:, None] < (klen + WINDOW_SIZE), acc, 0.0)
+        o_mask = (offs_m[:, None] < qlen) & (offs_d[None, :] < HEAD_DIM)
+        if WINDOW_SIZE is not None:
+            acc = tl.where(offs_m[:, None] < (klen + WINDOW_SIZE), acc, 0.0)
 
-            tl.store(o_ptrs, acc.to(Out.type.element_ty), mask=o_mask)
+        tl.store(o_ptrs, acc.to(Out.type.element_ty), mask=o_mask)
 
 
 @triton.jit
@@ -497,7 +455,6 @@ def _gdpa_fwd(
     K,
     K_offsets,
     V,
-    workspace_ptr,
     Out,  #
     Out_offsets,
     ad_to_request_offset_ptr,
@@ -553,20 +510,13 @@ def _gdpa_fwd(
     off_h = off_hz % H
     off_h_kv = off_h // G
     pid = tl.program_id(0)
-    if enable_tma:
-        workspace_ptr = (
-            workspace_ptr
-            + (tl.program_id(0) + tl.program_id(1) * tl.num_programs(0)) * 3 * 128
-        )
-    else:
-        workspace_ptr = None
+
     _gdpa_fwd_compute(
         Q,
         Q_offsets,
         K,
         K_offsets,
         V,
-        workspace_ptr,
         Out,  #
         Out_offsets,
         ad_to_request_offset_ptr,
@@ -618,7 +568,6 @@ def _gdpa_fwd_persistent(
     K,
     K_offsets,
     V,
-    workspace_ptr,
     Out,  #
     Out_offsets,
     ad_to_request_offset_ptr,
@@ -674,31 +623,19 @@ def _gdpa_fwd_persistent(
     desc_k = None
     desc_v = None
     if enable_tma:
-        workspace_ptr_base = workspace_ptr + prog_id * 3 * 128
         if IS_DENSE_KV:
-            with tl.async_task([0]):
-                TMA_SIZE: tl.constexpr = 128
-                workspace_base = workspace_ptr_base
-                desc_k = workspace_base + TMA_SIZE
-                desc_v = workspace_base + 2 * TMA_SIZE
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_k,
-                    global_address=K,
-                    load_size=[BLOCK_N, BLOCK_D],
-                    global_size=[N_CTX_KV * Z, HEAD_DIM * H // G],
-                    element_ty=K.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_v,
-                    global_address=V,
-                    load_size=[BLOCK_N, BLOCK_D],
-                    global_size=[N_CTX_KV * Z, HEAD_DIM * H // G],
-                    element_ty=V.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v)
-    else:
-        workspace_ptr_base = None
+            desc_k = tl.make_tensor_descriptor(
+                K,
+                block_shape=[BLOCK_N, BLOCK_D],
+                shape=[N_CTX_KV * Z, HEAD_DIM * H // G],
+                strides=[stride_kn, stride_kk],
+            )
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                block_shape=[BLOCK_N, BLOCK_D],
+                shape=[N_CTX_KV * Z, HEAD_DIM * H // G],
+                strides=[stride_vn, stride_vk],
+            )
 
     for _ in range(0, tiles_per_sm):
         pid = tile_idx % n_tile_num
@@ -722,7 +659,6 @@ def _gdpa_fwd_persistent(
             K,
             K_offsets,
             V,
-            workspace_ptr_base,
             Out,  #
             Out_offsets,
             ad_to_request_offset_ptr,
@@ -832,154 +768,111 @@ def _gdpa_bwd_dkdv(
     for _blk_idx in tl.range(0, num_steps, 1, loop_unroll_factor=1):
         offs_m = curr_m + tl.arange(0, BLOCK_M1)
         qmask = (offs_k[:, None] < HEAD_DIM) & (offs_m[None, :] < qlen)
-        with tl.async_task([0]):
-            if enable_tma:
-                # qmask = (offs_k[:, None] < HEAD_DIM) & (offs_m[None, :] < qlen)
-                q = tl._experimental_descriptor_load(
-                    desc_q,
-                    [
-                        (begin_q + curr_m).to(tl.int32),
-                        (off_h2 * stride_qh).to(tl.int32),
-                    ],
-                    [BLOCK_M1, BLOCK_D],
-                    Q.dtype.element_ty,
-                )
-                qT = tl.trans(q)
-                # we may need this line for correctness
-                # qT = tl.where(qmask, qT, 0.0)
-            else:
-                qT = tl.load(qT_ptrs, mask=qmask)
+        if enable_tma:
+            # qmask = (offs_k[:, None] < HEAD_DIM) & (offs_m[None, :] < qlen)
+            q = desc_q.load(
+                [
+                    (begin_q + curr_m).to(tl.int32),
+                    (off_h2 * stride_qh).to(tl.int32),
+                ],
+            )
+            qT = tl.trans(q)
+            # we may need this line for correctness
+            # qT = tl.where(qmask, qT, 0.0)
+        else:
+            qT = tl.load(qT_ptrs, mask=qmask)
 
         qT = qT.to(k.dtype)
-        with tl.async_task([1, NUM_CONSUMER_GROUPS]):
-            qkT = tl.dot(k, qT)
+        qkT = tl.dot(k, qT)
 
-        with tl.async_task([0]):
-            # move dot ahead hoping to overlap with other computations
-            omask = (offs_m[:, None] < qlen) & (offs_k[None, :] < HEAD_DIM)
+        # move dot ahead hoping to overlap with other computations
+        omask = (offs_m[:, None] < qlen) & (offs_k[None, :] < HEAD_DIM)
+        if enable_tma:
+            do = desc_do.load(
+                [
+                    (begin_q + curr_m).to(tl.int32),
+                    (off_h2 * stride_qh).to(tl.int32),
+                ],
+            )
+            # do = tl.where(omask, do, 0.0)
+        else:
+            do = tl.load(do_ptrs, mask=omask)  # Compute dP and dS.
+
+        dpT = tl.dot(v, tl.trans(do)).to(tl.float32)
+        pT = qkT
+        # Autoregressive masking.
+        if MASK:
+            mask = offs_m[None, :] >= offs_n[:, None]
+            pT = tl.where(mask, pT, 0.0)
+        # Sliding window masking.
+        if WINDOW_SIZE is not None:
+            window_mask = tl.abs(offs_m[None, :] - offs_n[:, None]) <= WINDOW_SIZE
+            pT = tl.where(window_mask, pT, 0.0)
+        # Compute dV.
+        if activation_enum_int == 0:
+            ppT = pT
+        elif activation_enum_int == 1:
+            ppT = gelu(pT)
+        elif activation_enum_int == 2:
+            tanh_out = tanh_approx_fp32(0.7978845608 * pT * (1 + 0.044715 * pT * pT))
+            ppT = 0.5 * pT * (1 + tanh_out)
+        else:
+            # rest of the enums are not supported yet
+            ppT = pT
+        ppT *= qk_scale
+        ppT = ppT.to(Q.dtype.element_ty)
+        dv += tl.dot(ppT, do)
+
+        ##
+        if activation_enum_int == 0:
+            pT = 1.0
+        elif activation_enum_int == 1:
+            # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
+            pT = gelu_grad(pT)
+        elif activation_enum_int == 2:
+            pT = (
+                0.5
+                * pT
+                * (1 - tanh_out * tanh_out)
+                * (0.7978845608 + 0.1070322243 * pT * pT)
+            ) + 0.5 * (1 + tanh_out)
+        else:
+            pT = 1
+        pT *= qk_scale
+
+        # Autoregressive masking.
+        if MASK:
+            mask = offs_m[None, :] >= offs_n[:, None]
+            pT = tl.where(mask, pT, 0.0)
+        # Sliding window masking.
+        if WINDOW_SIZE is not None:
+            window_mask = tl.abs(offs_m[None, :] - offs_n[:, None]) <= WINDOW_SIZE
+            pT = tl.where(window_mask, pT, 0.0)
+        dsT = pT * dpT
+        dsT = dsT.to(Q.dtype.element_ty)
+        dk += tl.dot(dsT, tl.trans(qT))
+        if USE_DQ_ATOMIC_ADD:
+            dq = tl.dot(tl.trans(dsT), k)
             if enable_tma:
-                do = tl._experimental_descriptor_load(
-                    desc_do,
+                desc_dq.store(
                     [
                         (begin_q + curr_m).to(tl.int32),
                         (off_h2 * stride_qh).to(tl.int32),
                     ],
-                    [BLOCK_M1, BLOCK_D],
-                    DO.dtype.element_ty,
+                    dq.to(Q.dtype.element_ty),
                 )
-                # do = tl.where(omask, do, 0.0)
             else:
-                do = tl.load(do_ptrs, mask=omask)  # Compute dP and dS.
-
-        with tl.async_task([1, NUM_CONSUMER_GROUPS]):
-            dpT = tl.dot(v, tl.trans(do)).to(tl.float32)
-            pT = qkT
-            # Autoregressive masking.
-            if MASK:
-                mask = offs_m[None, :] >= offs_n[:, None]
-                pT = tl.where(mask, pT, 0.0)
-            # Sliding window masking.
-            if WINDOW_SIZE is not None:
-                window_mask = tl.abs(offs_m[None, :] - offs_n[:, None]) <= WINDOW_SIZE
-                pT = tl.where(window_mask, pT, 0.0)
-            # Compute dV.
-            if activation_enum_int == 0:
-                ppT = raw(pT)
-            elif activation_enum_int == 1:
-                ppT = gelu(pT)
-            elif activation_enum_int == 2:
-                tanh_out = tanh(0.7978845608 * pT * (1 + 0.044715 * pT * pT))
-                ppT = 0.5 * pT * (1 + tanh_out)
-            elif activation_enum_int == 3:
-                tanh_out = tanh_approx_fp32(
-                    0.7978845608 * pT * (1 + 0.044715 * pT * pT)
+                tl.atomic_add(
+                    dq_ptrs,
+                    dq,
+                    mask=(offs_k[None, :] < HEAD_DIM) & (offs_m[:, None] < qlen),
+                    sem="relaxed",
                 )
-                ppT = 0.5 * pT * (1 + tanh_out)
-            elif activation_enum_int == 4:
-                ppT = leaky_relu(pT)
-            elif activation_enum_int == 5:
-                ppT = relu(pT)
-            elif activation_enum_int == 6:
-                pT = pT.to(Q.dtype.element_ty)
-                tanh_out = tanh_approx_bf16(
-                    0.7978845608 * pT * (1 + 0.044715 * pT * pT)
-                )
-                ppT = 0.5 * pT * (1 + tanh_out)
-            elif activation_enum_int == 7:
-                ppT = silu(pT)
-            elif activation_enum_int == 8:
-                ppT = fast_silu(pT)
-            else:
-                ppT = pT
-            ppT *= qk_scale
-            ppT = ppT.to(Q.dtype.element_ty)
-            dv += tl.dot(ppT, do)
-
-            ##
-            if activation_enum_int == 0:
-                pT = raw_grad(pT)
-            elif activation_enum_int == 1:
-                # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
-                pT = gelu_grad(pT)
-            elif (activation_enum_int == 2) or (activation_enum_int == 3):
-                pT = (
-                    0.5
-                    * pT
-                    * (1 - tanh_out * tanh_out)
-                    * (0.7978845608 + 0.1070322243 * pT * pT)
-                ) + 0.5 * (1 + tanh_out)
-            elif activation_enum_int == 4:
-                pT = leaky_relu_grad(pT)
-            elif activation_enum_int == 5:
-                pT = relu_grad(pT)
-            elif activation_enum_int == 6:  # A or B or C is not supported
-                pT = 0.5 * pT * (1 - tanh_out * tanh_out) * (
-                    0.7978845608 + 0.1070322243 * pT * pT
-                ) + 0.5 * (1 + tanh_out)
-            elif activation_enum_int == 7:
-                pT = silu_grad(pT)
-            elif activation_enum_int == 8:
-                pT = fast_silu_grad(pT)
-            else:
-                pT = 1
-            pT *= qk_scale
-
-            # Autoregressive masking.
-            if MASK:
-                mask = offs_m[None, :] >= offs_n[:, None]
-                pT = tl.where(mask, pT, 0.0)
-            # Sliding window masking.
-            if WINDOW_SIZE is not None:
-                window_mask = tl.abs(offs_m[None, :] - offs_n[:, None]) <= WINDOW_SIZE
-                pT = tl.where(window_mask, pT, 0.0)
-            dsT = pT * dpT
-            dsT = dsT.to(Q.dtype.element_ty)
-            dk += tl.dot(dsT, tl.trans(qT))
-            if USE_DQ_ATOMIC_ADD:
-                dq = tl.dot(tl.trans(dsT), k)
-                if enable_tma:
-                    tl._experimental_descriptor_store(
-                        desc_dq,
-                        dq.to(Q.dtype.element_ty),
-                        [
-                            (begin_q + curr_m).to(tl.int32),
-                            (off_h2 * stride_qh).to(tl.int32),
-                        ],
-                        store_reduce="add",
-                    )
-                else:
-                    tl.atomic_add(
-                        dq_ptrs,
-                        dq,
-                        mask=(offs_k[None, :] < HEAD_DIM) & (offs_m[:, None] < qlen),
-                        sem="relaxed",
-                    )
         # Increment pointers.
         curr_m += step_m
-        with tl.async_task([0]):
-            if not enable_tma:
-                qT_ptrs += step_m * stride_qm
-                do_ptrs += step_m * stride_dom
+        if not enable_tma:
+            qT_ptrs += step_m * stride_qm
+            do_ptrs += step_m * stride_dom
 
         if USE_DQ_ATOMIC_ADD:
             dq_ptrs += step_m * stride_qm
@@ -1038,82 +931,61 @@ def _gdpa_bwd_dq(
     step_n = BLOCK_N2
     for _blk_idx in tl.range(0, num_steps, 1, loop_unroll_factor=1):
         offs_n = curr_n + tl.arange(0, BLOCK_N2)
-        with tl.async_task([0]):
-            kmask = (offs_k[:, None] < HEAD_DIM) & (offs_n[None, :] < klen)
-            if enable_tma:
-                k = tl._experimental_descriptor_load(
-                    desc_k2,
-                    [
-                        (begin_k + curr_n).to(tl.int32),
-                        (off_h_kv * stride_kh).to(tl.int32),
-                    ],
-                    [BLOCK_N2, BLOCK_D],
-                    K.dtype.element_ty,
-                )
-                kT = tl.trans(k)
-                # kT = tl.where(kmask, kT, 0.0)
-                v = tl._experimental_descriptor_load(
-                    desc_v2,
-                    [
-                        (begin_k + curr_n).to(tl.int32),
-                        (off_h_kv * stride_kh).to(tl.int32),
-                    ],
-                    [BLOCK_N2, BLOCK_D],
-                    V.dtype.element_ty,
-                )
-                vT = tl.trans(v)
-                # vT = tl.where(kmask, vT, 0.0)
-            else:
-                kT = tl.load(kT_ptrs, mask=kmask)
-                vT = tl.load(vT_ptrs, mask=kmask)
-        with tl.async_task([1, NUM_CONSUMER_GROUPS]):
-            qk = tl.dot(q, kT)
-            if activation_enum_int == 0:
-                p = raw_grad(qk)
-            elif activation_enum_int == 1:
-                # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
-                p = gelu_grad(qk)
-            elif activation_enum_int == 2:
-                p = gelu_approx_grad(qk)
-            elif activation_enum_int == 3:
-                p = fast_gelu_grad(qk)
-            elif activation_enum_int == 4:
-                p = leaky_relu_grad(qk)
-            elif activation_enum_int == 5:
-                p = relu_grad(qk)
-            elif activation_enum_int == 6:
-                qk = qk.to(tl.bfloat16)
-                p = fast_gelu_bf16_grad(qk)
-            elif activation_enum_int == 7:
-                p = silu_grad(qk)
-            elif activation_enum_int == 8:
-                p = fast_silu_grad(qk)
-            else:
-                p = 1
-            p *= qk_scale
+        kmask = (offs_k[:, None] < HEAD_DIM) & (offs_n[None, :] < klen)
+        if enable_tma:
+            k = desc_k2.load(
+                [
+                    (begin_k + curr_n).to(tl.int32),
+                    (off_h_kv * stride_kh).to(tl.int32),
+                ],
+            )
+            kT = tl.trans(k)
+            # kT = tl.where(kmask, kT, 0.0)
+            v = desc_v2.load(
+                [
+                    (begin_k + curr_n).to(tl.int32),
+                    (off_h_kv * stride_kh).to(tl.int32),
+                ],
+            )
+            vT = tl.trans(v)
+            # vT = tl.where(kmask, vT, 0.0)
+        else:
+            kT = tl.load(kT_ptrs, mask=kmask)
+            vT = tl.load(vT_ptrs, mask=kmask)
 
-            # Autoregressive masking.
-            if MASK:
-                mask = offs_m[:, None] >= offs_n[None, :]
-                p = tl.where(mask, p, 0.0)
-            # Sliding window masking.
-            if WINDOW_SIZE is not None:
-                window_mask = tl.abs(offs_m[:, None] - offs_n[None, :]) <= WINDOW_SIZE
-                p = tl.where(window_mask, p, 0.0)
+        qk = tl.dot(q, kT)
+        if activation_enum_int == 0:
+            p = 1.0
+        elif activation_enum_int == 1:
+            # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
+            p = gelu_grad(qk)
+        elif activation_enum_int == 2:
+            p = fast_gelu_grad(qk)
+        else:
+            p = 1
+        p *= qk_scale
 
-            # Compute dP and dS.
-            dp = tl.dot(do, vT).to(tl.float32)
-            ds = p * dp  # - Di[:, None])
-            ds = ds.to(K.dtype.element_ty)
-            # Compute dQ.
-            # NOTE: We need to de-qk_scale dq in the end, because kT was pre-scaled.
-            dq += tl.dot(ds, tl.trans(kT))  # * ln_scale
+        # Autoregressive masking.
+        if MASK:
+            mask = offs_m[:, None] >= offs_n[None, :]
+            p = tl.where(mask, p, 0.0)
+        # Sliding window masking.
+        if WINDOW_SIZE is not None:
+            window_mask = tl.abs(offs_m[:, None] - offs_n[None, :]) <= WINDOW_SIZE
+            p = tl.where(window_mask, p, 0.0)
+
+        # Compute dP and dS.
+        dp = tl.dot(do, vT).to(tl.float32)
+        ds = p * dp  # - Di[:, None])
+        ds = ds.to(K.dtype.element_ty)
+        # Compute dQ.
+        # NOTE: We need to de-qk_scale dq in the end, because kT was pre-scaled.
+        dq += tl.dot(ds, tl.trans(kT))  # * ln_scale
         # Increment pointers.
         curr_n += step_n
-        with tl.async_task([0]):
-            if not enable_tma:
-                kT_ptrs += step_n * stride_km
-                vT_ptrs += step_n * stride_km
+        if not enable_tma:
+            kT_ptrs += step_n * stride_km
+            vT_ptrs += step_n * stride_km
     return dq
 
 
@@ -1147,8 +1019,6 @@ bwd_configs_ws = [
             },
             num_stages=s,
             num_warps=w,
-            num_buffers_warp_spec=buf,
-            num_consumer_groups=2,
         )
     )
     for buf in [2]
@@ -1223,7 +1093,6 @@ def _gdpa_bwd_compute(
     K,
     K_offsets,
     V,
-    workspace_ptr,
     DO,  #
     Out_offsets,
     DQ,
@@ -1306,172 +1175,112 @@ def _gdpa_bwd_compute(
     desc_dv = None
 
     if enable_tma:
-        with tl.async_task([0]):
-            TMA_SIZE: tl.constexpr = 128
-            workspace_base = workspace_ptr
-            desc_q = workspace_base
-            desc_q2 = workspace_base + 1 * TMA_SIZE
-            desc_do = workspace_base + 2 * TMA_SIZE
-            desc_do2 = workspace_base + 3 * TMA_SIZE
-            tl.extra.cuda.experimental_device_tensormap_create2d(
-                desc_ptr=desc_q,
-                global_address=Q,
-                load_size=[BLOCK_M1, BLOCK_D],
-                global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                element_ty=Q.dtype.element_ty,
+        desc_q = tl.make_tensor_descriptor(
+            Q,
+            block_shape=[BLOCK_M1, BLOCK_D],
+            shape=[end_q.to(tl.int32), HEAD_DIM * H],
+            strides=[stride_qm, stride_d],
+        )
+        desc_do = tl.make_tensor_descriptor(
+            DO,
+            block_shape=[BLOCK_M1, BLOCK_D],
+            shape=[end_q.to(tl.int32), HEAD_DIM * H],
+            strides=[stride_dom, stride_d],
+        )
+
+        if not USE_DQ_ATOMIC_ADD:
+            desc_q2 = tl.make_tensor_descriptor(
+                Q,
+                block_shape=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
+                shape=[end_q.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_qm, stride_d],
             )
-            tl.extra.cuda.experimental_device_tensormap_create2d(
-                desc_ptr=desc_do,
-                global_address=DO,
-                load_size=[BLOCK_M1, BLOCK_D],
-                global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                element_ty=Q.dtype.element_ty,
+            desc_k2 = tl.make_tensor_descriptor(
+                K,
+                block_shape=[BLOCK_N2, BLOCK_D],
+                shape=[end_k.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_km, stride_d],
             )
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_q)
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k)
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v)
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_do)
-
-            if not USE_DQ_ATOMIC_ADD:
-                desc_q2 = workspace_base + 7 * TMA_SIZE
-                desc_k2 = workspace_base + 8 * TMA_SIZE
-                desc_v2 = workspace_base + 9 * TMA_SIZE
-                desc_do2 = workspace_base + 10 * TMA_SIZE
-
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_q2,
-                    global_address=Q,
-                    load_size=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                    element_ty=Q.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_k2,
-                    global_address=K,
-                    load_size=[BLOCK_N2, BLOCK_D],
-                    global_size=[end_k.to(tl.int32), HEAD_DIM * H],
-                    element_ty=K.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_v2,
-                    global_address=V,
-                    load_size=[BLOCK_N2, BLOCK_D],
-                    global_size=[end_k.to(tl.int32), HEAD_DIM * H],
-                    element_ty=V.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_do2,
-                    global_address=DO,
-                    load_size=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                    element_ty=Q.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_q2)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k2)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v2)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_do2)
-
-        with tl.async_task([1, NUM_CONSUMER_GROUPS]):
-            desc_dq = workspace_base + 4 * TMA_SIZE
-            desc_dk = workspace_base + 5 * TMA_SIZE
-            desc_dv = workspace_base + 6 * TMA_SIZE
-            if USE_DQ_ATOMIC_ADD:
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_dq,
-                    global_address=DQ,
-                    load_size=[BLOCK_M1, BLOCK_D],
-                    global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                    element_ty=Q.dtype.element_ty,
-                )
-            else:
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_dq,
-                    global_address=DQ,
-                    load_size=[BLOCK_M1 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                    element_ty=Q.dtype.element_ty,
-                )
-            tl.extra.cuda.experimental_device_tensormap_create2d(
-                desc_ptr=desc_q2,
-                global_address=Q,
-                load_size=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                element_ty=Q.dtype.element_ty,
+            desc_v2 = tl.make_tensor_descriptor(
+                V,
+                block_shape=[BLOCK_N2, BLOCK_D],
+                shape=[end_k.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_km, stride_d],
             )
-            tl.extra.cuda.experimental_device_tensormap_create2d(
-                desc_ptr=desc_do2,
-                global_address=DO,
-                load_size=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                global_size=[end_q.to(tl.int32), HEAD_DIM * H],
-                element_ty=Q.dtype.element_ty,
+
+        if USE_DQ_ATOMIC_ADD:
+            desc_dq = tl.make_tensor_descriptor(
+                DQ,
+                block_shape=[BLOCK_M1, BLOCK_D],
+                shape=[end_q.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_qm, stride_d],
             )
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_q)
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_do)
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_q2)
-            tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_do2)
-            if not IS_DENSE_KV:
-                desc_k = workspace_base + 4 * TMA_SIZE
-                desc_v = workspace_base + 5 * TMA_SIZE
-                desc_k2 = workspace_base + 6 * TMA_SIZE
-                desc_v2 = workspace_base + 7 * TMA_SIZE
-
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_k,
-                    global_address=K,
-                    load_size=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[end_k.to(tl.int32), HEAD_DIM * H],
-                    element_ty=K.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_v,
-                    global_address=V,
-                    load_size=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[end_k.to(tl.int32), HEAD_DIM * H],
-                    element_ty=V.dtype.element_ty,
-                )
-
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_k2,
-                    global_address=K,
-                    load_size=[BLOCK_N2, BLOCK_D],
-                    global_size=[end_k.to(tl.int32), HEAD_DIM * H],
-                    element_ty=K.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_v2,
-                    global_address=V,
-                    load_size=[BLOCK_N2, BLOCK_D],
-                    global_size=[end_k.to(tl.int32), HEAD_DIM * H],
-                    element_ty=V.dtype.element_ty,
-                )
-
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k2)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v2)
+        else:
+            desc_dq = tl.make_tensor_descriptor(
+                DQ,
+                block_shape=[BLOCK_M1 // NUM_CONSUMER_GROUPS, BLOCK_D],
+                shape=[end_q.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_qm, stride_d],
+            )
+        desc_q2 = tl.make_tensor_descriptor(
+            Q,
+            block_shape=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
+            shape=[end_q.to(tl.int32), HEAD_DIM * H],
+            strides=[stride_qm, stride_d],
+        )
+        desc_do2 = tl.make_tensor_descriptor(
+            DO,
+            block_shape=[BLOCK_M2 // NUM_CONSUMER_GROUPS, BLOCK_D],
+            shape=[end_q.to(tl.int32), HEAD_DIM * H],
+            strides=[stride_dom, stride_d],
+        )
+        if not IS_DENSE_KV:
+            desc_k = tl.make_tensor_descriptor(
+                K,
+                block_shape=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
+                shape=[end_k.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                block_shape=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
+                shape=[end_k.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
+            desc_k2 = tl.make_tensor_descriptor(
+                K,
+                block_shape=[BLOCK_N2, BLOCK_D],
+                shape=[end_k.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
+            desc_v2 = tl.make_tensor_descriptor(
+                V,
+                block_shape=[BLOCK_N2, BLOCK_D],
+                shape=[end_k.to(tl.int32), HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
 
     # if start_n > klen and start_m > qlen:
     #    return
     # Some of the ops are used for both producer and consumer, some are used by consumer
     # Try to correctly specialize the IfOp by marking all ops.
-    with tl.async_task([0, 1, NUM_CONSUMER_GROUPS]):
-        # invert of start_n > klen and start_m > qlen
-        if start_n <= klen or start_m <= qlen:
-            begin_o = tl.load(Out_offsets + off_z)
+    # invert of start_n > klen and start_m > qlen
+    if start_n <= klen or start_m <= qlen:
+        begin_o = tl.load(Out_offsets + off_z)
 
-            off_h2 = off_h.to(tl.int64)
-            qadj = off_h2 * stride_qh + begin_q * stride_qm
-            kadj = off_h_kv * stride_kh + begin_k * stride_km
-            doadj = off_h2 * stride_doh + begin_o * stride_dom
+        off_h2 = off_h.to(tl.int64)
+        qadj = off_h2 * stride_qh + begin_q * stride_qm
+        kadj = off_h_kv * stride_kh + begin_k * stride_km
+        doadj = off_h2 * stride_doh + begin_o * stride_dom
 
-            # offset pointers for batch/head
-            Q += qadj
-            K += kadj
-            V += kadj
-            DO += doadj
-            DQ += qadj
-            DK += kadj
-            DV += kadj
+        # offset pointers for batch/head
+        Q += qadj
+        K += kadj
+        V += kadj
+        DO += doadj
+        DQ += qadj
+        DK += kadj
+        DV += kadj
 
     # load qk_scales
     if start_n < klen:
@@ -1483,36 +1292,29 @@ def _gdpa_bwd_compute(
 
         # load K and V: they stay in SRAM throughout the inner loop.
 
-        with tl.async_task([0]):
-            if enable_tma:
-                k = tl._experimental_descriptor_load(
-                    desc_k,
-                    [
-                        (begin_k + start_n).to(tl.int32),
-                        (off_h_kv * stride_kh).to(tl.int32),
-                    ],
-                    [BLOCK_N1, BLOCK_D],
-                    K.dtype.element_ty,
-                )
-                v = tl._experimental_descriptor_load(
-                    desc_v,
-                    [
-                        (begin_k + start_n).to(tl.int32),
-                        (off_h_kv * stride_kh).to(tl.int32),
-                    ],
-                    [BLOCK_N1, BLOCK_D],
-                    V.dtype.element_ty,
-                )
+        if enable_tma:
+            k = desc_k.load(
+                [
+                    (begin_k + start_n).to(tl.int32),
+                    (off_h_kv * stride_kh).to(tl.int32),
+                ],
+            )
+            v = desc_v.load(
+                [
+                    (begin_k + start_n).to(tl.int32),
+                    (off_h_kv * stride_kh).to(tl.int32),
+                ],
+            )
 
-            else:
-                k = tl.load(
-                    K + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d,
-                    mask=kmask,
-                )
-                v = tl.load(
-                    V + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d,
-                    mask=kmask,
-                )
+        else:
+            k = tl.load(
+                K + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d,
+                mask=kmask,
+            )
+            v = tl.load(
+                V + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d,
+                mask=kmask,
+            )
 
         start_m_inner = 0
         num_steps = tl.cdiv((qlen - start_m_inner), BLOCK_M1)
@@ -1566,40 +1368,37 @@ def _gdpa_bwd_compute(
             activation_enum_int=activation_enum_int,
         )
 
-        with tl.async_task([1, NUM_CONSUMER_GROUPS]):
-            # rematerialize
-            dv_ptrs = DV + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d
-            if USE_START_END_OFFSETS or G > 1:
-                tl.atomic_add(dv_ptrs, dv, mask=kmask, sem="relaxed")
+        # rematerialize
+        dv_ptrs = DV + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d
+        if USE_START_END_OFFSETS or G > 1:
+            tl.atomic_add(dv_ptrs, dv, mask=kmask, sem="relaxed")
+        else:
+            if enable_tma:
+                desc_dv.store(
+                    [
+                        (begin_k + start_n).to(tl.int32),
+                        (off_h_kv * stride_kh).to(tl.int32),
+                    ],
+                    dv.to(K.dtype.element_ty),
+                )
             else:
-                if enable_tma:
-                    tl._experimental_descriptor_store(
-                        desc_dv,
-                        dv.to(K.dtype.element_ty),
-                        [
-                            (begin_k + start_n).to(tl.int32),
-                            (off_h_kv * stride_kh).to(tl.int32),
-                        ],
-                    )
-                else:
-                    tl.store(dv_ptrs, dv, mask=kmask)
+                tl.store(dv_ptrs, dv, mask=kmask)
 
-            # Write back dK.
-            dk_ptrs = DK + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d
-            if USE_START_END_OFFSETS or G > 1:
-                tl.atomic_add(dk_ptrs, dk, mask=kmask, sem="relaxed")
+        # Write back dK.
+        dk_ptrs = DK + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d
+        if USE_START_END_OFFSETS or G > 1:
+            tl.atomic_add(dk_ptrs, dk, mask=kmask, sem="relaxed")
+        else:
+            if enable_tma:
+                desc_dk.store(
+                    [
+                        (begin_k + start_n).to(tl.int32),
+                        (off_h_kv * stride_kh).to(tl.int32),
+                    ],
+                    dk.to(K.dtype.element_ty),
+                )
             else:
-                if enable_tma:
-                    tl._experimental_descriptor_store(
-                        desc_dk,
-                        dk.to(K.dtype.element_ty),
-                        [
-                            (begin_k + start_n).to(tl.int32),
-                            (off_h_kv * stride_kh).to(tl.int32),
-                        ],
-                    )
-                else:
-                    tl.store(dk_ptrs, dk, mask=kmask)
+                tl.store(dk_ptrs, dk, mask=kmask)
 
     # THIS BLOCK DOES DQ:
     # use nested if to avoid jit error
@@ -1610,35 +1409,28 @@ def _gdpa_bwd_compute(
             off_h2 = off_h.to(tl.int64)
             qmask = (offs_k[None, :] < HEAD_DIM) & (offs_m[:, None] < qlen)
 
-            with tl.async_task([0]):
-                if enable_tma:
-                    q = tl._experimental_descriptor_load(
-                        desc_q2,
-                        [
-                            (begin_q + start_m).to(tl.int32),
-                            (off_h2 * stride_qh).to(tl.int32),
-                        ],
-                        [BLOCK_M2, BLOCK_D],
-                        Q.dtype.element_ty,
-                    )
-                    do = tl._experimental_descriptor_load(
-                        desc_do2,
-                        [
-                            (begin_q + start_m).to(tl.int32),
-                            (off_h2 * stride_doh).to(tl.int32),
-                        ],
-                        [BLOCK_M2, BLOCK_D],
-                        DO.dtype.element_ty,
-                    )
-                else:
-                    q = tl.load(
-                        Q + offs_m[:, None] * stride_qm + offs_k[None, :] * stride_d,
-                        mask=qmask,
-                    )
-                    do = tl.load(
-                        DO + offs_m[:, None] * stride_dom + offs_k[None, :] * stride_d,
-                        mask=qmask,
-                    )
+            if enable_tma:
+                q = desc_q2.load(
+                    [
+                        (begin_q + start_m).to(tl.int32),
+                        (off_h2 * stride_qh).to(tl.int32),
+                    ],
+                )
+                do = desc_do2.load(
+                    [
+                        (begin_q + start_m).to(tl.int32),
+                        (off_h2 * stride_doh).to(tl.int32),
+                    ],
+                )
+            else:
+                q = tl.load(
+                    Q + offs_m[:, None] * stride_qm + offs_k[None, :] * stride_d,
+                    mask=qmask,
+                )
+                do = tl.load(
+                    DO + offs_m[:, None] * stride_dom + offs_k[None, :] * stride_d,
+                    mask=qmask,
+                )
             dq = tl.zeros([BLOCK_M2, BLOCK_D], dtype=tl.float32)
 
             start_n_inner = 0
@@ -1686,25 +1478,23 @@ def _gdpa_bwd_compute(
                 activation_enum_int=activation_enum_int,
             )
 
-            with tl.async_task([1, NUM_CONSUMER_GROUPS]):
-                # Write back dQ.
-                dq_ptrs = DQ + offs_m[:, None] * stride_qm + offs_k[None, :] * stride_d
-                # dq *= LN2
-                if BROADCAST_Q or USE_START_END_OFFSETS:
-                    tl.atomic_add(dq_ptrs, dq, mask=qmask, sem="relaxed")
+            # Write back dQ.
+            dq_ptrs = DQ + offs_m[:, None] * stride_qm + offs_k[None, :] * stride_d
+            # dq *= LN2
+            if BROADCAST_Q or USE_START_END_OFFSETS:
+                tl.atomic_add(dq_ptrs, dq, mask=qmask, sem="relaxed")
+            else:
+                if enable_tma:
+                    desc_dq.store(
+                        [
+                            (begin_q + start_m).to(tl.int32),
+                            (off_h2 * stride_qh).to(tl.int32),
+                        ],
+                        dq.to(Q.dtype.element_ty),
+                        store_reduce="add",
+                    )
                 else:
-                    if enable_tma:
-                        tl._experimental_descriptor_store(
-                            desc_dq,
-                            dq.to(Q.dtype.element_ty),
-                            [
-                                (begin_q + start_m).to(tl.int32),
-                                (off_h2 * stride_qh).to(tl.int32),
-                            ],
-                            store_reduce="add",
-                        )
-                    else:
-                        tl.store(dq_ptrs, dq, mask=qmask)
+                    tl.store(dq_ptrs, dq, mask=qmask)
 
 
 @triton.jit
@@ -1714,7 +1504,6 @@ def _gdpa_bwd(
     K,
     K_offsets,
     V,
-    workspace_ptr,
     seq_index,  #
     DO,  #
     Out_offsets,
@@ -1774,14 +1563,6 @@ def _gdpa_bwd(
             num_desc = 7
         else:
             num_desc = 11
-        workspace_ptr = (
-            workspace_ptr
-            + (tl.program_id(0) + tl.program_id(2) * tl.num_programs(0))
-            * num_desc
-            * 128
-        )
-    else:
-        workspace_ptr = None
 
     _gdpa_bwd_compute(
         Q,
@@ -1789,7 +1570,6 @@ def _gdpa_bwd(
         K,
         K_offsets,
         V,
-        workspace_ptr,
         DO,  #
         Out_offsets,
         DQ,
@@ -1842,7 +1622,6 @@ def _gdpa_bwd_persistent(
     K,
     K_offsets,
     V,
-    workspace,
     seq_index,  #
     DO,  #
     Out_offsets,
@@ -1891,53 +1670,36 @@ def _gdpa_bwd_persistent(
         tiles_per_sm += 1
 
     tile_idx = prog_id
-    workspace_ptr_base = None
     desc_k = None
     desc_v = None
     desc_k2 = None
     desc_v2 = None
     if enable_tma:
-        workspace_ptr_base = workspace + prog_id * 8 * 128
         if IS_DENSE_KV:
-            with tl.async_task([0]):
-                TMA_SIZE: tl.constexpr = 128
-                workspace_base = workspace_ptr_base
-                desc_k = workspace_base + 4 * TMA_SIZE
-                desc_v = workspace_base + 5 * TMA_SIZE
-                desc_k2 = workspace_base + 6 * TMA_SIZE
-                desc_v2 = workspace_base + 7 * TMA_SIZE
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_k,
-                    global_address=K,
-                    load_size=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[N_CTX_KV * Z, HEAD_DIM * H],
-                    element_ty=K.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_v,
-                    global_address=V,
-                    load_size=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
-                    global_size=[N_CTX_KV * Z, HEAD_DIM * H],
-                    element_ty=V.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_k2,
-                    global_address=K,
-                    load_size=[BLOCK_N2, BLOCK_D],
-                    global_size=[N_CTX_KV * Z, HEAD_DIM * H],
-                    element_ty=K.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_device_tensormap_create2d(
-                    desc_ptr=desc_v2,
-                    global_address=V,
-                    load_size=[BLOCK_N2, BLOCK_D],
-                    global_size=[N_CTX_KV * Z, HEAD_DIM * H],
-                    element_ty=V.dtype.element_ty,
-                )
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_k2)
-                tl.extra.cuda.experimental_tensormap_fenceproxy_acquire(desc_v2)
+            desc_k = tl.make_tensor_descriptor(
+                K,
+                block_shape=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
+                global_size=[N_CTX_KV * Z, HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
+            desc_v = tl.make_tensor_descriptor(
+                V,
+                block_shape=[BLOCK_N1 // NUM_CONSUMER_GROUPS, BLOCK_D],
+                global_size=[N_CTX_KV * Z, HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
+            desc_k2 = tl.make_tensor_descriptor(
+                K,
+                block_shape=[BLOCK_N2, BLOCK_D],
+                global_size=[N_CTX_KV * Z, HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
+            desc_v2 = tl.make_tensor_descriptor(
+                V,
+                block_shape=[BLOCK_N2, BLOCK_D],
+                global_size=[N_CTX_KV * Z, HEAD_DIM * H],
+                strides=[stride_km, stride_d],
+            )
 
     for _ in tl.range(0, tiles_per_sm, 1, num_stages=1):
         pid = tile_idx % n_tile_num
@@ -1960,7 +1722,6 @@ def _gdpa_bwd_persistent(
             K,
             K_offsets,
             V,
-            workspace_ptr_base,
             DO,  #
             Out_offsets,
             DQ,
@@ -2159,8 +1920,6 @@ def generalized_dot_product_attention(
         kstrides = k.stride()
         vstrides = v.stride()
 
-    tma_size = 128
-    workspace = None
     # TODO: support non-power of 2 D (has some overhead), shared seq, & fused KV.
     enable_tma &= (
         is_tma_supported()
@@ -2171,16 +1930,12 @@ def generalized_dot_product_attention(
     # enable_ws &= enable_tma
 
     if enable_tma:
-        num_tiles = (
-            NUM_SMS
-            if enable_persistent
-            else triton.cdiv(max_seq_len_q, 32) * batch_size
-        )
-        workspace = torch.empty(
-            num_tiles * 3 * tma_size,
-            dtype=torch.uint8,
-            device="cuda",
-        )
+        # TMA descriptors require a global memory allocation
+        def alloc_fn(size: int, alignment: int, stream: int | None):
+            return torch.empty(size, device="cuda", dtype=torch.int8)
+
+        triton.set_allocator(alloc_fn)
+
     if enable_persistent:
         kernel_fn = _gdpa_fwd_persistent
         grid = grid_tma_persistent
@@ -2203,7 +1958,6 @@ def generalized_dot_product_attention(
         k,
         key_offset,
         v,
-        workspace,
         o,  #
         output_offset,
         ad_to_request_offset,
@@ -2465,25 +2219,6 @@ def generalized_dot_product_attention_backward(
     if len(restore_value) == 0:
         restore_value = None
 
-    tma_size = 128
-    workspace = None
-    if enable_tma:
-        num_tiles = (
-            NUM_SMS
-            if enable_persistent
-            else max(
-                triton.cdiv(N_CTX_KV, 32),
-                triton.cdiv(N_CTX, 32),
-            )
-            * BATCH
-            * N_HEAD
-        )
-        num_desc = 7 if use_dq_atomic_add else 11
-        workspace = torch.empty(
-            num_tiles * num_desc * tma_size,
-            dtype=torch.uint8,
-            device="cuda",
-        )
     kernel_grid = None
 
     if enable_persistent:
@@ -2504,7 +2239,6 @@ def generalized_dot_product_attention_backward(
         k,
         k_offsets,
         v,
-        workspace,
         seq_index,  #
         do,
         output_offset,
