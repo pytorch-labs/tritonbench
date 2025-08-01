@@ -1,6 +1,8 @@
 import triton.language as tl
 from torch import zeros
 from torch._C import _cuda_getCurrentRawStream as get_raw_stream
+
+from torch._inductor.utils import triton_version_uses_attrs_dict
 from triton.compiler import CompiledKernel
 
 from tritonbench.utils.triton_op import (
@@ -39,7 +41,10 @@ class Operator(BenchmarkOperator):
 
         else:
             bin = nop_with_args_kernel[1,](*args)
-            args = args[:-5]  # remove tl.constexpr args
+            # triton <= 3.3 does not include tl.constexpr args in call
+            # but triton 3.4 does
+            if not triton_version_uses_attrs_dict():
+                args = args[:-5]
         function = bin.function
         metadata = (
             bin.packed_metadata if hasattr(bin, "packed_metadata") else bin.metadata
