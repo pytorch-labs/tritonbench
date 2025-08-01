@@ -12,10 +12,23 @@ import torch
 
 import triton
 import triton.language as tl
+from triton.tools.tensor_descriptor import TensorDescriptor
 
-from tritonbench.utils.env_utils import is_hip_mi300
+from tritonbench.utils.env_utils import is_cuda, is_fbcode, is_hip_mi300
 
 from .triton_matmul_configs import get_full_amd_config_space
+
+if not is_fbcode():
+    if is_cuda():
+        from triton._C.libtriton import nvidia
+
+        cublas_workspace = torch.empty(
+            32 * 1024 * 1024, device="cuda", dtype=torch.uint8
+        )
+        cublas = nvidia.cublas.CublasLt(cublas_workspace)
+    else:
+        cublas = None
+
 
 if os.environ.get("FULL_AUTOTUNING_AMD", "0") == "1" and torch.version.hip is not None:
     tuning_configs = get_full_amd_config_space(False)
@@ -56,7 +69,7 @@ else:
     }
 )
 @triton.jit
-def streamk_gemm(
+def streamk_amd_gemm(
     A,
     B,
     C,
@@ -274,7 +287,7 @@ def streamk_gemm(
         start_iter = end_iter
 
 
-def streamk_matmul(a, b, bias=None):
+def streamk_amd_matmul(a, b, bias=None):
     M, K = a.shape
     _, N = b.shape
     dtype = a.dtype
@@ -350,7 +363,7 @@ def streamk_matmul(a, b, bias=None):
         and c.stride(0) >= 0
         and c.stride(1) >= 0
     )
-    streamk_gemm[(grids,)](
+    streamk_amd_gemm[(grids,)](
         a,
         b,
         c,
@@ -375,4 +388,254 @@ def streamk_matmul(a, b, bias=None):
 
     # print(c)
     # print(a @ b)
+    return c
+
+def _matmul_launch_metadata(grid, kernel, args):
+    ret = {}
+    M, N, K = args["M"], args["N"], args["K"]
+    ret["name"] = f"{kernel.name} [M={M}, N={N}, K={K}]"
+    ret["flops8"] = 2.0 * M * N * K
+    if "c_ptr" in args:
+        bytes_per_elem = args["c_ptr"].element_size()
+    else:
+        bytes_per_elem = 1 if args["FP8_OUTPUT"] else 2
+    ret["bytes"] = bytes_per_elem * (M * K + N * K)
+    return ret
+
+
+def matmul_get_configs(pre_hook=None):
+    return [
+        triton.Config(
+            {"BLOCK_M": BM, "BLOCK_N": BN, "BLOCK_K": BK, "SK_BLOCK_K": skBK, "GROUP_M": 8},
+            num_stages=s,
+            num_warps=w,
+            pre_hook=pre_hook,
+        )  #
+        for BM in [128, 256]  #
+        for BN in [128, 256]  #
+        for BK in [32, 64, 128]  #
+        for skBK in [16, 32, 64, 128] #
+        for s in ([2, 3, 4])  #
+        for w in [4, 8]  #
+    ]
+
+def matmul_tma_set_block_size_hook(nargs):
+    BLOCK_M = nargs["BLOCK_M"]
+    BLOCK_N = nargs["BLOCK_N"]
+    BLOCK_K = nargs["BLOCK_K"]
+    nargs["a_desc"].block_shape = [BLOCK_M, BLOCK_K]
+    nargs["b_desc"].block_shape = [BLOCK_N, BLOCK_K]
+    nargs["c_desc"].block_shape = [BLOCK_M, BLOCK_N]
+
+    SK_BLOCK_K = nargs["SK_BLOCK_K"]
+    nargs["a_desc_sk"].block_shape = [BLOCK_M, SK_BLOCK_K]
+    nargs["b_desc_sk"].block_shape = [BLOCK_N, SK_BLOCK_K]
+
+@triton.autotune(
+    configs=matmul_get_configs(pre_hook=matmul_tma_set_block_size_hook),
+    key=["M", "N", "K"],
+)
+@triton.jit(launch_metadata=_matmul_launch_metadata)
+def streamk_cuda_gemm(
+    # Pointer to a [BLOCK_M, BLOCK_K] TensorDescriptor
+    a_desc,
+    # Pointer to b [BLOCK_N, BLOCK_K] TensorDescriptor
+    b_desc,
+    # Pointer to a [BLOCK_M, SK_BLOCK_K] TensorDescriptor
+    a_desc_sk,
+    # Pointer to b [BLOCK_N, SK_BLOCK_K] TensorDescriptor
+    b_desc_sk,
+    # Pointer to c [BLOCK_M, BLOCK_N] TensorDescriptor
+    c_desc,
+    #
+    M,
+    N,
+    K,
+    # Tile dimensions both phases
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    # K block dimension for DDP phase
+    BLOCK_K: tl.constexpr,
+    # K block dimension for Stream-K phase
+    SK_BLOCK_K: tl.constexpr,
+    # Group size for both phases
+    GROUP_M: tl.constexpr,
+    # TRUE if lowering for FP8 output
+    FP8_OUTPUT: tl.constexpr,
+    #
+    ENABLE_BUFFER_OPS_ASSUMES: tl.constexpr,
+    # Number of SMs on the device
+    NUM_SMS: tl.constexpr,
+):
+    if ENABLE_BUFFER_OPS_ASSUMES:
+        tl.assume(M >= 0)
+        tl.assume(N >= 0)
+        tl.assume(K >= 0)
+
+    dtype = tl.float8e4nv if FP8_OUTPUT else tl.float16
+
+    pid = tl.program_id(0)
+    num_pid = tl.num_programs(0)
+    num_tile_m = tl.cdiv(M, BLOCK_M)
+    num_tile_n = tl.cdiv(N, BLOCK_N)
+    num_tile_in_group = GROUP_M * num_tile_n
+
+    total_tiles = num_tile_m * num_tile_n
+
+    # number of full waves
+    W = total_tiles // NUM_SMS
+    # number of tiles in partial wave
+    R = total_tiles % NUM_SMS
+    if W == 0 or R == 0:
+        total_ddp_tiles = num_pid
+        streamk_sms = 0
+    else:
+        # hybrid Stream-K + DDP: DDP on first W-1 waves, Stream-K on last wave with full SM occupancy
+        total_ddp_tiles = num_pid - NUM_SMS
+        streamk_sms = NUM_SMS
+
+
+    # ----------------------------------------------------------------------------
+    # DDP phase
+    # ----------------------------------------------------------------------------
+    if pid < total_ddp_tiles:
+        # Each DDP-assigned program computes 1 full tile
+        group_id = pid // num_tile_in_group
+        first_tile_m = group_id * GROUP_M
+        group_size_m = min(num_tile_m - first_tile_m, GROUP_M)
+        tile_m = first_tile_m + (pid % group_size_m)
+        tile_n = (pid % num_tile_in_group) // group_size_m
+
+        offs_am = tile_m * BLOCK_M
+        offs_bn = tile_n * BLOCK_N
+
+        accumulator = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
+
+        work_units_per_tile = tl.cdiv(K, BLOCK_K)
+
+        for k in tl.range(0, work_units_per_tile, warp_specialize=True):
+            offs_k = k * BLOCK_K
+            a = a_desc.load([offs_am, offs_k])
+            b = b_desc.load([offs_bn, offs_k])
+            accumulator = tl.dot(a, b.T, accumulator)
+
+        c = accumulator.to(dtype)
+        c_desc.store([offs_am, offs_bn], c)
+
+    # ----------------------------------------------------------------------------
+    # Stream-K phase
+    # ----------------------------------------------------------------------------
+    else:
+        # index each Stream-K program as if it were a single SM (num_pid - total_ddp_tiles = streamk_sms)
+        worker_id = pid - total_ddp_tiles
+
+        work_units_per_tile = tl.cdiv(K, SK_BLOCK_K)
+        total_work_units = (total_tiles - total_ddp_tiles) * work_units_per_tile
+
+        # `evenly` distribute work units across SMs, with rem tiles assigned contiguously to the first rem programs
+        base = total_work_units // streamk_sms
+        rem  = total_work_units % streamk_sms
+        work = tl.where(worker_id < rem, base + 1, base)
+        start = tl.where(
+            worker_id < rem,
+            worker_id * (base + 1),
+            rem * (base + 1) + (worker_id - rem) * base
+        )
+        end = start + work - 1
+
+        # if start >= total_units, nothing to do
+        if start >= total_work_units:
+            return
+
+        # this program is responsible for computing tiles [(st_tile_streamk, en_k_streamk), (en_tile_streamk, en_k_streamk)]
+        # *_k_streamk indexes along the K dimension and is one of {0, 1, ..., work_units_per_tile - 1}
+        st_tile_streamk = start // work_units_per_tile + total_ddp_tiles
+        st_k_streamk = start % work_units_per_tile
+        en_tile_streamk = end // work_units_per_tile + total_ddp_tiles
+        en_k_streamk = end % work_units_per_tile
+
+        for curr_tile in tl.range(st_tile_streamk, en_tile_streamk + 1, flatten=True):
+            # Compute the tile associate with this work unit --- consistent with the DDP phase
+            group_id = curr_tile // num_tile_in_group
+            first_tile_m = group_id * GROUP_M
+            group_size_m = min(num_tile_m - first_tile_m, GROUP_M)
+            tile_m = first_tile_m + (curr_tile % group_size_m)
+            tile_n = (curr_tile % num_tile_in_group) // group_size_m
+
+            offs_am = tile_m * BLOCK_M
+            offs_bn = tile_n * BLOCK_N
+
+            # compute the start and end K index on this tile for this work unit
+            curr_st_k = tl.where(curr_tile == st_tile_streamk, st_k_streamk, 0)
+            curr_en_k = tl.where(curr_tile == en_tile_streamk, en_k_streamk, work_units_per_tile - 1)
+
+            accumulator = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
+
+            for k in tl.range(curr_st_k, curr_en_k + 1, warp_specialize=True):
+                offs_k = k * SK_BLOCK_K
+                # if same Tensor Descriptor shape is used for both phases, just use DDP's (better performance)
+                if BLOCK_K == SK_BLOCK_K:
+                    a = a_desc.load([offs_am, offs_k])
+                    b = b_desc.load([offs_bn, offs_k])
+                else:
+                    a = a_desc_sk.load([offs_am, offs_k])
+                    b = b_desc_sk.load([offs_bn, offs_k])
+                accumulator = tl.dot(a, b.T, accumulator)
+
+            c = accumulator.to(dtype)
+
+            if curr_st_k == 0 and curr_en_k == work_units_per_tile - 1:
+                c_desc.store([offs_am, offs_bn], c)
+            else:
+                # NOTE: known correctness issue with atomic_add
+                c_desc.atomic_add([offs_am, offs_bn], c)
+
+def streamk_cuda_matmul(a, b):
+    assert a.dtype == b.dtype, "Incompatible dtypes"
+
+    M, K = a.shape
+    N, K = b.shape
+    dtype = a.dtype
+
+    c = torch.zeros((M, N), device=a.device, dtype=dtype)
+
+    dummy_block = [1, 1]
+    a_desc = TensorDescriptor(a, a.shape, a.stride(), dummy_block)
+    b_desc = TensorDescriptor(b, b.shape, b.stride(), dummy_block)
+    c_desc = TensorDescriptor(c, c.shape, c.stride(), dummy_block)
+
+    a_desc_sk = TensorDescriptor(a, a.shape, a.stride(), dummy_block)
+    b_desc_sk = TensorDescriptor(b, b.shape, b.stride(), dummy_block)
+
+    num_sms = torch.cuda.get_device_properties("cuda").multi_processor_count
+
+    def grid(META):
+        nonlocal a_desc, b_desc, c_desc
+        BLOCK_M = META["BLOCK_M"]
+        BLOCK_N = META["BLOCK_N"]
+        num_tiles = triton.cdiv(M, BLOCK_M) * triton.cdiv(N, BLOCK_N)
+        W = num_tiles // num_sms
+        R = num_tiles % num_sms
+        if W == 0 or R == 0:
+            total_ddp_tiles = num_tiles
+            streamk_sms = 0
+        else:
+            total_ddp_tiles = (W - 1) * num_sms
+            streamk_sms = num_sms
+        return (total_ddp_tiles + streamk_sms,)
+
+
+    streamk_cuda_gemm[grid](
+        a_desc,
+        b_desc,
+        a_desc_sk,
+        b_desc_sk,
+        c_desc,  #
+        M,
+        N,
+        K,  #
+        FP8_OUTPUT=dtype == torch.float8_e4m3fn,  #
+        ENABLE_BUFFER_OPS_ASSUMES=True,  #
+        NUM_SMS=num_sms #
+    )
     return c
