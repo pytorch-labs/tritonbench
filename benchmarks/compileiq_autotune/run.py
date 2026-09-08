@@ -270,6 +270,27 @@ def search(
                 f"[tritonbench_compileiq] Failed to extract best configs or write validation script: {e}"
             )
 
+        # In verbose mode the work dir holds the full stdout/stderr of every
+        # Tritonbench run, so ship the whole thing to the manifold mount.
+        if verbose:
+            verbose_target = os.path.join(target_path, REPO_WORK_DIR.name)
+            logger.info(
+                f"[tritonbench_compileiq] Uploading {REPO_WORK_DIR} to manifold mount: {verbose_target}"
+            )
+            try:
+                subprocess.run(["mkdir", "-p", target_path], check=True)
+                subprocess.run(
+                    ["cp", "-r", str(REPO_WORK_DIR), verbose_target],
+                    check=True,
+                )
+                logger.info(
+                    f"[tritonbench_compileiq] Upload complete: {MANIFOLD_URI_PREFIX}/{manifold_path}/{REPO_WORK_DIR.name}"
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(
+                    f"[tritonbench_compileiq] Failed to upload {REPO_WORK_DIR} to manifold: {e}"
+                )
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Top level for the CompileIQ Search.")
@@ -302,7 +323,8 @@ def get_parser():
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help=f"Save the full stdout/stderr of every Tritonbench run to {REPO_WORK_DIR}.",
+        help=f"Save the full stdout/stderr of every Tritonbench run to {REPO_WORK_DIR}, "
+        "and upload that directory to the manifold mount at the end of a MAST job.",
     )
     return parser
 
