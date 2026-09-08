@@ -213,7 +213,7 @@ tlx_configs = [
 
 @triton.autotune(
     tlx_configs,
-    key=["group_a_ptrs", "group_b_ptrs", "gropup_c_ptrs", "group_size"],
+    key=["group_a_ptrs", "group_b_ptrs", "group_c_ptrs", "group_size"],
 )
 @triton.jit
 def grouped_matmul_tlx_kernel(
