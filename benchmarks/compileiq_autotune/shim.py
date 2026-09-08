@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 from compileiq.utils.helpers import save_compiler_config
 
-from ..common import REPO_PATH
+from ..common import REPO_PATH, strip_torchrun_env
 
 REPO_WORK_DIR = Path("/tmp/tritonbench_compileiq_search")
 DEFAULT_CONFIG_FILE = "gemm_config_3.yaml"
@@ -20,26 +20,6 @@ CONTEXT_FILE = "context.json"
 # the kernel on its first launch, and every such candidate burns the whole timeout on
 # a GPU, so keep it close to the expected runtime rather than generously large.
 RUN_TIMEOUT_SEC = int(os.environ.get("TRITONBENCH_COMPILEIQ_TIMEOUT", "360"))
-
-# On MAST the search driver is launched by torchrun, and its torchelastic env
-# vars would otherwise be inherited by every benchmark subprocess we spawn.
-# Tritonbench's set_torchrun_env() keys off TORCHELASTIC_RUN_ID + LOCAL_RANK: it
-# would init a NCCL process group (which the search has no use for, and which
-# fails outright when no NCCL net plugin is available) and reset
-# CUDA_VISIBLE_DEVICES to LOCAL_RANK, pinning every Ray worker to the same GPU.
-TORCHRUN_ENV_VARS = (
-    "LOCAL_RANK",
-    "RANK",
-    "GROUP_RANK",
-    "ROLE_RANK",
-    "LOCAL_WORLD_SIZE",
-    "WORLD_SIZE",
-    "GROUP_WORLD_SIZE",
-    "ROLE_WORLD_SIZE",
-    "ROLE_NAME",
-    "MASTER_ADDR",
-    "MASTER_PORT",
-)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -139,18 +119,6 @@ def truncate_output(
     return output[-min(limit, len(output)) :]
 
 
-def strip_torchrun_env(env):
-    """Drop the torchelastic/torchrun variables from `env`, in place.
-
-    Each candidate is a plain single-GPU benchmark on the GPU Ray gave the
-    worker, so it must not inherit the driver's distributed rendezvous.
-    """
-    for key in list(env):
-        if key in TORCHRUN_ENV_VARS or key.startswith("TORCHELASTIC_"):
-            del env[key]
-    return env
-
-
 def write_encrypted_knobs(config: dict | bytes, knobs_file: str):
     """
     To be used if encrypted knobs are provided.
@@ -188,6 +156,8 @@ def run_tritonbench(
     else:
         knobs_env = ""
 
+    # Each candidate is a plain single-GPU run on the GPU Ray assigned to this
+    # worker, so it must not inherit the driver's torchrun rendezvous.
     cmd_env = strip_torchrun_env(os.environ.copy())
     assert os.path.exists(f"{workdir}/{config_file}")
     assert os.path.exists(REPO_PATH.joinpath("run.py")), (

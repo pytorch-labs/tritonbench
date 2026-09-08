@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 
-from ..common import setup_output_dir, setup_tritonbench_cwd
+from ..common import setup_output_dir, setup_tritonbench_cwd, strip_torchrun_env
 
 
 setup_tritonbench_cwd()
@@ -279,14 +279,16 @@ def main() -> int:
     print("[ptxas-check] === Run 1: WITH PTXAS_OPTIONS ===")
     output_dir_with = os.path.join(output_dir, "with_ptxas_options")
     os.mkdir(output_dir_with)
-    env_with = os.environ.copy()
+    # Both runs are plain single-GPU benchmarks; passed to run_tritonbench with
+    # override_envs=True, so this dict is verbatim the subprocess environment.
+    env_with = strip_torchrun_env(os.environ.copy())
     rc1 = run_tritonbench(config_file, extra_args, output_dir_with, env_with)
     print()
 
     print("[ptxas-check] === Run 2: WITHOUT PTXAS_OPTIONS ===")
     output_dir_without = os.path.join(output_dir, "without_ptxas_options")
     os.mkdir(output_dir_without)
-    env_without = os.environ.copy()
+    env_without = strip_torchrun_env(os.environ.copy())
     env_without.pop("PTXAS_OPTIONS", None)
     rc2 = run_tritonbench(config_file, extra_args, output_dir_without, env_without)
     print()
