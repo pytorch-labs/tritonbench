@@ -1,6 +1,8 @@
 import argparse
+import functools
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from typing import List, Optional
@@ -109,25 +111,35 @@ def write_validate_script(output_dir, tritonbench_config, acf_file):
     """Write a validate.sh into output_dir that re-applies an ACF config and re-runs
     the ptxas check for the search's tritonbench config.
 
+    The tritonbench config file is copied into output_dir alongside validate.sh,
+    so validation runs with the copied config in the same directory instead of
+    reaching back into the tritonbench checkout.
+
     TRITONBENCH_ROOT and CIQ_ACF can be overridden via env vars; they default to a
     local tritonbench checkout and the best extracted ACF file respectively.
     """
+    os.makedirs(output_dir, exist_ok=True)
+    config_basename = os.path.basename(tritonbench_config)
+    shutil.copy(
+        os.path.join(TRITONBENCH_CONFIGS_DIR, tritonbench_config),
+        os.path.join(output_dir, config_basename),
+    )
+    acf_basename = os.path.basename(acf_file)
     script = f"""CURDIR=$PWD
 
 if [ -z ${{TRITONBENCH_ROOT:-}} ]; then
   TRITONBENCH_ROOT=$HOME/local/tritonbench
 fi
 
-TRITONBENCH_CONFIGS_DIR=$TRITONBENCH_ROOT/benchmarks/run_config
-TRITONBENCH_CONFIG_FILE={tritonbench_config}
+TRITONBENCH_CONFIG_FILE={config_basename}
 
 if [ ! -f $CURDIR/$CIQ_ACF ]; then
-  CIQ_ACF="{acf_file}"
+  CIQ_ACF="{acf_basename}"
 fi
 
 cd $TRITONBENCH_ROOT
 
-PTXAS_OPTIONS="--apply-controls=$CURDIR/$CIQ_ACF" TRITONBENCH_RUN_CONFIG="$TRITONBENCH_CONFIGS_DIR/$TRITONBENCH_CONFIG_FILE" python -m benchmarks.ptxas_check.run
+PTXAS_OPTIONS="--apply-controls=$CURDIR/$CIQ_ACF" TRITONBENCH_RUN_CONFIG="$CURDIR/$TRITONBENCH_CONFIG_FILE" python -m benchmarks.ptxas_check.run
 
 cd -
 """
@@ -146,6 +158,7 @@ def search(
     tritonbench_config,
     search_space,
     has_manifold=False,
+    verbose=False,
 ):
     # Remove the .yaml extension
     tritonbench_config_name = os.path.splitext(tritonbench_config)[0]
@@ -195,8 +208,13 @@ def search(
         problem_type=problem_type,
         num_objectives=1,
     )
+    # The RAY workers are separate processes, so the flag has to travel with the
+    # objective function itself rather than through module state.
+    objective = (
+        functools.partial(objective_func, verbose=True) if verbose else objective_func
+    )
     tuner = Search(
-        objective_function=objective_func,
+        objective_function=objective,
         search_space=search_space_bin,
         search_config=main_config,
         worker_type=WorkerTypes.RAY,
@@ -263,6 +281,27 @@ def search(
                 f"[tritonbench_compileiq] Failed to extract best configs or write validation script: {e}"
             )
 
+        # In verbose mode the work dir holds the full stdout/stderr of every
+        # Tritonbench run, so ship the whole thing to the manifold mount.
+        if verbose:
+            verbose_target = os.path.join(target_path, REPO_WORK_DIR.name)
+            logger.info(
+                f"[tritonbench_compileiq] Uploading {REPO_WORK_DIR} to manifold mount: {verbose_target}"
+            )
+            try:
+                subprocess.run(["mkdir", "-p", target_path], check=True)
+                subprocess.run(
+                    ["cp", "-r", str(REPO_WORK_DIR), verbose_target],
+                    check=True,
+                )
+                logger.info(
+                    f"[tritonbench_compileiq] Upload complete: {MANIFOLD_URI_PREFIX}/{manifold_path}/{REPO_WORK_DIR.name}"
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(
+                    f"[tritonbench_compileiq] Failed to upload {REPO_WORK_DIR} to manifold: {e}"
+                )
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Top level for the CompileIQ Search.")
@@ -291,6 +330,12 @@ def get_parser():
         type=str,
         default=DEFAULT_SEARCH_SPACE,
         help="The CompileIQ ptxas search space. Either a local path or a manifold:// URI.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help=f"Save the full stdout/stderr of every Tritonbench run to {REPO_WORK_DIR}, "
+        "and upload that directory to the manifold mount at the end of a MAST job.",
     )
     return parser
 
@@ -388,6 +433,7 @@ def run(args: Optional[List[str]] = None):
             tritonbench_config=args.tritonbench_config,
             search_space=args.search_space,
             has_manifold=has_manifold,
+            verbose=args.verbose,
         )
 
 

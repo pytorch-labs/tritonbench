@@ -41,6 +41,35 @@ from tritonbench.utils.path_utils import REPO_PATH
 
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
 
+# When a benchmark driver is itself launched by torchrun (e.g. on MAST), its
+# torchelastic env vars would otherwise be inherited by every benchmark
+# subprocess it spawns. Tritonbench's set_torchrun_env() keys off
+# TORCHELASTIC_RUN_ID + LOCAL_RANK: it would init a NCCL process group (which
+# these single-GPU drivers have no use for, and which fails outright when no
+# NCCL net plugin is available) and reset CUDA_VISIBLE_DEVICES to LOCAL_RANK,
+# overriding whichever GPU the driver picked for the subprocess.
+TORCHRUN_ENV_VARS = (
+    "LOCAL_RANK",
+    "RANK",
+    "GROUP_RANK",
+    "ROLE_RANK",
+    "LOCAL_WORLD_SIZE",
+    "WORLD_SIZE",
+    "GROUP_WORLD_SIZE",
+    "ROLE_WORLD_SIZE",
+    "ROLE_NAME",
+    "MASTER_ADDR",
+    "MASTER_PORT",
+)
+
+
+def strip_torchrun_env(env):
+    """Drop the torchelastic/torchrun variables from `env`, in place."""
+    for key in list(env):
+        if key in TORCHRUN_ENV_VARS or key.startswith("TORCHELASTIC_"):
+            del env[key]
+    return env
+
 
 def post_run_callback(
     logger, benchmark_group_name, benchmark, output_file, output_files, disabled
