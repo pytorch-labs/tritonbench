@@ -2,6 +2,7 @@ import argparse
 import functools
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from typing import List, Optional
@@ -110,25 +111,35 @@ def write_validate_script(output_dir, tritonbench_config, acf_file):
     """Write a validate.sh into output_dir that re-applies an ACF config and re-runs
     the ptxas check for the search's tritonbench config.
 
+    The tritonbench config file is copied into output_dir alongside validate.sh,
+    so validation runs with the copied config in the same directory instead of
+    reaching back into the tritonbench checkout.
+
     TRITONBENCH_ROOT and CIQ_ACF can be overridden via env vars; they default to a
     local tritonbench checkout and the best extracted ACF file respectively.
     """
+    os.makedirs(output_dir, exist_ok=True)
+    config_basename = os.path.basename(tritonbench_config)
+    shutil.copy(
+        os.path.join(TRITONBENCH_CONFIGS_DIR, tritonbench_config),
+        os.path.join(output_dir, config_basename),
+    )
+    acf_basename = os.path.basename(acf_file)
     script = f"""CURDIR=$PWD
 
 if [ -z ${{TRITONBENCH_ROOT:-}} ]; then
   TRITONBENCH_ROOT=$HOME/local/tritonbench
 fi
 
-TRITONBENCH_CONFIGS_DIR=$TRITONBENCH_ROOT/benchmarks/run_config
-TRITONBENCH_CONFIG_FILE={tritonbench_config}
+TRITONBENCH_CONFIG_FILE={config_basename}
 
 if [ ! -f $CURDIR/$CIQ_ACF ]; then
-  CIQ_ACF="{acf_file}"
+  CIQ_ACF="{acf_basename}"
 fi
 
 cd $TRITONBENCH_ROOT
 
-PTXAS_OPTIONS="--apply-controls=$CURDIR/$CIQ_ACF" TRITONBENCH_RUN_CONFIG="$TRITONBENCH_CONFIGS_DIR/$TRITONBENCH_CONFIG_FILE" python -m benchmarks.ptxas_check.run
+PTXAS_OPTIONS="--apply-controls=$CURDIR/$CIQ_ACF" TRITONBENCH_RUN_CONFIG="$CURDIR/$TRITONBENCH_CONFIG_FILE" python -m benchmarks.ptxas_check.run
 
 cd -
 """

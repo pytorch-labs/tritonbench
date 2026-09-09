@@ -13,7 +13,10 @@ Usage:
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
@@ -236,15 +239,100 @@ def compare_outputs(dir_a: str, dir_b: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
+def parse_validate_sh(validate_sh_path: str) -> Tuple[str, str]:
+    """Read a CompileIQ validate.sh, returning (acf_file, config_file) basenames.
+
+    Both files are expected to sit in the same directory as validate.sh.
+    """
+    with open(validate_sh_path, "r") as f:
+        content = f.read()
+    acf_match = re.search(r'CIQ_ACF="([^"]+)"', content)
+    config_match = re.search(r"TRITONBENCH_CONFIG_FILE=([^\s]+)", content)
+    if not acf_match or not config_match:
+        raise ValueError(
+            f"Could not parse ACF/config file names from {validate_sh_path}"
+        )
+    acf_file = acf_match.group(1).strip().strip("\"'")
+    config_file = config_match.group(1).strip().strip("\"'")
+    if not acf_file or not config_file:
+        raise ValueError(
+            f"Could not parse ACF/config file names from {validate_sh_path}"
+        )
+    return os.path.basename(acf_file), os.path.basename(config_file)
+
+
+def resolve_manifold_path(
+    manifold_path: str, dest_dir: Optional[str] = None
+) -> Tuple[str, str]:
+    """Download a manifold:// dir holding validate.sh and its referenced files.
+
+    Returns the (PTXAS_OPTIONS value, tritonbench run config path) derived by
+    reading validate.sh, both pointing at the downloaded copies.
+    """
+    if not manifold_path.startswith("manifold://"):
+        raise ValueError(
+            f"manifold path must start with 'manifold://': {manifold_path}"
+        )
+    stripped = manifold_path[len("manifold://") :]
+    dest = dest_dir or tempfile.mkdtemp(prefix="ptxas_check_manifold_")
+    os.makedirs(dest, exist_ok=True)
+    subprocess.run(["manifold", "getr", stripped, dest], check=True)
+    top_level = os.path.join(dest, "validate.sh")
+    if os.path.isfile(top_level):
+        validate_sh = top_level
+    else:
+        validate_sh = None
+        for root, _, files in os.walk(dest):
+            if "validate.sh" in files:
+                validate_sh = os.path.join(root, "validate.sh")
+                break
+    if validate_sh is None:
+        raise FileNotFoundError(
+            f"validate.sh not found under {dest} downloaded from {manifold_path}"
+        )
+    acf_name, config_name = parse_validate_sh(validate_sh)
+    base_dir = os.path.dirname(validate_sh)
+    acf_path = os.path.join(base_dir, acf_name)
+    config_path = os.path.join(base_dir, config_name)
+    missing = [p for p in (acf_path, config_path) if not os.path.isfile(p)]
+    if missing:
+        raise FileNotFoundError(
+            f"Files referenced by {validate_sh} are missing: {missing}"
+        )
+    return f"--apply-controls={acf_path}", config_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="PTXAS Options Compatibility Check",
         usage="%(prog)s [options] -- <tritonbench args>",
     )
+    parser.add_argument(
+        "--manifold-path",
+        type=str,
+        default=None,
+        help="Manifold path (manifold://...) holding validate.sh with its ACF "
+        "and tritonbench config. Downloads it and validates by reading "
+        "validate.sh, overriding PTXAS_OPTIONS/TRITONBENCH_RUN_CONFIG.",
+    )
     args, extra_args = parser.parse_known_args()
 
     if "--" in extra_args:
         extra_args.remove("--")
+
+    if args.manifold_path is not None:
+        try:
+            ptxas_value, config_value = resolve_manifold_path(args.manifold_path)
+        except (
+            ValueError,
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+            OSError,
+        ) as e:
+            print(f"[ptxas-check] ERROR: {e}")
+            return 1
+        os.environ["PTXAS_OPTIONS"] = ptxas_value
+        os.environ["TRITONBENCH_RUN_CONFIG"] = config_value
 
     ptxas_options = os.environ.get("PTXAS_OPTIONS", None)
     if ptxas_options is None:
