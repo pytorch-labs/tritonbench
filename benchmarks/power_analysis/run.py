@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-from ..common import setup_tritonbench_cwd
+from ..common import setup_tritonbench_cwd, strip_torchrun_env
 
 setup_tritonbench_cwd()
 
@@ -140,7 +140,7 @@ def run_with_config(config_path, repeat):
     rewritten_config = rewrite_config_with_power_args(config_path, output_dir, repeat)
     logger.info(f"Rewritten tritonbench config: {rewritten_config}")
     cmd_env = strip_torchrun_env(os.environ.copy())
-    run_config(rewritten_config, extra_envs=cmd_env, override_envs=True)
+    run_config(rewritten_config, [], extra_envs=cmd_env, override_envs=True)
     upload_to_manifold(output_dir)
     return output_dir
 

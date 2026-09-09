@@ -49,7 +49,7 @@ class Latency:
         self.times = self._remove_outliers_iqr(times) if remove_outliers else times
 
     def __str__(self):
-        """By default, use mean"""
+        """By default, use p50"""
         return self.to_str()
 
     def _remove_outliers_iqr(self, data):
@@ -133,7 +133,7 @@ class Latency:
             other.p50 // self.p50 if isinstance(other, Latency) else other // self.p50
         )
 
-    def to_str(self, mode="mean") -> str:
+    def to_str(self, mode="p50") -> str:
         if mode == "p50":
             return str(self.p50)
         elif mode == "with_variance":
