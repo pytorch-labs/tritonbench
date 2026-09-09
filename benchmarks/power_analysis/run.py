@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import tempfile
 
 import yaml
@@ -102,6 +103,21 @@ def rewrite_config_with_power_args(config_path, output_dir, repeat):
     return rewritten_path
 
 
+def unset_nccl_envs():
+    """Remove NCCL_* variables from the environment.
+
+    Stale NCCL plugin/config vars (e.g. from the launcher environment) can
+    break the benchmark subprocesses, which inherit os.environ. Returns the
+    removed vars so the caller can restore them afterwards.
+    """
+    removed = {}
+    for key in [key for key in os.environ if key.startswith("NCCL_")]:
+        removed[key] = os.environ.pop(key)
+    if removed:
+        logger.info(f"Unset NCCL env vars: {sorted(removed)}")
+    return removed
+
+
 def upload_to_manifold(local_dir):
     """Recursively upload `local_dir` under MANIFOLD_DEST."""
     dest = f"{MANIFOLD_DEST}/{os.path.basename(local_dir)}"
@@ -123,7 +139,11 @@ def run_with_config(config_path, repeat):
     logger.info(f"Power analysis output dir: {output_dir}")
     rewritten_config = rewrite_config_with_power_args(config_path, output_dir, repeat)
     logger.info(f"Rewritten tritonbench config: {rewritten_config}")
-    run_config(rewritten_config, [])
+    removed_nccl_envs = unset_nccl_envs()
+    try:
+        run_config(rewritten_config, [])
+    finally:
+        os.environ.update(removed_nccl_envs)
     upload_to_manifold(output_dir)
     return output_dir
 
@@ -135,4 +155,4 @@ def run(argv=None):
 
 
 if __name__ == "__main__":
-    run()
+    run(sys.argv[1:])
