@@ -595,7 +595,7 @@ def tritonbench_run(args: Optional[List[str]] = None):
         assert torch.tpu.is_available(), "No TPU device available for --device tpu"
 
     if args.op:
-        ops = args.op.split(",")
+        ops = [op for op in args.op.split(",") if op]
     else:
         ops = list_operators_by_collection(args.op_collection)
 
