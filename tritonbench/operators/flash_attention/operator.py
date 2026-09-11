@@ -426,16 +426,12 @@ class Operator(BenchmarkOperator):
         if IS_HOPPER:
             if self.D_HEAD < 128:
                 raise NotImplementedError("Skip")
-            if self.causal:
-                raise NotImplementedError(
-                    "Hopper TLX FA does not support causal attention"
-                )
 
             tlx_attention = _tlx_hopper_fa
             assert tlx_attention is not None
 
             def fn(q, k, v):
-                return tlx_attention(q, k, v, self.sm_scale)
+                return tlx_attention(q, k, v, self.sm_scale, self.causal)
 
             return preproc_noop, fn
 
